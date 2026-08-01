@@ -1,0 +1,63 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // ==========================================
+    // GLOBAL COHESIVE SAFETY (Default Deny)
+    // ==========================================
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+
+    // ==========================================
+    // REUSABLE SECURITY ATTRIBUTES & ABAC RULES
+    // ==========================================
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isEmailVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    // Helper to retrieve the user's secure DB record for cross-service checks
+    function getUserData() {
+      return firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data;
+    }
+
+    // Validates that the active session matches the targeted tenant isolation folder
+    function belongsToTenant(tenantId) {
+      return isSignedIn() && getUserData().tenantId == tenantId;
+    }
+
+    // Checks if the user holds writing privileges within their isolated tenant sandbox
+    function hasWritePrivileges() {
+      return isSignedIn() && (getUserData().role in ['owner', 'admin', 'writer']);
+    }
+
+    // ==========================================
+    // PROTECTED TENANT STORAGE PATHS
+    // ==========================================
+    match /tenants/{tenantId}/{allPaths=**} {
+      
+      // Enforce strict multi-tenant context separation on read
+      allow read: if isSignedIn() && belongsToTenant(tenantId);
+      
+      // Enforce strict multi-tenant separation, RBAC validation, and file restrictions on write/upload
+      allow write: if isSignedIn() 
+        && belongsToTenant(tenantId) 
+        && hasWritePrivileges()
+        && request.resource.size < 5 * 1024 * 1024 // Strict 5MB Max File Size limit
+        && (
+          // Category A: Isolated Brand Logos
+          (request.resource.contentType.matches('image/png') || request.resource.contentType.matches('image/jpeg'))
+          ||
+          // Category B: Target Product Focus Images
+          (request.resource.contentType.matches('image/webp') || request.resource.contentType.matches('image/gif'))
+          ||
+          // Category C: Compliance Print / Campaign PDF Briefs
+          (request.resource.contentType.matches('application/pdf'))
+        );
+    }
+  }
+}

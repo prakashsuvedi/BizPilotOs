@@ -1,0 +1,490 @@
+{
+  "entities": {
+    "Tenant": {
+      "title": "Tenant",
+      "description": "Represents an enterprise customer account within the multi-tenant SaaS application.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique identifier of the tenant organization." },
+        "name": { "type": "string", "description": "The friendly display name of the tenant." },
+        "plan": { "enum": ["free", "pro", "enterprise"], "type": "string", "description": "SaaS subscription tier." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Creation timestamp." }
+      },
+      "required": ["id", "name", "plan"]
+    },
+    "User": {
+      "title": "User",
+      "description": "Represents an authenticated staff user or administrator mapped inside a secure tenant domain.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Firebase Authentication UID of the user." },
+        "email": { "type": "string", "description": "Email address of the user." },
+        "tenantId": { "type": "string", "description": "The tenant ID that isolates this user's data access." },
+        "role": { "enum": ["owner", "admin", "writer", "viewer"], "type": "string", "description": "RBAC privilege role inside the tenant sandbox." },
+        "name": { "type": "string", "description": "Display name of the user." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Creation timestamp." }
+      },
+      "required": ["uid", "email", "tenantId", "role", "name"]
+    },
+    "CampaignProfile": {
+      "title": "CampaignProfile",
+      "description": "Brand configurations and target market parameters customized for isolated campaigns.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique identifier of the brand configuration." },
+        "tenantId": { "type": "string", "description": "Isolating tenant identifier." },
+        "name": { "type": "string", "description": "Name of the target brand/business." },
+        "industry": { "type": "string", "description": "Industry domain." },
+        "category": { "type": "string", "description": "Product category." },
+        "description": { "type": "string", "description": "Raw description used for AI analysis." },
+        "targetAudience": { "type": "string", "description": "Primary purchasing audience demographics." },
+        "brandVoice": { "type": "string", "description": "Tone rules." },
+        "logoUrl": { "type": "string", "description": "Firebase Storage or web public URL of brand logo." },
+        "productImageUrl": { "type": "string", "description": "Target product focus image." },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "tenantId", "name", "industry", "category", "description", "targetAudience", "brandVoice"]
+    },
+    "Campaign": {
+      "title": "Campaign",
+      "description": "Synthesized campaign planner outputs generated for the Isolated Brand.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "profileId": { "type": "string" },
+        "campaignName": { "type": "string" },
+        "objective": { "type": "string" },
+        "durationWeeks": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "tenantId", "profileId", "campaignName", "objective", "durationWeeks"]
+    },
+    "ContentAsset": {
+      "title": "ContentAsset",
+      "description": "AI-generated marketing copy, including newsletters, social headlines, and ad briefs.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "profileId": { "type": "string" },
+        "type": { "enum": ["social", "ad", "email", "sales_pitch"], "type": "string" },
+        "title": { "type": "string" },
+        "headline": { "type": "string" },
+        "body": { "type": "string" },
+        "callToAction": { "type": "string" },
+        "channelName": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "tenantId", "profileId", "type", "title", "body", "callToAction", "channelName", "createdAt"]
+    },
+    "BrandGuideline": {
+      "title": "BrandGuideline",
+      "description": "Visual direction rules, color system, hex values, and typography pairings matching the campaign voice.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "profileId": { "type": "string" },
+        "primaryColor": { "type": "string" },
+        "secondaryColor": { "type": "string" },
+        "accentColor": { "type": "string" },
+        "typographyHeading": { "type": "string" },
+        "typographyBody": { "type": "string" },
+        "visualVibe": { "type": "string" },
+        "vibeDescription": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "tenantId", "profileId", "primaryColor", "secondaryColor", "accentColor", "typographyHeading", "typographyBody", "visualVibe", "vibeDescription", "createdAt"]
+    },
+    "AuditLog": {
+      "title": "AuditLog",
+      "description": "Inviolable system telemetry recording security-sensitive modifications for enterprise compliance.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "userId": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "action": { "type": "string" },
+        "details": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "tenantId", "userId", "userEmail", "action", "details", "timestamp"]
+    },
+    "OnboardingSession": {
+      "title": "OnboardingSession",
+      "description": "Multi-tenant onboarding session tracking state and auto-saved draft data.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "userId": { "type": "string" },
+        "currentStep": { "type": "integer" },
+        "completionPercentage": { "type": "integer" },
+        "stepsCompleted": { "type": "array", "items": { "type": "string" } },
+        "lastSaved": { "type": "string", "format": "date-time" },
+        "status": { "type": "string" },
+        "draftData": { "type": "object" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "tenantId", "userId", "currentStep", "completionPercentage", "status", "createdAt", "updatedAt"]
+    },
+    "GuideSession": {
+      "title": "GuideSession",
+      "description": "AI Coach guide state, messages history, and strategic advice recommendations.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "userId": { "type": "string" },
+        "guideState": { "type": "string" },
+        "guideResponses": { "type": "array", "items": { "type": "object" } },
+        "guideRecommendations": { "type": "array", "items": { "type": "string" } },
+        "guideProgress": { "type": "integer" },
+        "lastInteraction": { "type": "string", "format": "date-time" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "tenantId", "userId", "createdAt", "updatedAt"]
+    },
+    "OutcomeLog": {
+      "title": "OutcomeLog",
+      "description": "Recorded business results against a generated strategy or campaign.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "campaignId": { "type": "string" },
+        "goalType": { "type": "string" },
+        "logDate": { "type": "string", "format": "date-time" },
+        "periodStart": { "type": "string" },
+        "periodEnd": { "type": "string" },
+        "actualResults": { "type": "object" },
+        "notes": { "type": "string" },
+        "recordedBy": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "tenantId", "campaignId", "goalType", "logDate", "periodStart", "periodEnd", "actualResults", "recordedBy", "createdAt", "updatedAt"]
+    },
+    "DataIntegration": {
+      "title": "DataIntegration",
+      "description": "Securely configured and managed external data source credentials.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "integrationType": { "type": "string" },
+        "integrationName": { "type": "string" },
+        "status": { "type": "string" },
+        "credentials": { "type": "object" },
+        "mappingRules": { "type": "object" },
+        "linkedCampaignIds": { "type": "array", "items": { "type": "string" } },
+        "pullSchedule": { "type": "string" },
+        "lastPullDate": { "type": "string" },
+        "lastPullStatus": { "type": "string" },
+        "errorLog": { "type": "array", "items": { "type": "string" } },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "tenantId", "integrationType", "integrationName", "status", "createdAt", "updatedAt"]
+    },
+    "PlaybookPerformanceRecord": {
+      "title": "PlaybookPerformanceRecord",
+      "description": "Recalibrated performance metrics aggregated across historical marketing campaign runs.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "playbookType": { "type": "string" },
+        "vertical": { "type": "string" },
+        "campaignId": { "type": "string" },
+        "accuracyScore": { "type": "number" },
+        "variance": { "type": "object" },
+        "refinements": { "type": "array", "items": { "type": "string" } },
+        "runDate": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "tenantId", "playbookType", "vertical", "campaignId", "accuracyScore", "variance", "refinements", "runDate", "createdAt"]
+    },
+    "AdAccount": {
+      "title": "AdAccount",
+      "description": "Represents a connected ad account from Meta or Google platforms.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "adPlatform": { "enum": ["META", "GOOGLE"], "type": "string" },
+        "accountName": { "type": "string" },
+        "accountId": { "type": "string" },
+        "accountCurrency": { "type": "string" },
+        "accountSpend": { "type": "number" },
+        "accountBudgetLimit": { "type": "number" },
+        "connectedAt": { "type": "string" },
+        "isActive": { "type": "boolean" },
+        "lastSyncedAt": { "type": "string" },
+        "syncStatus": { "type": "string" }
+      },
+      "required": ["id", "tenantId", "adPlatform", "accountName", "accountId", "accountCurrency", "accountBudgetLimit", "connectedAt", "isActive"]
+    },
+    "AdProperty": {
+      "title": "AdProperty",
+      "description": "Associated properties like Facebook Pages, IG accounts, or Search modules within connected configurations.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "adAccountId": { "type": "string" },
+        "propertyType": { "type": "string" },
+        "propertyId": { "type": "string" },
+        "propertyName": { "type": "string" },
+        "propertyImage": { "type": "string" }
+      },
+      "required": ["id", "tenantId", "adAccountId", "propertyType", "propertyId", "propertyName"]
+    },
+    "AdCampaign": {
+      "title": "AdCampaign",
+      "description": "Directly represents an active ad campaign with targeting creatives and metrics.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "marketForgeCampaignId": { "type": "string" },
+        "adPlatform": { "type": "string" },
+        "campaignName": { "type": "string" },
+        "campaignObjective": { "type": "string" },
+        "campaignBudget": { "type": "number" },
+        "dailyBudget": { "type": "number" },
+        "startDate": { "type": "string" },
+        "endDate": { "type": "string" },
+        "status": { "type": "string" },
+        "targetingSettings": { "type": "object" },
+        "adCreatives": { "type": "array" },
+        "biddingStrategy": { "type": "object" },
+        "conversionTracking": { "type": "object" },
+        "performance": { "type": "object" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "tenantId", "campaignName", "adPlatform", "campaignObjective", "campaignBudget", "status", "createdAt", "updatedAt"]
+    },
+    "ConversionPixel": {
+      "title": "ConversionPixel",
+      "description": "Tracking pixels for META and GOOGLE tag managers.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "platform": { "type": "string" },
+        "pixelId": { "type": "string" },
+        "pixelName": { "type": "string" },
+        "pixelCode": { "type": "string" },
+        "installationStatus": { "type": "string" },
+        "installationDate": { "type": "string" },
+        "verifiedDate": { "type": "string" },
+        "trackedEvents": { "type": "array" },
+        "eventCount": { "type": "integer" }
+      },
+      "required": ["id", "tenantId", "platform", "pixelId", "pixelName", "installationStatus"]
+    },
+    "ABTest": {
+      "title": "ABTest",
+      "description": "Campaign creative performance A/B trials.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "campaignId": { "type": "string" },
+        "controlCreativeId": { "type": "string" },
+        "testCreativeIds": { "type": "array" },
+        "testDuration": { "type": "integer" },
+        "status": { "type": "string" },
+        "startedAt": { "type": "string" },
+        "winner": { "type": "string" },
+        "insights": { "type": "array" }
+      },
+      "required": ["id", "tenantId", "campaignId", "controlCreativeId", "testCreativeIds", "status", "startedAt"]
+    },
+    "NegativeKeyword": {
+      "title": "NegativeKeyword",
+      "description": "Keywords filtered out of target search campaigns to avoid wasteful expenditures.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "adCampaignId": { "type": "string" },
+        "keyword": { "type": "string" },
+        "matchType": { "type": "string" },
+        "addedDate": { "type": "string" },
+        "reasoning": { "type": "string" }
+      },
+      "required": ["id", "tenantId", "adCampaignId", "keyword", "matchType", "addedDate"]
+    },
+    "SocialAccount": {
+      "title": "SocialAccount",
+      "description": "Represents connected corporate Facebook Page or Instagram Business Profile credentials and tracking metrics.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "platform": { "enum": ["FACEBOOK", "INSTAGRAM"], "type": "string" },
+        "accountName": { "type": "string" },
+        "accountHandle": { "type": "string" },
+        "accountId": { "type": "string" },
+        "profileImage": { "type": "string" },
+        "followerCount": { "type": "integer" },
+        "credentials": {
+          "type": "object",
+          "properties": {
+            "accessToken": { "type": "string" },
+            "refreshToken": { "type": "string" },
+            "expiresAt": { "type": "string" }
+          }
+        },
+        "connectedAt": { "type": "string" },
+        "isActive": { "type": "boolean" },
+        "lastPostedAt": { "type": "string" },
+        "postCountThisMonth": { "type": "integer" }
+      },
+      "required": ["id", "tenantId", "platform", "accountName", "accountHandle"]
+    },
+    "SocialPost": {
+      "title": "SocialPost",
+      "description": "Master post structure representing text, caption variants, media inclusions, scheduling timelines, and audience metrics.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "campaignId": { "type": "string" },
+        "platforms": { "type": "array", "items": { "type": "string" } },
+        "postType": { "enum": ["TEXT", "IMAGE", "VIDEO"], "type": "string" },
+        "content": {
+          "type": "object",
+          "properties": {
+            "text": { "type": "string" },
+            "media": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "type": { "type": "string" },
+                  "url": { "type": "string" },
+                  "altText": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "caption": { "type": "string" },
+        "hashtags": { "type": "array", "items": { "type": "string" } },
+        "cta": {
+          "type": "object",
+          "properties": {
+            "text": { "type": "string" },
+            "url": { "type": "string" }
+          }
+        },
+        "scheduledFor": { "type": "string" },
+        "status": { "enum": ["DRAFT", "SCHEDULED", "PUBLISHED", "FAILED"], "type": "string" },
+        "publishedAt": { "type": "string" },
+        "metrics": {
+          "type": "object",
+          "properties": {
+            "likes": { "type": "integer" },
+            "comments": { "type": "integer" },
+            "shares": { "type": "integer" },
+            "saves": { "type": "integer" },
+            "impressions": { "type": "integer" },
+            "engagementRate": { "type": "number" }
+          }
+        },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "tenantId", "platforms", "postType", "caption"]
+    }
+  },
+  "firestore": {
+    "/tenants/{tenantId}": {
+      "schema": "Tenant",
+      "description": "Organizational container for multi-tenant subscription accounts."
+    },
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Secure staff logins with localized organizational pointers."
+    },
+    "/campaign_profiles/{profileId}": {
+      "schema": "CampaignProfile",
+      "description": "Isolating business data blueprints for specific brand configurations."
+    },
+    "/campaigns/{campaignId}": {
+      "schema": "Campaign",
+      "description": "Weeks launch schedules and strategic goal tracking records."
+    },
+    "/content_assets/{assetId}": {
+      "schema": "ContentAsset",
+      "description": "Persisted AI-scripted ad copies, posts, or sales pitches."
+    },
+    "/brand_guidelines/{guidelineId}": {
+      "schema": "BrandGuideline",
+      "description": "Coordinated visual codes, moodboards, and placement rules."
+    },
+    "/audit_logs/{logId}": {
+      "schema": "AuditLog",
+      "description": "Strict compliance ledger tracking tenant actions."
+    },
+    "/onboarding_sessions/{sessionId}": {
+      "schema": "OnboardingSession",
+      "description": "State machine workflow record tracking user progression."
+    },
+    "/guide_sessions/{guideSessionId}": {
+      "schema": "GuideSession",
+      "description": "Persistent AI Coaching consult conversation tracking."
+    },
+    "/outcome_logs/{logId}": {
+      "schema": "OutcomeLog",
+      "description": "Recorded real business outcome measures tied to marketing playbook targets."
+    },
+    "/data_integrations/{integrationId}": {
+      "schema": "DataIntegration",
+      "description": "Securely configured user-connected data source integration specifications."
+    },
+    "/playbook_performance_records/{recordId}": {
+      "schema": "PlaybookPerformanceRecord",
+      "description": "Analytical model feedback loop logs tracking strategy template calibration inputs."
+    },
+    "/ad_accounts/{accountId}": {
+      "schema": "AdAccount",
+      "description": "Connected performance channels scoped within tenant sandboxes."
+    },
+    "/ad_properties/{propertyId}": {
+      "schema": "AdProperty",
+      "description": "Linked social properties, pages and landing pixels for active targets."
+    },
+    "/ad_campaigns/{campaignId}": {
+      "schema": "AdCampaign",
+      "description": "SaaS managed ad campaigns mapped directly into Meta and Google networks."
+    },
+    "/conversion_pixels/{pixelId}": {
+      "schema": "ConversionPixel",
+      "description": "Analytical conversion and retention measurement scripts."
+    },
+    "/ab_tests/{testId}": {
+      "schema": "ABTest",
+      "description": "Split testing records tracking audience and copy optimization trials."
+    },
+    "/negative_keywords/{keywordId}": {
+      "schema": "NegativeKeyword",
+      "description": "B2B search match negative phrases to control ad burn rates."
+    },
+    "/social_accounts/{accountId}": {
+      "schema": "SocialAccount",
+      "description": "Connected Facebook or Instagram channels for publishing and tracking performance."
+    },
+    "/social_posts/{postId}": {
+      "schema": "SocialPost",
+      "description": "Scheduled and published social posts across platforms."
+    }
+  }
+}

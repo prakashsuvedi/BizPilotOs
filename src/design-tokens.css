@@ -1,0 +1,323 @@
+/* ==========================================================================
+   MARKETFORGE AI - GLOBAL TYPOGRAPHY DESIGN TOKENS
+   Standardized corporate design hierarchy (Notion, ChatGPT, Stripe, Linear grade)
+   ========================================================================== */
+
+:root {
+  /* 1. Font Family Tokens */
+  --font-family-primary: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-family-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  /* 2. Color Tokens (Kept clean & consistent) */
+  --color-text-primary: #0f172a;   /* Slate 900 */
+  --color-text-secondary: #475569; /* Slate 600 */
+  --color-text-muted: #64748b;     /* Slate 500 */
+
+  /* 3. Font Size Tokens */
+  --text-display-lg: 48px;
+  --text-display-md: 40px;
+  --text-page-title: 32px;
+  --text-section-title: 24px;
+  --text-card-title: 18px;
+  --text-body-lg: 16px;
+  --text-body: 14px;
+  --text-form-label: 13px;
+  --text-caption: 12px;
+  --text-button: 14px;
+
+  /* 4. Font Weight Tokens */
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  /* 5. Line Height Tokens */
+  --line-height-display: 1.15;
+  --line-height-heading: 1.25;
+  --line-height-body-lg: 1.6;
+  --line-height-body: 1.5;
+  --line-height-utility: 1.4;
+
+  /* 6. Letter Spacing Tokens */
+  --letter-spacing-tightest: -0.025em;
+  --letter-spacing-tight: -0.015em;
+  --letter-spacing-normal: 0em;
+  --letter-spacing-tracking: 0.05em;
+}
+
+/* ==========================================================================
+   STANDARD BASE & UTILITY CLASSES
+   ========================================================================== */
+
+/* Universal Apply to Body & UI context classes */
+.font-sans, body {
+  font-family: var(--font-family-primary) !important;
+  font-size: var(--text-body);
+  font-weight: var(--font-weight-normal);
+  line-height: var(--line-height-body);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.font-mono {
+  font-family: var(--font-family-mono) !important;
+}
+
+/* Centralized Typography Scale Styles */
+.text-display-lg {
+  font-size: var(--text-display-lg) !important;
+  font-weight: var(--font-weight-bold) !important;
+  line-height: var(--line-height-display) !important;
+  letter-spacing: var(--letter-spacing-tightest) !important;
+}
+
+.text-display-md {
+  font-size: var(--text-display-md) !important;
+  font-weight: var(--font-weight-bold) !important;
+  line-height: var(--line-height-display) !important;
+  letter-spacing: var(--letter-spacing-tightest) !important;
+}
+
+.text-page-title {
+  font-size: var(--text-page-title) !important;
+  font-weight: var(--font-weight-semibold) !important;
+  line-height: var(--line-height-heading) !important;
+  letter-spacing: var(--letter-spacing-tight) !important;
+}
+
+.text-section-title {
+  font-size: var(--text-section-title) !important;
+  font-weight: var(--font-weight-semibold) !important;
+  line-height: var(--line-height-heading) !important;
+  letter-spacing: var(--letter-spacing-tight) !important;
+}
+
+.text-card-title {
+  font-size: var(--text-card-title) !important;
+  font-weight: var(--font-weight-semibold) !important;
+  line-height: var(--line-height-heading) !important;
+}
+
+.text-body-lg {
+  font-size: var(--text-body-lg) !important;
+  font-weight: var(--font-weight-normal) !important;
+  line-height: var(--line-height-body-lg) !important;
+}
+
+.text-body {
+  font-size: var(--text-body) !important;
+  font-weight: var(--font-weight-normal) !important;
+  line-height: var(--line-height-body) !important;
+}
+
+.text-caption {
+  font-size: var(--text-caption) !important;
+  font-weight: var(--font-weight-normal) !important;
+  line-height: var(--line-height-utility) !important;
+}
+
+.text-button {
+  font-size: var(--text-button) !important;
+  font-weight: var(--font-weight-medium) !important;
+  line-height: var(--line-height-utility) !important;
+}
+
+/* Sidebar labels */
+.sidebar-label {
+  font-size: var(--text-body) !important; /* 14px */
+  font-weight: var(--font-weight-medium) !important; /* w-500 */
+}
+
+/* Dashboard Cards Standards */
+.dashboard-card-title,
+.dashboard-card h3,
+.dashboard-card h4 {
+  font-size: var(--text-card-title) !important; /* 18px */
+  font-weight: var(--font-weight-semibold) !important;
+  font-family: var(--font-family-primary) !important;
+}
+
+.dashboard-card-desc,
+.dashboard-card p {
+  font-size: var(--text-body) !important; /* 14px */
+  font-weight: var(--font-weight-normal) !important;
+  line-height: var(--line-height-body) !important;
+  font-family: var(--font-family-primary) !important;
+}
+
+.dashboard-card-metric,
+.text-2xl.font-black,
+.text-3xl.font-black,
+.text-2xl.font-extrabold {
+  font-size: var(--text-page-title) !important; /* 32px */
+  font-weight: var(--font-weight-bold) !important;
+  letter-spacing: var(--letter-spacing-tight) !important;
+}
+
+/* Forms Elements styling */
+label,
+.form-label,
+.text-\[10px\].font-bold.font-mono.text-slate-400 {
+  font-size: var(--text-form-label) !important; /* 13px */
+  font-weight: var(--font-weight-medium) !important; /* 500 */
+  font-family: var(--font-family-primary) !important;
+  text-transform: none !important;
+  letter-spacing: var(--letter-spacing-normal) !important;
+}
+
+input,
+textarea,
+select,
+.form-input {
+  font-size: var(--text-body) !important; /* 14px */
+  font-weight: var(--font-weight-normal) !important; /* 400 */
+  font-family: var(--font-family-primary) !important;
+}
+
+/* Button override utilities */
+.btn-primary, .btn-secondary {
+  font-size: var(--text-button) !important; /* 14px */
+  font-weight: var(--font-weight-medium) !important; /* 500 */
+}
+
+/* Table overrides standard classes */
+.table-header {
+  font-size: var(--text-form-label) !important; /* 13px */
+  font-weight: var(--font-weight-semibold) !important; /* 600 */
+}
+
+.table-row-text {
+  font-size: var(--text-body) !important; /* 14px */
+  font-weight: var(--font-weight-normal) !important; /* 400 */
+}
+
+/* Professional AI-generated Content panels typography overrides */
+.ai-generated-panel,
+p.whitespace-pre-line,
+span.whitespace-pre-line,
+p.whitespace-pre-wrap {
+  font-size: var(--text-body-lg) !important; /* 16px */
+  line-height: var(--line-height-body-lg) !important; /* 1.6 */
+  font-weight: var(--font-weight-normal) !important;
+  font-family: var(--font-family-primary) !important;
+  letter-spacing: var(--letter-spacing-normal) !important;
+}
+.ai-generated-panel p,
+p.whitespace-pre-line {
+  margin-bottom: 1.25rem !important; /* Perfect paragraph spacing */
+}
+.ai-generated-panel h1,
+.ai-generated-panel h2,
+.ai-generated-panel h3 {
+  font-weight: var(--font-weight-semibold) !important;
+  margin-top: 1.5rem !important;
+  margin-bottom: 0.75rem !important;
+  color: #0f172a !important;
+}
+.ai-generated-panel h1 {
+  font-size: var(--text-section-title) !important; /* 24px */
+}
+.ai-generated-panel h2 {
+  font-size: var(--text-card-title) !important; /* 18px */
+}
+.ai-generated-panel h3 {
+  font-size: var(--text-body-lg) !important; /* 16px */
+}
+.ai-generated-panel ul, 
+.ai-generated-panel ol {
+  margin-bottom: 1.25rem !important;
+  padding-left: 1.5rem !important;
+}
+.ai-generated-panel li {
+  margin-bottom: 0.5rem !important;
+  line-height: var(--line-height-body-lg) !important;
+}
+
+/* ==========================================================================
+   EXECUTIVE GRADE PREMIUM LOOK AND FEEL OVERRIDES
+   ========================================================================== */
+
+/* Eradicate aggressive monospace unless specifically whitelisted */
+.font-mono,
+[class*="font-mono"] {
+  font-family: var(--font-family-primary) !important;
+  letter-spacing: var(--letter-spacing-normal) !important;
+  text-transform: none !important;
+}
+
+/* Whitelist strictly for API Keys, Log IDs, code snippets, etc. */
+code,
+pre,
+.font-mono-tech,
+.log-id,
+.api-key,
+.font-mono-tech *,
+.log-id *,
+.api-key * {
+  font-family: var(--font-family-mono) !important;
+}
+
+/* Eliminate hacker styles, neon borders, and glowing effects */
+[class*="shadow-neon"],
+[class*="border-neon"],
+.border-indigo-500\/50,
+.shadow-indigo-500\/50 {
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05) !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* Force Sentence Case for aggressive UPPERCASE labels */
+.uppercase,
+[class*="uppercase"] {
+  text-transform: none !important;
+  letter-spacing: var(--letter-spacing-normal) !important;
+}
+
+/* Capitalize the first letter if requested */
+.uppercase::first-letter,
+[class*="uppercase"]::first-letter {
+  text-transform: uppercase;
+}
+
+/* Table styling overrides to guarantee premium executive feel */
+table thead th,
+.table-header {
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  padding: 1rem 1.25rem !important;
+  color: #475569 !important;
+  background-color: #f8fafc !important;
+  text-transform: none !important;
+  letter-spacing: normal !important;
+}
+
+table tbody td {
+  font-size: 14px !important;
+  font-weight: 400 !important;
+  padding: 1rem 1.25rem !important;
+  line-height: var(--line-height-body) !important;
+}
+
+/* Card refinements (ChatGPT, Linear & Stripe standard) */
+.dashboard-card {
+  border-radius: 12px !important;
+  border: 1px solid rgba(0, 0, 0, 0.06) !important;
+}
+
+/* Soft dark themes cards */
+.bg-slate-900,
+.bg-slate-950,
+.bg-slate-850 {
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+/* Button overrides */
+button,
+.btn-primary,
+.btn-secondary {
+  border-radius: 8px !important;
+  font-weight: 500 !important;
+  letter-spacing: var(--letter-spacing-normal) !important;
+  text-transform: none !important;
+}
+

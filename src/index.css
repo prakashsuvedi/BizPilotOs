@@ -1,0 +1,112 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Plus Jakarta Sans", "Outfit", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  --font-display: "Outfit", "Space Grotesk", sans-serif;
+}
+
+:root {
+  --base-font-size: 16px;
+  --bg-color: #07080E;
+  --text-color: #F1F5F9;
+}
+
+body {
+  font-family: var(--font-sans);
+  font-size: var(--base-font-size);
+  background-color: var(--bg-color);
+  color: var(--text-color);
+}
+
+/* High Contrast Mode Overrides */
+body.high-contrast {
+  --bg-color: #000000;
+  --text-color: #FFFFFF;
+}
+
+body.high-contrast * {
+  /* Only apply to classes that need high contrast forced */
+}
+
+body.high-contrast .bg-\[\#0C0D14\],
+body.high-contrast .bg-\[\#0e101a\],
+body.high-contrast .bg-\[\#090a10\],
+body.high-contrast .bg-white,
+body.high-contrast .bg-slate-50,
+body.high-contrast .bg-slate-100,
+body.high-contrast .bg-slate-800,
+body.high-contrast .bg-slate-900,
+body.high-contrast .bg-slate-950 {
+  background-color: #000000 !important;
+  border-color: #FFFFFF !important;
+}
+
+body.high-contrast .text-slate-200,
+body.high-contrast .text-slate-300,
+body.high-contrast .text-slate-400,
+body.high-contrast .text-slate-500,
+body.high-contrast .text-slate-600,
+body.high-contrast .text-slate-700,
+body.high-contrast .text-slate-800,
+body.high-contrast .text-slate-900,
+body.high-contrast .text-white,
+body.high-contrast .text-slate-100 {
+  color: #FFFFFF !important;
+}
+
+body.high-contrast .border-slate-100,
+body.high-contrast .border-slate-200,
+body.high-contrast .border-slate-300,
+body.high-contrast .border-slate-400,
+body.high-contrast .border-slate-500,
+body.high-contrast .border-slate-700,
+body.high-contrast .border-slate-800,
+body.high-contrast .border-white\/5,
+body.high-contrast .border-white\/10 {
+  border-color: #FFFFFF !important;
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.02);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* Print Styles for Receipts and Invoices */
+@media print {
+  body * {
+    visibility: hidden !important;
+  }
+  .printable-receipt, .printable-receipt * {
+    visibility: visible !important;
+  }
+  .printable-receipt {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 16px !important;
+    background: white !important;
+    color: black !important;
+    box-shadow: none !important;
+    border: none !important;
+    z-index: 999999 !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+}

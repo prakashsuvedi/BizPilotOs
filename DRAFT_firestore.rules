@@ -1,0 +1,282 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ==========================================
+    // 1. GLOBAL SAFETY NET (Default Deny)
+    // ==========================================
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // ==========================================
+    // 2. HELPER PRIMITIVES (ABAC Logic)
+    // ==========================================
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isEmailVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // Retrieves safe metadata of the active staff session
+    function getUserDocument() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isTenantMember(tenantId) {
+      return isSignedIn() && getUserDocument().tenantId == tenantId;
+    }
+
+    function hasRole(allowedRoles) {
+      return isSignedIn() && getUserDocument().role in allowedRoles;
+    }
+
+    // ==========================================
+    // 3. COLLECTIONS RULES & ISOLATION
+    // ==========================================
+
+    // TENANTS COLLECTION
+    match /tenants/{tenantId} {
+      allow get: if isSignedIn() && isTenantMember(tenantId);
+      allow create: if isSignedIn() && isValidId(tenantId) &&
+        incoming().keys().hasAll(['id', 'name', 'plan']) &&
+        incoming().keys().size() == 4; // Including potential system stamps
+      allow update: if isSignedIn() && isTenantMember(tenantId) &&
+        hasRole(['owner', 'admin']) &&
+        incoming().plan == existing().plan; // Immutable fields protection
+    }
+
+    // USERS COLLECTION
+    match /users/{userId} {
+      allow get: if isSignedIn() && (request.auth.uid == userId || getUserDocument().tenantId == existing().tenantId);
+      allow list: if isSignedIn() && getUserDocument().tenantId == resource.data.tenantId;
+      
+      allow create: if isSignedIn() && request.auth.uid == userId &&
+        incoming().keys().hasAll(['uid', 'email', 'tenantId', 'role', 'name']) &&
+        incoming().uid == request.auth.uid &&
+        incoming().role in ['owner', 'admin', 'writer', 'viewer'];
+        
+      allow update: if isSignedIn() && (request.auth.uid == userId || hasRole(['owner', 'admin'])) &&
+        incoming().uid == existing().uid &&
+        // Block standard users from escalating their own privileges
+        (request.auth.uid == userId ? (incoming().role == existing().role && incoming().tenantId == existing().tenantId) : true);
+    }
+
+    // CAMPAIGN PROFILES
+    match /campaign_profiles/{profileId} {
+      allow get: if isSignedIn() && isTenantMember(existing().tenantId);
+      allow list: if isSignedIn() && isTenantMember(resource.data.tenantId);
+      
+      allow create: if isSignedIn() && isValidId(profileId) &&
+        isTenantMember(incoming().tenantId) &&
+        hasRole(['owner', 'admin', 'writer']) &&
+        incoming().name is string && incoming().name.size() <= 200;
+        
+      allow update: if isSignedIn() && isTenantMember(existing().tenantId) &&
+        isTenantMember(incoming().tenantId) &&
+        hasRole(['owner', 'admin', 'writer']) &&
+        incoming().tenantId == existing().tenantId; // Immutable tenant separation
+        
+      allow delete: if isSignedIn() && isTenantMember(existing().tenantId) &&
+        hasRole(['owner', 'admin']);
+    }
+
+    // CAMPAIGNS
+    match /campaigns/{campaignId} {
+      allow get: if isSignedIn() && isTenantMember(existing().tenantId);
+      allow list: if isSignedIn() && isTenantMember(resource.data.tenantId);
+      
+      allow create: if isSignedIn() && isValidId(campaignId) &&
+        isTenantMember(incoming().tenantId) &&
+        hasRole(['owner', 'admin', 'writer']) &&
+        incoming().campaignName is string && incoming().campaignName.size() <= 200;
+        
+      allow update: if isSignedIn() && isTenantMember(existing().tenantId) &&
+        isTenantMember(incoming().tenantId) &&
+        hasRole(['owner', 'admin', 'writer']) &&
+        incoming().tenantId == existing().tenantId;
+        
+      allow delete: if isSignedIn() && isTenantMember(existing().tenantId) &&
+        hasRole(['owner', 'admin']);
+    }
+
+    // CONTENT ASSETS
+    match /content_assets/{assetId} {
+      allow get: if isSignedIn() && isTenantMember(existing().tenantId);
+      allow list: if isSignedIn() && isTenantMember(resource.data.tenantId);
+      
+      allow create: if isSignedIn() && isValidId(assetId) &&
+        isTenantMember(incoming().tenantId) &&
+        hasRole(['owner', 'admin', 'writer']);
+        
+      allow update: if isSignedIn() && isTenantMember(existing().tenantId) &&
+        isTenantMember(incoming().tenantId) &&
+        hasRole(['owner', 'admin', 'writer']) &&
+        incoming().tenantId == existing().tenantId;
+        
+      allow delete: if isSignedIn() && isTenantMember(existing().tenantId) &&
+        hasRole(['owner', 'admin']);
+    }
+
+    // BRAND GUIDELINES
+    match /brand_guidelines/{guidelineId} {
+      allow get: if isSignedIn() && isTenantMember(existing().tenantId);
+      allow list: if isSignedIn() && isTenantMember(resource.data.tenantId);
+      
+      allow create: if isSignedIn() && isValidId(guidelineId) &&
+        isTenantMember(incoming().tenantId) &&
+        hasRole(['owner', 'admin', 'writer']);
+        
+      allow update: if isSignedIn() && isTenantMember(existing().tenantId) &&
+        isTenantMember(incoming().tenantId) &&
+        hasRole(['owner', 'admin', 'writer']) &&
+        incoming().tenantId == existing().tenantId;
+        
+      allow delete: if isSignedIn() && isTenantMember(existing().tenantId) &&
+        hasRole(['owner', 'admin']);
+    }
+
+    // AUDIT LOGS (Inviolable compliance ledger)
+    match /audit_logs/{logId} {
+      allow get: if isSignedIn() && isTenantMember(existing().tenantId) && hasRole(['owner', 'admin']);
+      allow list: if isSignedIn() && isTenantMember(resource.data.tenantId) && getUserDocument().role in ['owner', 'admin'];
+      
+      // Client apps are absolutely FORBIDDEN from creating or modifying logs directly.
+      // All logging must happen on the secure Node backend where admin privileges apply.
+      allow write: if false;
+    }
+
+    // ONBOARDING SESSIONS
+    match /onboarding_sessions/{sessionId} {
+      allow get: if isSignedIn() && isTenantMember(existing().tenantId);
+      allow list: if isSignedIn() && isTenantMember(resource.data.tenantId);
+      allow create: if isSignedIn() && isTenantMember(incoming().tenantId) && incoming().userId == request.auth.uid;
+      allow update: if isSignedIn() && isTenantMember(existing().tenantId) && isTenantMember(incoming().tenantId) && existing().userId == request.auth.uid;
+      allow delete: if isSignedIn() && isTenantMember(existing().tenantId) && existing().userId == request.auth.uid;
+    }
+
+    // GUIDE SESSIONS
+    match /guide_sessions/{guideSessionId} {
+      allow get: if isSignedIn() && isTenantMember(existing().tenantId);
+      allow list: if isSignedIn() && isTenantMember(resource.data.tenantId);
+      allow create: if isSignedIn() && isTenantMember(incoming().tenantId) && incoming().userId == request.auth.uid;
+      allow update: if isSignedIn() && isTenantMember(existing().tenantId) && isTenantMember(incoming().tenantId) && existing().userId == request.auth.uid;
+      allow delete: if isSignedIn() && isTenantMember(existing().tenantId) && existing().userId == request.auth.uid;
+    }
+
+    // AI DECISION RECORDS
+    match /ai_decision_records/{recordId} {
+      allow read, write: if isSignedIn();
+    }
+
+    // OUTCOME LOGS
+    match /outcome_logs/{logId} {
+      allow get: if isSignedIn() && isTenantMember(existing().tenantId);
+      allow list: if isSignedIn() && isTenantMember(resource.data.tenantId);
+      allow create, update: if isSignedIn() && isTenantMember(incoming().tenantId) && hasRole(['owner', 'admin', 'writer']);
+      allow delete: if isSignedIn() && isTenantMember(existing().tenantId) && hasRole(['owner', 'admin']);
+    }
+
+    // DATA INTEGRATIONS
+    match /data_integrations/{integrationId} {
+      allow get: if isSignedIn() && isTenantMember(existing().tenantId);
+      allow list: if isSignedIn() && isTenantMember(resource.data.tenantId);
+      allow create, update: if isSignedIn() && isTenantMember(incoming().tenantId) && hasRole(['owner', 'admin', 'writer']);
+      allow delete: if isSignedIn() && isTenantMember(existing().tenantId) && hasRole(['owner', 'admin']);
+    }
+
+    // PLAYBOOK PERFORMANCE RECORDS
+    match /playbook_performance_records/{recordId} {
+      allow get: if isSignedIn() && isTenantMember(existing().tenantId);
+      allow list: if isSignedIn() && isTenantMember(resource.data.tenantId);
+      allow create, update: if isSignedIn() && isTenantMember(incoming().tenantId) && hasRole(['owner', 'admin', 'writer']);
+      allow delete: if isSignedIn() && isTenantMember(existing().tenantId) && hasRole(['owner', 'admin']);
+    }
+
+    // SOCIAL ACCOUNTS
+    match /social_accounts/{accountId} {
+      allow get: if isSignedIn() && isTenantMember(existing().tenantId);
+      allow list: if isSignedIn() && isTenantMember(resource.data.tenantId);
+      allow create, update: if isSignedIn() && isTenantMember(incoming().tenantId) && hasRole(['owner', 'admin', 'writer']);
+      allow delete: if isSignedIn() && isTenantMember(existing().tenantId) && hasRole(['owner', 'admin']);
+    }
+
+    // SOCIAL POSTS
+    match /social_posts/{postId} {
+      allow get: if isSignedIn() && isTenantMember(existing().tenantId);
+      allow list: if isSignedIn() && isTenantMember(resource.data.tenantId);
+      allow create, update: if isSignedIn() && isTenantMember(incoming().tenantId) && hasRole(['owner', 'admin', 'writer']);
+      allow delete: if isSignedIn() && isTenantMember(existing().tenantId) && hasRole(['owner', 'admin']);
+    }
+
+    // SOCIAL APPROVALS
+    match /social_approvals/{approvalId} {
+      allow get: if isSignedIn() && isTenantMember(existing().tenantId);
+      allow list: if isSignedIn() && isTenantMember(resource.data.tenantId);
+      allow create, update: if isSignedIn() && isTenantMember(incoming().tenantId) && hasRole(['owner', 'admin', 'writer']);
+      allow delete: if isSignedIn() && isTenantMember(existing().tenantId) && hasRole(['owner', 'admin']);
+    }
+
+    // AD ACCOUNTS
+    match /ad_accounts/{accountId} {
+      allow get: if isSignedIn() && isTenantMember(existing().tenantId);
+      allow list: if isSignedIn() && isTenantMember(resource.data.tenantId);
+      allow create, update: if isSignedIn() && isTenantMember(incoming().tenantId) && hasRole(['owner', 'admin', 'writer']);
+      allow delete: if isSignedIn() && isTenantMember(existing().tenantId) && hasRole(['owner', 'admin']);
+    }
+
+    // AD PROPERTIES
+    match /ad_properties/{propertyId} {
+      allow get: if isSignedIn() && isTenantMember(existing().tenantId);
+      allow list: if isSignedIn() && isTenantMember(resource.data.tenantId);
+      allow create, update: if isSignedIn() && isTenantMember(incoming().tenantId) && hasRole(['owner', 'admin', 'writer']);
+      allow delete: if isSignedIn() && isTenantMember(existing().tenantId) && hasRole(['owner', 'admin']);
+    }
+
+    // AD CAMPAIGNS
+    match /ad_campaigns/{campaignId} {
+      allow get: if isSignedIn() && isTenantMember(existing().tenantId);
+      allow list: if isSignedIn() && isTenantMember(resource.data.tenantId);
+      allow create, update: if isSignedIn() && isTenantMember(incoming().tenantId) && hasRole(['owner', 'admin', 'writer']);
+      allow delete: if isSignedIn() && isTenantMember(existing().tenantId) && hasRole(['owner', 'admin']);
+    }
+
+    // CONVERSION PIXELS
+    match /conversion_pixels/{pixelId} {
+      allow get: if isSignedIn() && isTenantMember(existing().tenantId);
+      allow list: if isSignedIn() && isTenantMember(resource.data.tenantId);
+      allow create, update: if isSignedIn() && isTenantMember(incoming().tenantId) && hasRole(['owner', 'admin', 'writer']);
+      allow delete: if isSignedIn() && isTenantMember(existing().tenantId) && hasRole(['owner', 'admin']);
+    }
+
+    // AB TESTS
+    match /ab_tests/{testId} {
+      allow get: if isSignedIn() && isTenantMember(existing().tenantId);
+      allow list: if isSignedIn() && isTenantMember(resource.data.tenantId);
+      allow create, update: if isSignedIn() && isTenantMember(incoming().tenantId) && hasRole(['owner', 'admin', 'writer']);
+      allow delete: if isSignedIn() && isTenantMember(existing().tenantId) && hasRole(['owner', 'admin']);
+    }
+
+    // NEGATIVE KEYWORDS
+    match /negative_keywords/{keywordId} {
+      allow get: if isSignedIn() && isTenantMember(existing().tenantId);
+      allow list: if isSignedIn() && isTenantMember(resource.data.tenantId);
+      allow create, update: if isSignedIn() && isTenantMember(incoming().tenantId) && hasRole(['owner', 'admin', 'writer']);
+      allow delete: if isSignedIn() && isTenantMember(existing().tenantId) && hasRole(['owner', 'admin']);
+    }
+  }
+}

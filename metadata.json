@@ -1,0 +1,10 @@
+{
+  "name": "BizPilot OS",
+  "description": "An Enterprise AI Business Operating System unifying CRM, ERP, Finance, HR, POS, Marketing, Inventory, and Multi-Branch Management into one platform.",
+  "requestFramePermissions": [
+    "geolocation"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
