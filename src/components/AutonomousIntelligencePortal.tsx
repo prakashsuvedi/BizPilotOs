@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import PlatformTesterOS from './PlatformTesterOS';
 import { 
   AutonomousIntelligenceEngine, 
   DependencyNode, 
@@ -49,7 +50,7 @@ import {
 
 export default function AutonomousIntelligencePortal() {
   // Navigation Tabs for different views
-  const [activePortalTab, setActivePortalTab] = useState<'cockpit' | 'roles' | 'dependencies' | 'code_intel' | 'drift' | 'vitals' | 'ai_audit' | 'db_intel' | 'security' | 'deploy' | 'healing' | 'automation' | 'docs'>('cockpit');
+  const [activePortalTab, setActivePortalTab] = useState<'cockpit' | 'platform_tester' | 'roles' | 'dependencies' | 'code_intel' | 'drift' | 'vitals' | 'ai_audit' | 'db_intel' | 'security' | 'deploy' | 'healing' | 'automation' | 'docs'>('cockpit');
   
   // Executive/Staff Roles
   const [activeRole, setActiveRole] = useState<'CEO' | 'CTO' | 'Developer' | 'DevOps' | 'Security' | 'Finance' | 'Operations' | 'AI_Usage' | 'Customer_Success'>('CTO');
@@ -231,6 +232,7 @@ export default function AutonomousIntelligencePortal() {
       <div className="flex gap-1 overflow-x-auto border-b border-slate-200 pb-px scrollbar-none" id="portal-tab-rail">
         {[
           { id: 'cockpit', label: 'Dashboard Cockpit', icon: Activity },
+          { id: 'platform_tester', label: 'Platform Tester Suite', icon: ShieldCheck },
           { id: 'roles', label: 'Executive Perspectives', icon: BarChart3 },
           { id: 'dependencies', label: 'Dependency Graph', icon: Network },
           { id: 'code_intel', label: 'Code Intelligence', icon: FileText },
@@ -266,6 +268,11 @@ export default function AutonomousIntelligencePortal() {
       {/* TAB SUB-VIEWS PANEL */}
       <div className="bg-white p-5 rounded-xl border border-slate-200/60 shadow-xs text-slate-900" id="portal-panel-content">
         
+        {/* VIEW 0: PLATFORM TESTER OS */}
+        {activePortalTab === 'platform_tester' && (
+          <PlatformTesterOS tenantId="omnicore-labs" userRole="super_admin" />
+        )}
+
         {/* VIEW 1: COCKPIT OVERVIEW */}
         {activePortalTab === 'cockpit' && (
           <div className="space-y-6">

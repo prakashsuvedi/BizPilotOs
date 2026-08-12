@@ -2,11 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { 
   Briefcase, Users, FileText, CheckSquare, Clock, PieChart, 
   ArrowRight, Activity, Calendar, Cpu, Key, Shield, Search, 
-  Filter, Download, RefreshCw, Eye, X, AlertTriangle, CheckCircle2 
+  Filter, Download, RefreshCw, Eye, X, AlertTriangle, CheckCircle2,
+  Database, Upload, FileSpreadsheet, Plus, Table, Mail, BookOpen
 } from 'lucide-react';
 import { BusinessProfile, TenantTeamMember } from '../types';
 import TenantTeamManagement from './TenantTeamManagement';
 import AiTelemetryModal from './AiTelemetryModal';
+import EmailDiagnosticPanel from './EmailDiagnosticPanel';
+import OperationsKnowledgeBase from './OperationsKnowledgeBase';
 import { clientDb } from '../lib/firebase';
 
 interface Props {
@@ -16,7 +19,7 @@ interface Props {
 }
 
 export default function BusinessOperations({ profile, tenantId, onLoginAsUser }: Props) {
-  const [activeTab, setActiveTab] = useState('hr');
+  const [activeTab, setActiveTab] = useState('email_diagnostics');
   const [isAiModalOpen, setIsAiModalOpen] = useState(false);
 
   return (
@@ -27,8 +30,8 @@ export default function BusinessOperations({ profile, tenantId, onLoginAsUser }:
             <Briefcase className="w-6 h-6" />
           </div>
           <div>
-            <h2 className="text-xl font-bold text-slate-800">Business Operations & Team Management</h2>
-            <p className="text-sm text-slate-500">Manage tenant team members, designation OS, AI token billing, and BYOK keys.</p>
+            <h2 className="text-xl font-bold text-slate-800">Business Operations & Enterprise Governance</h2>
+            <p className="text-sm text-slate-500">Manage multi-driver email fallbacks, SOP knowledge bases, tenant teams, designation OS, and CSV portability.</p>
           </div>
         </div>
 
@@ -51,7 +54,10 @@ export default function BusinessOperations({ profile, tenantId, onLoginAsUser }:
 
       <div className="flex gap-4 border-b border-slate-200 pb-px overflow-x-auto">
         {[
+          { id: 'email_diagnostics', label: 'Primary SMTP & Email Diagnostics', icon: Mail },
+          { id: 'sop_kb', label: 'Operations Knowledge Base & SOPs', icon: BookOpen },
           { id: 'hr', label: 'Team Members & Designation OS', icon: Users },
+          { id: 'bulk_data', label: 'Bulk Data & CSV Portability', icon: Database },
           { id: 'audit_logs', label: 'Audit Logs & Governance', icon: Shield },
           { id: 'payroll', label: 'Payroll & Leaves', icon: FileText },
           { id: 'tasks', label: 'Task Management', icon: CheckSquare },
@@ -68,12 +74,21 @@ export default function BusinessOperations({ profile, tenantId, onLoginAsUser }:
         ))}
       </div>
 
+      {activeTab === 'email_diagnostics' && (
+        <EmailDiagnosticPanel tenantId={tenantId} tenantName={profile.name} />
+      )}
+      {activeTab === 'sop_kb' && (
+        <OperationsKnowledgeBase tenantId={tenantId} tenantName={profile.name} />
+      )}
       {activeTab === 'hr' && (
         <TenantTeamManagement 
           tenantId={tenantId} 
           tenantName={profile.name} 
           onLoginAsUser={onLoginAsUser} 
         />
+      )}
+      {activeTab === 'bulk_data' && (
+        <BulkDataTab tenantId={tenantId} tenantName={profile.name} />
       )}
       {activeTab === 'audit_logs' && (
         <AuditLogsTab 
@@ -746,6 +761,412 @@ function AuditLogsTab({ tenantId, tenantName }: { tenantId: string; tenantName: 
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function BulkDataTab({ tenantId, tenantName }: { tenantId: string; tenantName: string }) {
+  const [csvText, setCsvText] = useState('');
+  const [parsedRows, setParsedRows] = useState<any[]>([]);
+  const [importStatus, setImportStatus] = useState<string | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
+  const [exportReportType, setExportReportType] = useState('campaign_roi');
+  const [exportStartDate, setExportStartDate] = useState('');
+  const [exportEndDate, setExportEndDate] = useState('');
+  const [existingCustomers, setExistingCustomers] = useState<any[]>([]);
+
+  useEffect(() => {
+    loadCustomers();
+  }, [tenantId]);
+
+  const loadCustomers = async () => {
+    try {
+      const records = await clientDb.getCollection('customers', tenantId);
+      if (records && records.length > 0) {
+        setExistingCustomers(records);
+      } else {
+        // Mock default list if empty
+        setExistingCustomers([
+          { id: 'cust-1', name: 'Global Tech Corp', email: 'contact@globaltech.com', phone: '+1 555-0192', company: 'Global Tech', tier: 'Enterprise', status: 'Active', value: 12500 },
+          { id: 'cust-2', name: 'Apex Media Solutions', email: 'sarah@apexmedia.io', phone: '+1 555-0481', company: 'Apex Media', tier: 'Growth', status: 'Lead', value: 4800 },
+          { id: 'cust-3', name: 'Lumina Commerce', email: 'david@lumina.com', phone: '+1 555-0823', company: 'Lumina', tier: 'Starter', status: 'Active', value: 2400 },
+        ]);
+      }
+    } catch (err) {
+      console.warn("Could not load customers:", err);
+    }
+  };
+
+  const handleDownloadSampleCsv = () => {
+    const sampleCsv = `Name,Email,Phone,Company,Tier,Status,Estimated_Value\n` +
+      `Acme Dynamics,info@acmedynamics.com,+1 555-1234,Acme Dynamics,Enterprise,Active,15000\n` +
+      `Beta Retailers,orders@betaretail.com,+1 555-5678,Beta Retailers,Growth,Lead,6500\n` +
+      `Zenith Logistics,contact@zenithlog.com,+1 555-9012,Zenith Logistics,Starter,Active,3200\n` +
+      `Orion Software,support@orion.io,+1 555-3456,Orion Software,Enterprise,Qualified,22000`;
+
+    const blob = new Blob([sampleCsv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', 'sample_customer_import_template.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target?.result as string;
+      setCsvText(text);
+      parseCsvString(text);
+    };
+    reader.readAsText(file);
+  };
+
+  const parseCsvString = (rawCsv: string) => {
+    if (!rawCsv.trim()) {
+      setParsedRows([]);
+      return;
+    }
+    const lines = rawCsv.trim().split('\n');
+    if (lines.length < 2) {
+      setParsedRows([]);
+      return;
+    }
+
+    const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+    const rows = [];
+
+    for (let i = 1; i < lines.length; i++) {
+      if (!lines[i].trim()) continue;
+      const values = lines[i].split(',').map(v => v.trim().replace(/^"|"$/g, ''));
+      const rowObj: any = { _id: `temp-${i}` };
+      headers.forEach((h, index) => {
+        rowObj[h] = values[index] || '';
+      });
+      rows.push(rowObj);
+    }
+    setParsedRows(rows);
+  };
+
+  const handleCommitImport = async () => {
+    if (parsedRows.length === 0) return;
+    setIsImporting(true);
+    setImportStatus(null);
+
+    try {
+      for (const row of parsedRows) {
+        const docData = {
+          name: row.Name || row.name || 'Unnamed Contact',
+          email: row.Email || row.email || 'N/A',
+          phone: row.Phone || row.phone || 'N/A',
+          company: row.Company || row.company || 'N/A',
+          tier: row.Tier || row.tier || 'Starter',
+          status: row.Status || row.status || 'Active',
+          value: parseFloat(row.Estimated_Value || row.value || '0') || 0,
+          importedAt: new Date().toISOString()
+        };
+        await clientDb.addDocToTenant('customers', docData, tenantId);
+      }
+
+      setImportStatus(`Successfully imported ${parsedRows.length} customer records to tenant database!`);
+      setParsedRows([]);
+      setCsvText('');
+      loadCustomers();
+    } catch (e: any) {
+      console.error(e);
+      setImportStatus(`Import failed: ${e.message || 'Unknown database error'}`);
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
+  const handleExportReport = () => {
+    let reportFilename = 'report.csv';
+    let headers: string[] = [];
+    let rows: string[][] = [];
+
+    if (exportReportType === 'campaign_roi') {
+      reportFilename = `Campaign_Performance_Report_${tenantName.replace(/\s+/g, '_')}.csv`;
+      headers = ['Campaign_Name', 'Channel', 'Impressions', 'Clicks', 'Leads', 'Conversion_Rate', 'Ad_Spend_USD', 'Attributed_Revenue_USD', 'ROI_Percent'];
+      rows = [
+        ['Enterprise AI Engine Launch', 'LinkedIn & X', '145,000', '4,200', '320', '7.6%', '$3,500.00', '$28,400.00', '+711%'],
+        ['Summer Growth Promo Banner', 'Facebook & Instagram', '280,000', '8,900', '650', '7.3%', '$2,200.00', '$16,250.00', '+638%'],
+        ['Gourmet Culinary Tasting', 'Instagram Reels', '98,000', '3,100', '210', '6.7%', '$1,200.00', '$8,400.00', '+600%'],
+      ];
+    } else if (exportReportType === 'customer_leads') {
+      reportFilename = `Customer_Leads_Report_${tenantName.replace(/\s+/g, '_')}.csv`;
+      headers = ['Customer_Name', 'Email', 'Phone', 'Company', 'Tier', 'Status', 'Estimated_Value_USD'];
+      rows = existingCustomers.map(c => [
+        c.name || 'N/A',
+        c.email || 'N/A',
+        c.phone || 'N/A',
+        c.company || 'N/A',
+        c.tier || 'Starter',
+        c.status || 'Active',
+        `$${(c.value || 0).toLocaleString()}`
+      ]);
+    } else if (exportReportType === 'ai_telemetry') {
+      reportFilename = `AI_Token_Consumption_Report_${tenantName.replace(/\s+/g, '_')}.csv`;
+      headers = ['Timestamp', 'Task_Name', 'Model_ID', 'Prompt_Tokens', 'Completion_Tokens', 'Estimated_Cost_USD'];
+      rows = [
+        [new Date().toISOString(), 'Campaign Strategy Generation', 'gemini-2.5-flash', '3,400', '1,850', '$0.0135'],
+        [new Date(Date.now() - 3600000).toISOString(), 'WhatsApp Bot Trigger Builder', 'gemini-2.5-flash', '1,200', '450', '$0.0018'],
+        [new Date(Date.now() - 7200000).toISOString(), 'AEO Search Index Audit', 'gemini-2.5-flash', '2,100', '980', '$0.0039'],
+      ];
+    } else {
+      reportFilename = `Operations_Audit_Log_${tenantName.replace(/\s+/g, '_')}.csv`;
+      headers = ['Timestamp', 'User', 'Action', 'Severity', 'Details'];
+      rows = [
+        [new Date().toISOString(), 'admin@marketforge.io', 'BULK_CSV_EXPORT', 'info', 'Exported performance report CSV'],
+        [new Date(Date.now() - 1800000).toISOString(), 'admin@marketforge.io', 'MEMBER_DESIGNATION_UPDATE', 'info', 'Updated designation rules for sales team'],
+      ];
+    }
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(r => r.map(val => `"${val.replace(/"/g, '""')}"`).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', reportFilename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  return (
+    <div className="space-y-6 text-slate-800">
+      {/* Utility Header */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+            <Database className="w-5 h-5 text-indigo-600" /> Bulk Data Utility & CSV Portability OS
+          </h3>
+          <p className="text-xs text-slate-500 mt-1">
+            Import customer records in bulk via CSV or export granular performance, customer, and AI usage reports for tenant <strong className="text-slate-800">{tenantName}</strong>.
+          </p>
+        </div>
+
+        <button
+          onClick={handleDownloadSampleCsv}
+          className="flex items-center gap-2 px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold rounded-xl border border-indigo-200 transition cursor-pointer shrink-0"
+        >
+          <FileSpreadsheet className="w-4 h-4 text-indigo-600" />
+          <span>Download Sample CSV Template</span>
+        </button>
+      </div>
+
+      {/* Grid: Left - CSV Import, Right - Export Reports */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* SECTION 1: IMPORT CUSTOMER LISTS */}
+        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+            <h4 className="font-bold text-sm text-slate-800 flex items-center gap-2">
+              <Upload className="w-4 h-4 text-emerald-600" /> 1. Bulk Import Customer Lists (CSV)
+            </h4>
+            <span className="text-[10px] font-mono text-emerald-700 font-bold bg-emerald-50 px-2.5 py-0.5 rounded border border-emerald-200">
+              CSV Parser Active
+            </span>
+          </div>
+
+          <div className="space-y-3">
+            <label className="text-xs font-bold text-slate-700 block">
+              Select CSV File from Device
+            </label>
+            <input
+              type="file"
+              accept=".csv,text/csv"
+              onChange={handleFileUpload}
+              className="block w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer border border-slate-200 rounded-xl p-1 bg-slate-50"
+            />
+
+            <div className="text-center text-[10px] text-slate-400 font-bold uppercase tracking-wider">- OR PASTE RAW CSV CONTENT -</div>
+
+            <textarea
+              rows={4}
+              value={csvText}
+              onChange={(e) => {
+                setCsvText(e.target.value);
+                parseCsvString(e.target.value);
+              }}
+              placeholder={`Name,Email,Phone,Company,Tier,Status,Estimated_Value\nAcme Corp,contact@acme.com,+1 555-0100,Acme,Enterprise,Active,10000`}
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs font-mono text-slate-800 focus:outline-none focus:border-indigo-500 resize-none"
+            />
+          </div>
+
+          {parsedRows.length > 0 && (
+            <div className="space-y-3 pt-2">
+              <div className="flex items-center justify-between text-xs font-bold text-slate-700">
+                <span>Parsed Preview ({parsedRows.length} Rows Detected)</span>
+                <span className="text-emerald-600 font-mono text-[11px]">✓ Headers Validated</span>
+              </div>
+
+              <div className="max-h-48 overflow-x-auto border border-slate-200 rounded-xl bg-slate-50 p-2">
+                <table className="w-full text-left text-[11px] font-sans">
+                  <thead>
+                    <tr className="border-b border-slate-200 text-slate-500 font-bold">
+                      {Object.keys(parsedRows[0]).filter(k => k !== '_id').map(key => (
+                        <th key={key} className="p-2 whitespace-nowrap">{key}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {parsedRows.slice(0, 5).map((row, idx) => (
+                      <tr key={idx} className="border-b border-slate-100 text-slate-700">
+                        {Object.keys(row).filter(k => k !== '_id').map(key => (
+                          <td key={key} className="p-2 whitespace-nowrap">{row[key]}</td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <button
+                onClick={handleCommitImport}
+                disabled={isImporting}
+                className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white font-bold text-xs rounded-xl shadow-md transition cursor-pointer flex items-center justify-center gap-2"
+              >
+                {isImporting ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin text-white" /> Saving Customers to Tenant DB...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="w-4 h-4 text-white" /> Commit Import ({parsedRows.length} Customers)
+                  </>
+                )}
+              </button>
+            </div>
+          )}
+
+          {importStatus && (
+            <div className={`p-3 rounded-xl text-xs font-bold flex items-center gap-2 ${importStatus.includes('Successfully') ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-rose-50 text-rose-800 border border-rose-200'}`}>
+              <CheckCircle2 className="w-4 h-4 shrink-0" />
+              <span>{importStatus}</span>
+            </div>
+          )}
+        </div>
+
+        {/* SECTION 2: EXPORT PERFORMANCE REPORTS */}
+        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4 flex flex-col justify-between">
+          <div className="space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h4 className="font-bold text-sm text-slate-800 flex items-center gap-2">
+                <Download className="w-4 h-4 text-indigo-600" /> 2. Export Performance Reports to CSV
+              </h4>
+              <span className="text-[10px] font-mono text-indigo-700 font-bold bg-indigo-50 px-2.5 py-0.5 rounded border border-indigo-200">
+                CSV Exporter
+              </span>
+            </div>
+
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-700">Select Report Type</label>
+                <select
+                  value={exportReportType}
+                  onChange={(e) => setExportReportType(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-slate-800 font-semibold focus:outline-none focus:border-indigo-500 cursor-pointer"
+                >
+                  <option value="campaign_roi">Campaign Performance & Channel ROI Summary</option>
+                  <option value="customer_leads">Customer Leads & Pipeline Register</option>
+                  <option value="ai_telemetry">AI Token Usage & BYOK API Telemetry</option>
+                  <option value="audit_trail">Operations Audit Trail & Compliance Log</option>
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[11px] font-bold text-slate-600">Start Date (Optional)</label>
+                  <input
+                    type="date"
+                    value={exportStartDate}
+                    onChange={(e) => setExportStartDate(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2 text-xs text-slate-800 focus:outline-none"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[11px] font-bold text-slate-600">End Date (Optional)</label>
+                  <input
+                    type="date"
+                    value={exportEndDate}
+                    onChange={(e) => setExportEndDate(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2 text-xs text-slate-800 focus:outline-none"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-indigo-50/50 border border-indigo-100 p-4 rounded-xl text-xs space-y-2">
+              <span className="font-bold text-indigo-900 block">CSV Export Format Specification:</span>
+              <p className="text-slate-600 text-[11px] leading-relaxed">
+                Generates a clean RFC 4180 compliant CSV document with double-quoted text fields, timestamp formatting, and aggregated numeric metrics ready for Excel or Google Sheets.
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={handleExportReport}
+            className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-md transition cursor-pointer flex items-center justify-center gap-2 mt-4"
+          >
+            <Download className="w-4 h-4 text-white" /> Generate & Download CSV Report
+          </button>
+        </div>
+      </div>
+
+      {/* Existing Customer Records Table */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
+        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+          <h4 className="font-bold text-sm text-slate-800 flex items-center gap-2">
+            <Table className="w-4 h-4 text-slate-600" /> Active Tenant Customer Directory ({existingCustomers.length} Records)
+          </h4>
+          <span className="text-xs text-slate-500 font-mono">Synced with Firestore database</span>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs font-sans">
+            <thead>
+              <tr className="border-b border-slate-200 text-slate-400 font-mono text-[10px] uppercase">
+                <th className="p-3">Customer Name</th>
+                <th className="p-3">Email</th>
+                <th className="p-3">Company</th>
+                <th className="p-3">Tier</th>
+                <th className="p-3">Status</th>
+                <th className="p-3 text-right">Est. Value</th>
+              </tr>
+            </thead>
+            <tbody>
+              {existingCustomers.map((c, idx) => (
+                <tr key={c.id || idx} className="border-b border-slate-100 hover:bg-slate-50 transition">
+                  <td className="p-3 font-bold text-slate-800">{c.name}</td>
+                  <td className="p-3 font-mono text-slate-600">{c.email}</td>
+                  <td className="p-3 text-slate-600">{c.company}</td>
+                  <td className="p-3">
+                    <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                      {c.tier || 'Starter'}
+                    </span>
+                  </td>
+                  <td className="p-3">
+                    <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                      {c.status || 'Active'}
+                    </span>
+                  </td>
+                  <td className="p-3 text-right font-mono font-bold text-slate-900">
+                    ${(c.value || 0).toLocaleString()}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   );
 }

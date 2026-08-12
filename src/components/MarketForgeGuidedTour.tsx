@@ -66,9 +66,9 @@ export const TOUR_STEPS: GuidedTourStep[] = [
     accentBg: 'from-indigo-500/20 to-blue-600/20',
     badge: 'Step 1 of 5 • Infrastructure',
     summary: 'Instantly provision secure, isolated database schema containers with multi-branch RBAC access and customized brand identities.',
-    description: 'BizPilot OS boots up tenant environments in seconds. Group holding companies, subsidiaries, and localized retail branches under a unified executive hierarchy with automatic currency matching and SOC2-ready isolation.',
-    metaTitle: 'BizPilot OS Guided Tour | Step 1: Multi-Branch & Tenant Workspace Setup',
-    metaDescription: 'Discover how BizPilot OS provisions isolated enterprise database schemas and configures multi-branch operating hierarchies in seconds.',
+    description: 'MarketForge OS boots up tenant environments in seconds. Group holding companies, subsidiaries, and localized retail branches under a unified executive hierarchy with automatic currency matching and SOC2-ready isolation.',
+    metaTitle: 'MarketForge OS Guided Tour | Step 1: Multi-Branch & Tenant Workspace Setup',
+    metaDescription: 'Discover how MarketForge OS provisions isolated enterprise database schemas and configures multi-branch operating hierarchies in seconds.',
     keyHighlights: [
       '100% Isolated tenant database schemas with zero data leakage',
       'Multi-branch hierarchical P&L roll-up and localized currency routing',
@@ -104,9 +104,9 @@ export const TOUR_STEPS: GuidedTourStep[] = [
     accentBg: 'from-purple-500/20 to-indigo-600/20',
     badge: 'Step 2 of 5 • Sales Automation',
     summary: 'Deploy self-operating AI SDR agents that research ideal customer profiles, craft personalized email copy, and book qualified sales meetings.',
-    description: 'Eliminate manual cold prospecting. BizPilot OS AI SDR agents continuously monitor web intent, scrape prospect profiles, draft multi-touch email sequences via Gemini AI, and handle inbound responses autonomously.',
-    metaTitle: 'BizPilot OS Guided Tour | Step 2: Autonomous AI SDR & Prospecting',
-    metaDescription: 'Explore the BizPilot OS AI SDR Autopilot engine: research leads, generate tailored email sequences, and book enterprise demos 24/7.',
+    description: 'Eliminate manual cold prospecting. MarketForge OS AI SDR agents continuously monitor web intent, scrape prospect profiles, draft multi-touch email sequences via Gemini AI, and handle inbound responses autonomously.',
+    metaTitle: 'MarketForge OS Guided Tour | Step 2: Autonomous AI SDR & Prospecting',
+    metaDescription: 'Explore the MarketForge OS AI SDR Autopilot engine: research leads, generate tailored email sequences, and book enterprise demos 24/7.',
     keyHighlights: [
       'Deep web & LinkedIn company intelligence scraping',
       'Hyper-personalized email copy generation powered by Google Gemini',
@@ -142,9 +142,9 @@ export const TOUR_STEPS: GuidedTourStep[] = [
     accentBg: 'from-amber-500/20 to-orange-600/20',
     badge: 'Step 3 of 5 • Retail & Supply Chain',
     summary: 'Unify physical barcode retail registers with online inventory catalogs and multi-warehouse safety stock reorder triggers.',
-    description: 'Keep your stock counts perfectly in sync across physical stores and web channels. BizPilot OS tracks raw material SKU depletions, generates supplier purchase orders when safety thresholds are breached, and processes 1.2s checkouts.',
-    metaTitle: 'BizPilot OS Guided Tour | Step 3: Omnichannel POS & Inventory Sync',
-    metaDescription: 'Learn how BizPilot OS connects barcode POS checkout terminals with multi-warehouse inventory tracking and automated reorders.',
+    description: 'Keep your stock counts perfectly in sync across physical stores and web channels. MarketForge OS tracks raw material SKU depletions, generates supplier purchase orders when safety thresholds are breached, and processes 1.2s checkouts.',
+    metaTitle: 'MarketForge OS Guided Tour | Step 3: Omnichannel POS & Inventory Sync',
+    metaDescription: 'Learn how MarketForge OS connects barcode POS checkout terminals with multi-warehouse inventory tracking and automated reorders.',
     keyHighlights: [
       'Touchscreen POS interface supporting barcode scanners & Stripe hardware',
       'Real-time multi-warehouse stock sync with zero overselling',
@@ -180,9 +180,9 @@ export const TOUR_STEPS: GuidedTourStep[] = [
     accentBg: 'from-emerald-500/20 to-teal-600/20',
     badge: 'Step 4 of 5 • Human Resources',
     summary: 'Manage global staff records, biometric attendance, tax withholdings, and 1-click batch direct deposit payroll disbursements.',
-    description: 'Simplify human resource management. From employee onboarding contracts and time tracking to regional tax calculations and digital pay stub distribution, BizPilot OS automates the full employee lifecycle.',
-    metaTitle: 'BizPilot OS Guided Tour | Step 4: HR, Biometrics & 1-Click Payroll',
-    metaDescription: 'See how BizPilot OS streamlines HR onboarding, biometric GPS attendance, direct deposit payroll, and regional tax compliance.',
+    description: 'Simplify human resource management. From employee onboarding contracts and time tracking to regional tax calculations and digital pay stub distribution, MarketForge OS automates the full employee lifecycle.',
+    metaTitle: 'MarketForge OS Guided Tour | Step 4: HR, Biometrics & 1-Click Payroll',
+    metaDescription: 'See how MarketForge OS streamlines HR onboarding, biometric GPS attendance, direct deposit payroll, and regional tax compliance.',
     keyHighlights: [
       'Digital employee onboarding & contract e-signatures',
       'Biometric & GPS mobile shift check-ins with overtime calculation',
@@ -218,9 +218,9 @@ export const TOUR_STEPS: GuidedTourStep[] = [
     accentBg: 'from-cyan-500/20 to-blue-600/20',
     badge: 'Step 5 of 5 • Executive Cockpit',
     summary: 'Gain total financial clarity with automated double-entry general ledger, OCR expense scanning, and predictive 90-day cashflow runway models.',
-    description: 'Make confident executive decisions. BizPilot OS compiles real-time P&L statements, balance sheets, and automated morning executive AI briefings so leaders always have full visibility into profitability and growth metrics.',
-    metaTitle: 'BizPilot OS Guided Tour | Step 5: Treasury Ledger & Executive Cockpit',
-    metaDescription: 'Explore executive business intelligence in BizPilot OS: double-entry accounting, OCR expense scanning, and 90-day cashflow models.',
+    description: 'Make confident executive decisions. MarketForge OS compiles real-time P&L statements, balance sheets, and automated morning executive AI briefings so leaders always have full visibility into profitability and growth metrics.',
+    metaTitle: 'MarketForge OS Guided Tour | Step 5: Treasury Ledger & Executive Cockpit',
+    metaDescription: 'Explore executive business intelligence in MarketForge OS: double-entry accounting, OCR expense scanning, and 90-day cashflow models.',
     keyHighlights: [
       'Standardized double-entry general ledger & customizable chart of accounts',
       'AI OCR receipt scanner with automated category tagging',
@@ -247,12 +247,12 @@ export const TOUR_STEPS: GuidedTourStep[] = [
   }
 ];
 
-export interface BizPilotGuidedTourProps {
+export interface MarketForgeGuidedTourProps {
   onEnterOS?: () => void;
   onSelectFeature?: (featureId: string) => void;
 }
 
-export function BizPilotGuidedTour({ onEnterOS, onSelectFeature }: BizPilotGuidedTourProps) {
+export function MarketForgeGuidedTour({ onEnterOS, onSelectFeature }: MarketForgeGuidedTourProps) {
   const [currentStepIndex, setCurrentStepIndex] = useState<number>(0);
   const [isAutoPlaying, setIsAutoPlaying] = useState<boolean>(false);
   const [simulatedActionResult, setSimulatedActionResult] = useState<string | null>(null);
@@ -302,7 +302,7 @@ export function BizPilotGuidedTour({ onEnterOS, onSelectFeature }: BizPilotGuide
       <Helmet>
         <title>{activeStep.metaTitle}</title>
         <meta name="description" content={activeStep.metaDescription} />
-        <meta name="keywords" content={`BizPilot OS, ${activeStep.title}, ${activeStep.category}, enterprise ERP, AI operating system, ${activeStep.replacedTools.join(', ')}`} />
+        <meta name="keywords" content={`MarketForge OS, ${activeStep.title}, ${activeStep.category}, enterprise ERP, AI operating system, ${activeStep.replacedTools.join(', ')}`} />
         <meta property="og:title" content={activeStep.metaTitle} />
         <meta property="og:description" content={activeStep.metaDescription} />
         <meta property="og:type" content="website" />
@@ -311,7 +311,7 @@ export function BizPilotGuidedTour({ onEnterOS, onSelectFeature }: BizPilotGuide
           {JSON.stringify({
             "@context": "https://schema.org",
             "@type": "SoftwareApplication",
-            "name": "BizPilot OS",
+            "name": "MarketForge OS",
             "operatingSystem": "Web Cloud OS",
             "applicationCategory": "BusinessApplication",
             "description": activeStep.metaDescription,
@@ -335,10 +335,10 @@ export function BizPilotGuidedTour({ onEnterOS, onSelectFeature }: BizPilotGuide
             Interactive Guided Tour & Workflow Stepper
           </div>
           <h2 className="font-display font-extrabold text-2xl sm:text-4xl text-white tracking-tight">
-            The BizPilot OS Workflow Blueprint
+            The MarketForge OS Workflow Blueprint
           </h2>
           <p className="text-slate-300 text-xs sm:text-sm max-w-2xl">
-            Step through how BizPilot OS unifies your entire business operations from initial workspace boot to autonomous AI execution.
+            Step through how MarketForge OS unifies your entire business operations from initial workspace boot to autonomous AI execution.
           </p>
         </div>
 
@@ -379,59 +379,85 @@ export function BizPilotGuidedTour({ onEnterOS, onSelectFeature }: BizPilotGuide
       </div>
 
       {/* STEPPER STEP BUTTONS NAVIGATOR BAR */}
-      <div className="grid grid-cols-1 sm:grid-cols-5 gap-2.5">
-        {TOUR_STEPS.map((step, idx) => {
-          const isActive = idx === currentStepIndex;
-          const isCompleted = idx < currentStepIndex;
+      <div className="space-y-3">
+        {/* Step Progress Line */}
+        <div className="w-full bg-white/10 h-1.5 rounded-full overflow-hidden">
+          <div
+            className="h-full bg-gradient-to-r from-cyan-400 via-indigo-500 to-purple-500 transition-all duration-500 shadow-[0_0_12px_rgba(6,182,212,0.6)]"
+            style={{ width: `${((currentStepIndex + 1) / TOUR_STEPS.length) * 100}%` }}
+          />
+        </div>
 
-          return (
-            <button
-              key={step.id}
-              onClick={() => {
-                setCurrentStepIndex(idx);
-                setIsAutoPlaying(false);
-                setSimulatedActionResult(null);
-              }}
-              className={`p-3 rounded-2xl border text-left transition-all cursor-pointer relative overflow-hidden flex flex-col justify-between space-y-2 ${
-                isActive
-                  ? 'bg-gradient-to-b from-indigo-900/60 to-[#0B0D19] border-indigo-500 shadow-lg shadow-indigo-600/20 text-white scale-[1.02]'
-                  : isCompleted
-                  ? 'bg-white/5 border-white/10 text-slate-300 hover:border-indigo-500/40 hover:text-white'
-                  : 'bg-black/30 border-white/5 text-slate-400 hover:border-white/10 hover:text-slate-300'
-              }`}
-            >
-              {/* Active Glow Bar */}
-              {isActive && (
-                <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-cyan-500" />
-              )}
+        <div className="grid grid-cols-1 sm:grid-cols-5 gap-3 relative">
+          {TOUR_STEPS.map((step, idx) => {
+            const isActive = idx === currentStepIndex;
+            const isCompleted = idx < currentStepIndex;
 
-              <div className="flex items-center justify-between w-full">
-                <span className={`w-6 h-6 rounded-lg text-xs font-mono font-bold flex items-center justify-center border ${
-                  isActive
-                    ? 'bg-indigo-600 border-indigo-400 text-white'
-                    : isCompleted
-                    ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300'
-                    : 'bg-white/5 border-white/10 text-slate-400'
-                }`}>
-                  {isCompleted ? <Check className="w-3.5 h-3.5" /> : step.id}
-                </span>
+            return (
+              <div key={step.id} className="relative group">
+                <button
+                  onClick={() => {
+                    setCurrentStepIndex(idx);
+                    setIsAutoPlaying(false);
+                    setSimulatedActionResult(null);
+                  }}
+                  className={`w-full p-3.5 rounded-2xl border text-left transition-all duration-300 cursor-pointer relative overflow-hidden flex flex-col justify-between space-y-2.5 ${
+                    isActive
+                      ? 'bg-gradient-to-b from-indigo-900/80 via-[#0D1127] to-[#0B0D19] border-cyan-400/80 shadow-[0_10px_30px_rgba(6,182,212,0.25)] text-white scale-[1.02] z-20'
+                      : isCompleted
+                      ? 'bg-white/5 border-white/15 text-slate-200 hover:border-cyan-500/40 hover:text-white'
+                      : 'bg-black/40 border-white/5 text-slate-400 hover:border-white/15 hover:text-slate-300'
+                  }`}
+                >
+                  {/* Active Glow Streak Header */}
+                  {isActive && (
+                    <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-cyan-400 via-indigo-400 to-purple-400 animate-pulse" />
+                  )}
 
-                <span className="text-[10px] font-mono text-slate-400 uppercase">
-                  {step.category.split(' ')[0]}
-                </span>
+                  <div className="flex items-center justify-between w-full">
+                    <span className={`w-6 h-6 rounded-lg text-xs font-mono font-bold flex items-center justify-center border transition-colors ${
+                      isActive
+                        ? 'bg-gradient-to-r from-cyan-500 to-indigo-600 border-cyan-300 text-white shadow-md'
+                        : isCompleted
+                        ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300'
+                        : 'bg-white/5 border-white/10 text-slate-400'
+                    }`}>
+                      {isCompleted ? <Check className="w-3.5 h-3.5" /> : step.id}
+                    </span>
+
+                    <span className={`text-[10px] font-mono font-extrabold uppercase px-1.5 py-0.5 rounded ${
+                      isActive ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30' : 'text-slate-400'
+                    }`}>
+                      {step.category.split(' ')[0]}
+                    </span>
+                  </div>
+
+                  <div>
+                    <span className="text-xs font-bold block truncate leading-tight group-hover:text-cyan-300 transition-colors">
+                      {step.title.split('&')[0]}
+                    </span>
+                    <span className="text-[10px] text-slate-400 block truncate font-mono mt-0.5">
+                      {step.subtitle}
+                    </span>
+                  </div>
+                </button>
+
+                {/* Animated Gradient Node Connector for Desktop Screens */}
+                {idx < TOUR_STEPS.length - 1 && (
+                  <div className="hidden lg:block absolute top-1/2 -right-2.5 -translate-y-1/2 w-2 h-2 z-30 pointer-events-none">
+                    <div className={`w-2 h-2 rounded-full border ${
+                      idx < currentStepIndex
+                        ? 'bg-emerald-400 border-emerald-300 shadow-[0_0_8px_rgba(52,211,153,0.8)]'
+                        : idx === currentStepIndex
+                        ? 'bg-cyan-400 border-cyan-200 animate-ping'
+                        : 'bg-slate-700 border-slate-600'
+                    }`} />
+                  </div>
+                )}
               </div>
-
-              <div>
-                <span className="text-xs font-bold block truncate leading-tight">
-                  {step.title.split('&')[0]}
-                </span>
-                <span className="text-[10px] text-slate-400 block truncate font-mono">
-                  {step.subtitle}
-                </span>
-              </div>
-            </button>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
 
       {/* ACTIVE STEP CARD CONTENT DISPLAY */}
@@ -515,7 +541,7 @@ export function BizPilotGuidedTour({ onEnterOS, onSelectFeature }: BizPilotGuide
                   <span className="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block" />
                   <span className="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block" />
                   <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block" />
-                  <span className="text-[11px] font-mono text-slate-400 ml-1">workflow-node // step-{activeStep.id}.bizpilot</span>
+                  <span className="text-[11px] font-mono text-slate-400 ml-1">workflow-node // step-{activeStep.id}.marketforge</span>
                 </div>
                 <span className="text-[10px] font-mono bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded font-bold">
                   ● LIVE SIMULATOR
@@ -601,4 +627,4 @@ export function BizPilotGuidedTour({ onEnterOS, onSelectFeature }: BizPilotGuide
   );
 }
 
-export default BizPilotGuidedTour;
+export default MarketForgeGuidedTour;

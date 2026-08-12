@@ -1912,8 +1912,11 @@ export default function EmailStudio({
 
       {/* CREATE NEW SEQUENCE MODAL CONTAINER */}
       {showCreateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fade-in">
-          <div className="bg-white border border-slate-200 rounded-3xl w-full max-w-xl shadow-2xl overflow-hidden animate-slide-up flex flex-col max-h-[90vh] text-slate-900">
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto animate-fade-in"
+          onClick={(e) => { if (e.target === e.currentTarget) setShowCreateModal(false); }}
+        >
+          <div className="bg-white border border-slate-200 rounded-3xl w-full max-w-xl shadow-2xl overflow-hidden animate-slide-up flex flex-col max-h-[90vh] my-auto text-slate-900">
             <div className="bg-slate-900 p-5 text-white flex justify-between items-center">
               <div className="flex items-center gap-2">
                 <Sparkles className="w-5 h-5 text-indigo-400 animate-pulse" />
@@ -2068,8 +2071,11 @@ export default function EmailStudio({
 
       {/* SUBSCRIPTION UPGRADE MODAL DIALOG */}
       {showUpgradeModal && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/70 backdrop-blur-sm flex justify-center items-center p-4">
-          <div className="bg-white border text-slate-900 rounded-3xl shadow-2xl w-full max-w-lg p-8 font-sans space-y-6 relative animate-zoom-in">
+        <div 
+          className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/70 backdrop-blur-sm flex justify-center items-center p-4"
+          onClick={(e) => { if (e.target === e.currentTarget) setShowUpgradeModal(false); }}
+        >
+          <div className="bg-white border text-slate-900 rounded-3xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto my-auto p-8 font-sans space-y-6 relative animate-zoom-in">
             <button 
               onClick={() => setShowUpgradeModal(false)} 
               className="absolute top-6 right-6 text-slate-400 hover:text-slate-600 transition cursor-pointer"

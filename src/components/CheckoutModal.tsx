@@ -28,7 +28,7 @@ export default function CheckoutModal({ isOpen, onClose, selectedPlan, onConfirm
           initial={{ scale: 0.95, opacity: 0, y: 20 }}
           animate={{ scale: 1, opacity: 1, y: 0 }}
           exit={{ scale: 0.95, opacity: 0, y: 20 }}
-          className="bg-[#0C0D14] border border-white/10 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden"
+          className="bg-[#0C0D14] border border-white/10 rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto my-auto shadow-2xl"
         >
           <div className="flex items-center justify-between p-6 border-b border-white/5 bg-[#0e101a]">
             <div>

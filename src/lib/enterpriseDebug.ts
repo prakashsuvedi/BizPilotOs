@@ -144,10 +144,10 @@ export function analyzeGeminiError(err: any, attemptedModel: string): GeminiFail
 
 // Resilient model fallback implementation
 export const GEMINI_MODEL_FALLBACK_CHAIN = [
-  "gemini-3.5-flash",
-  "gemini-flash-latest",
-  "gemini-3.1-flash-lite",
-  "gemini-3.1-pro-preview"
+  "gemini-2.5-flash",
+  "gemini-2.0-flash",
+  "gemini-1.5-flash",
+  "gemini-3.5-flash"
 ];
 
 // Execute a resilient Gemini generation

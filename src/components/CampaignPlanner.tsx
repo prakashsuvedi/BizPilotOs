@@ -6,6 +6,7 @@ import OutputEvidencePanel from './OutputEvidencePanel';
 import { convertCurrency, formatCurrency } from '../lib/commerce';
 import { logAiTaskUsage } from '../lib/aiUsageTracker';
 import AiUsageBadge from './AiUsageBadge';
+import OkrTracker from './OkrTracker';
 
 interface Props {
   profile: BusinessProfile;
@@ -69,7 +70,7 @@ export default function CampaignPlanner({
           tenantId: profile.tenantId || 'demo-tenant',
           taskId: 'campaign_planner',
           taskTitle: `AI Campaign Strategy Generation (${data.campaignName})`,
-          modelId: 'gemini-2.5-pro',
+          modelId: 'gemini-2.5-flash',
           promptTokens: 3400,
           completionTokens: 1850
         });
@@ -109,7 +110,7 @@ export default function CampaignPlanner({
                 CAMPAIGN PLANNER AGENT
               </span>
               <AiUsageBadge
-                modelId="gemini-2.5-pro"
+                modelId="gemini-2.5-flash"
                 promptTokens={3400}
                 completionTokens={1850}
                 totalTokens={5250}
@@ -388,6 +389,9 @@ export default function CampaignPlanner({
           )}
         </div>
       )}
+
+      {/* OKR Tracker Module */}
+      <OkrTracker tenantId={profile.tenantId || profile.id} tenantName={profile.name} />
     </div>
   );
 }

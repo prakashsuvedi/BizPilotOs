@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100%" height="100%">
+  <radialGradient id="favBg" cx="50%" cy="50%" r="50%">
+    <stop offset="0%" stop-color="#1e1b4b" />
+    <stop offset="100%" stop-color="#030712" />
+  </radialGradient>
+  <linearGradient id="favRim" x1="0%" y1="0%" x2="100%" y2="100%">
+    <stop offset="0%" stop-color="#38bdf8" />
+    <stop offset="50%" stop-color="#1d4ed8" />
+    <stop offset="100%" stop-color="#60a5fa" />
+  </linearGradient>
+  <linearGradient id="favM" x1="0%" y1="0%" x2="100%" y2="100%">
+    <stop offset="0%" stop-color="#f0f9ff" />
+    <stop offset="50%" stop-color="#38bdf8" />
+    <stop offset="100%" stop-color="#0284c7" />
+  </linearGradient>
+
+  <!-- Outer Ring -->
+  <circle cx="50" cy="50" r="48" fill="url(#favBg)" stroke="url(#favRim)" stroke-width="4" />
+  
+  <!-- M Letter -->
+  <path d="M 22 68 L 22 30 L 32 20 L 42 45 L 35 68 Z" fill="#1e293b" />
+  <path d="M 25 66 L 25 32 L 32 24 L 38 43 L 34 66 Z" fill="url(#favM)" />
+  
+  <path d="M 42 45 L 50 64 L 58 45 L 50 68 Z" fill="#0284c7" />
+
+  <path d="M 58 45 L 68 20 L 78 30 L 78 68 L 65 68 Z" fill="#1e293b" />
+  <path d="M 62 43 L 68 24 L 75 32 L 75 66 L 66 66 Z" fill="url(#favM)" />
+
+  <!-- Arrow -->
+  <path d="M 28 66 C 40 58, 60 40, 80 20 L 72 20 L 84 15 L 82 28 L 76 22 C 60 40, 40 58, 28 66 Z" fill="#38bdf8" />
+
+  <!-- Anvil & Spark -->
+  <path d="M 40 68 L 60 68 L 56 62 L 62 58 L 38 58 L 44 62 Z" fill="#94a3b8" />
+  <circle cx="50" cy="56" r="4" fill="#fbbf24" />
+</svg>

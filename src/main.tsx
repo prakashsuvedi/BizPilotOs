@@ -8,13 +8,13 @@ import './index.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <HelmetProvider>
-      <CurrencyProvider>
-        <ErrorBoundary>
+    <ErrorBoundary>
+      <HelmetProvider>
+        <CurrencyProvider>
           <App />
-        </ErrorBoundary>
-      </CurrencyProvider>
-    </HelmetProvider>
+        </CurrencyProvider>
+      </HelmetProvider>
+    </ErrorBoundary>
   </React.StrictMode>
 );
 

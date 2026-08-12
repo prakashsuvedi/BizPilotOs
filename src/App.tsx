@@ -22,6 +22,7 @@ import {
   Settings as SettingsIcon,
   ArrowLeft,
   Building2,
+  Bed,
   ChevronRight,
   Globe,
   Plus,
@@ -43,11 +44,16 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Maximize2,
-  Minimize2
+  Minimize2,
+  CheckSquare,
+  Square,
+  Ban,
+  PlayCircle
 } from 'lucide-react';
 
 import { clientAuth, clientDb } from './lib/firebase';
 import { BusinessProfile, CampaignPlan, CustomerPersona, BrandGuideline, TenantTeamMember } from './types';
+import { getTenantBranding } from './lib/tenantBranding';
 
 // Components
 import LoginPortal from './components/LoginPortal';
@@ -63,19 +69,25 @@ import RevenueIntelligenceOS from './components/RevenueIntelligenceOS';
 import SuccessCenter from './components/SuccessCenter';
 import TenantWhiteLabelCenter from './components/TenantWhiteLabelCenter';
 import CustomDomainCenter from './components/CustomDomainCenter';
-import { getTenantBranding } from './lib/tenantBranding';
 import SubscriptionManagement from './components/SubscriptionManagement';
+import TenantHealthMonitor from './components/TenantHealthMonitor';
 
 import RestaurantManagement from './components/RestaurantManagement';
+import MobileTableQrOrderingApp from './components/MobileTableQrOrderingApp';
+import HotelManagement from './components/HotelManagement';
 import ToursAndTravelsManagement from './components/ToursAndTravelsManagement';
 import WebsiteBuilderOS from './components/WebsiteBuilderOS';
 
 import BusinessOperations from './components/BusinessOperations';
+import WorkflowAutomationStudio from './components/WorkflowAutomationStudio';
+import ApiGatewayDeveloperPortal from './components/ApiGatewayDeveloperPortal';
+import AdvancedWebhookEngine from './components/AdvancedWebhookEngine';
+import IntegrationManager from './components/IntegrationManager';
 import MemberAuthModal from './components/MemberAuthModal';
 import TelemetrySparkline from './components/TelemetrySparkline';
 import AiTelemetryModal from './components/AiTelemetryModal';
-import { BizPilotLanding } from './components/BizPilotLanding';
-import { MarketBazaarLanding } from './components/MarketBazaarLanding';
+import MarketForgeLanding from './components/MarketForgeLanding';
+import { MarketForgeEmblem, MarketForgeLogo } from './components/MarketForgeLogo';
 
 import PaymentSuccessModal from './components/PaymentSuccessModal';
 import TrialBanner from './components/TrialBanner';
@@ -113,8 +125,12 @@ const defaultGuideline: BrandGuideline = {
 export default function App() {
   // Session State
   const [user, setUser] = useState<{ role: string; tenantId: string; email: string } | null>(() => {
-    const saved = localStorage.getItem("marketforge_user_session");
-    return saved ? JSON.parse(saved) : null;
+    try {
+      const saved = localStorage.getItem("marketforge_user_session");
+      return saved ? JSON.parse(saved) : null;
+    } catch (e) {
+      return null;
+    }
   });
 
   // Active Team Member Session state (for designation-based access)
@@ -155,9 +171,10 @@ export default function App() {
   const [selectionPlanFilter, setSelectionPlanFilter] = useState('ALL');
   const [selectionStatusFilter, setSelectionStatusFilter] = useState('ALL');
   const [selectionSort, setSelectionSort] = useState<'name-asc' | 'mrr-desc' | 'users-desc'>('name-asc');
+  const [gridSelectedTenantIds, setGridSelectedTenantIds] = useState<string[]>([]);
 
   // Business Dashboard navigation
-  const [dashboardTab, setDashboardTab] = useState<'landing' | 'command' | 'planner' | 'ad_studio' | 'email_studio' | 'social_studio' | 'revenue_intelligence' | 'success_center' | 'omnicore_labs' | 'domains' | 'whitelabel' | 'restaurant_os' | 'tours_os' | 'website_builder' | 'business_ops' | 'subscription'>('landing');
+  const [dashboardTab, setDashboardTab] = useState<'landing' | 'command' | 'planner' | 'ad_studio' | 'email_studio' | 'social_studio' | 'revenue_intelligence' | 'success_center' | 'omnicore_labs' | 'domains' | 'whitelabel' | 'restaurant_os' | 'hotel_os' | 'tours_os' | 'website_builder' | 'business_ops' | 'subscription'>('landing');
 
   // OmniCore Labs sub-tabs
   const [omnicoreSubTab, setOmnicoreSubTab] = useState<'command' | 'launch' | 'business' | 'ads'>('command');
@@ -165,7 +182,7 @@ export default function App() {
   // Shared Tenant-Specific App States
   const [profile, setProfile] = useState<BusinessProfile>(defaultProfile);
   const [brandConfig, setBrandConfig] = useState<any>({
-    brand_name: "BizPilot OS",
+    brand_name: "MarketForge OS",
     tagline: "The complete next-gen enterprise operating system.",
     primary_color: "#6366f1",
     secondary_color: "#06b6d4"
@@ -178,6 +195,9 @@ export default function App() {
   const [isQuickActionsOpen, setIsQuickActionsOpen] = useState(false);
   const [isSubscriptionModalOpen, setIsSubscriptionModalOpen] = useState(false);
   const [isPaymentSuccessOpen, setIsPaymentSuccessOpen] = useState(false);
+  const [themeMode, setThemeMode] = useState<'dark' | 'light'>(() => {
+    return (localStorage.getItem('marketforge_theme_mode') as 'dark' | 'light') || 'dark';
+  });
   const [highContrastMode, setHighContrastMode] = useState(() => {
     return localStorage.getItem('marketforge_high_contrast') === 'true';
   });
@@ -186,6 +206,15 @@ export default function App() {
   });
 
   // Apply CSS overrides based on user settings
+  useEffect(() => {
+    localStorage.setItem('marketforge_theme_mode', themeMode);
+    if (themeMode === 'light') {
+      document.body.classList.add('light-mode-bg');
+    } else {
+      document.body.classList.remove('light-mode-bg');
+    }
+  }, [themeMode]);
+
   useEffect(() => {
     if (highContrastMode) {
       document.body.classList.add('high-contrast');
@@ -220,20 +249,12 @@ export default function App() {
       const res = await fetch('/api/tenants-list');
       if (res.ok) {
         const list = await res.json();
-        setTenantsList(list);
+        setTenantsList(list || []);
       } else {
-        setTenantsList([
-          { id: "demo-tenant", name: "Enterprise DemoCorp", domain: "demo.marketforge.com", ownerEmail: "owner@democorp.com", isCustom: false, status: "active", plan: "Enterprise", mrr: 499, trialDaysLeft: 30, activeUsers: 5, storageMb: 450.0, health: "Healthy", apiRequests: 1280, pdfExports: 42, imageGenerations: 180, knowledgeAssets: 12, disabledModules: [] },
-          { id: "sienna-tenant", name: "Sienna Clay Co", domain: "siennaclay.com", ownerEmail: "evelyn@siennaclay.com", isCustom: false, status: "active", plan: "Basic", mrr: 99, trialDaysLeft: 12, activeUsers: 3, storageMb: 48.2, health: "Healthy", apiRequests: 320, pdfExports: 4, imageGenerations: 12, knowledgeAssets: 4, disabledModules: [] },
-          { id: "solas-tenant", name: "Solas Systems", domain: "solas.io", ownerEmail: "admin@solas.io", isCustom: false, status: "active", plan: "Pro", mrr: 499, trialDaysLeft: 0, activeUsers: 14, storageMb: 289.4, health: "Healthy", apiRequests: 1940, pdfExports: 34, imageGenerations: 98, knowledgeAssets: 28, disabledModules: [] }
-        ]);
+        setTenantsList([]);
       }
     } catch (err) {
-      setTenantsList([
-        { id: "demo-tenant", name: "Enterprise DemoCorp", domain: "demo.marketforge.com", ownerEmail: "owner@democorp.com", isCustom: false, status: "active", plan: "Enterprise", mrr: 499, trialDaysLeft: 30, activeUsers: 5, storageMb: 450.0, health: "Healthy", apiRequests: 1280, pdfExports: 42, imageGenerations: 180, knowledgeAssets: 12, disabledModules: [] },
-        { id: "sienna-tenant", name: "Sienna Clay Co", domain: "siennaclay.com", ownerEmail: "evelyn@siennaclay.com", isCustom: false, status: "active", plan: "Basic", mrr: 99, trialDaysLeft: 12, activeUsers: 3, storageMb: 48.2, health: "Healthy", apiRequests: 320, pdfExports: 4, imageGenerations: 12, knowledgeAssets: 4, disabledModules: [] },
-        { id: "solas-tenant", name: "Solas Systems", domain: "solas.io", ownerEmail: "admin@solas.io", isCustom: false, status: "active", plan: "Pro", mrr: 499, trialDaysLeft: 0, activeUsers: 14, storageMb: 289.4, health: "Healthy", apiRequests: 1940, pdfExports: 34, imageGenerations: 98, knowledgeAssets: 28, disabledModules: [] }
-      ]);
+      setTenantsList([]);
     }
   };
 
@@ -299,6 +320,14 @@ export default function App() {
 
   // Load state whenever selectedTenantId or user session changes
   const loadTenantDetails = async (tenantId: string) => {
+    const dynamicTenantName = tenantId
+      .replace(/[-_]/g, ' ')
+      .replace(/\btenant\b/gi, 'Workspace')
+      .split(' ')
+      .filter(Boolean)
+      .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+      .join(' ') || 'Enterprise Workspace';
+
     try {
       // 1. Load Campaign Profiles (BusinessProfile)
       try {
@@ -308,6 +337,7 @@ export default function App() {
         } else {
           const freshProfile = {
             ...defaultProfile,
+            name: dynamicTenantName,
             id: `prof_${Math.random().toString(36).substr(2, 9)}`,
             tenantId
           };
@@ -316,7 +346,7 @@ export default function App() {
         }
       } catch (err1) {
         console.warn("Failed loading campaign profiles from Firestore:", err1);
-        setProfile({ ...defaultProfile, tenantId });
+        setProfile({ ...defaultProfile, name: dynamicTenantName, tenantId });
       }
 
       // 2. Load guidelines
@@ -457,6 +487,21 @@ export default function App() {
     }
   };
 
+  // Check for Mobile QR Menu mode or Table scan
+  const urlParams = new URLSearchParams(window.location.search);
+  const isQrMode = urlParams.get('mode') === 'qr_menu' || urlParams.get('qr') === 'true' || urlParams.get('table');
+  const qrTableNumber = urlParams.get('table') || 'T-01';
+  const targetTenantId = urlParams.get('tenant') || urlParams.get('slug') || selectedTenantId || 'sienna-tenant';
+
+  if (isQrMode && !urlParams.get('action')) {
+    return (
+      <MobileTableQrOrderingApp 
+        tenantId={targetTenantId} 
+        tableNumber={qrTableNumber} 
+      />
+    );
+  }
+
   // Render Login Portal
   if (!user) {
     return (
@@ -469,7 +514,7 @@ export default function App() {
   }
 
   // Active tenant name helper
-  const activeTenantObj = tenantsList.find(t => t.id === (user.role === 'super_admin' ? selectedTenantId : user.tenantId));
+  const activeTenantObj = tenantsList.find(t => t.id === (user?.role === 'super_admin' ? selectedTenantId : user?.tenantId));
 
   const activeTenantName = activeTenantObj?.name || "Enterprise Workspace";
   
@@ -488,6 +533,10 @@ export default function App() {
     { id: 'landing', label: 'OS Features Suite', icon: Sparkles, color: 'text-amber-400' },
     { id: 'command', label: 'Command Center', icon: Terminal, color: 'text-emerald-400' },
     { id: 'subscription', label: 'Subscription & Billing', icon: Receipt, color: 'text-emerald-400' },
+    { id: 'workflow_automation', label: 'Workflow Automation', icon: Zap, color: 'text-amber-400' },
+    { id: 'api_gateway', label: 'API Gateway & Keys', icon: Network, color: 'text-cyan-400' },
+    { id: 'webhook_engine', label: 'Webhook Engine', icon: Network, color: 'text-fuchsia-400' },
+    { id: 'integrations', label: 'Autonomous Integrations', icon: Share2, color: 'text-violet-400' },
     { id: 'planner', label: 'Marketing Planner', icon: Layers, color: 'text-indigo-400' },
     { id: 'ad_studio', label: 'Ad Copy Studio', icon: Sparkles, color: 'text-purple-400' },
     { id: 'email_studio', label: 'Email Studio', icon: Mail, color: 'text-cyan-400' },
@@ -515,6 +564,10 @@ export default function App() {
 
       // Map tabId to module name
       const tabToModuleMap: Record<string, string> = {
+        workflow_automation: 'workflow_automation',
+        api_gateway: 'api_gateway',
+        webhook_engine: 'webhook_engine',
+        integrations: 'integrations',
         planner: 'marketing_planner',
         ad_studio: 'ad_studio',
         email_studio: 'email_studio',
@@ -579,7 +632,7 @@ export default function App() {
       case 'landing':
         const activeTenantForLanding = user ? (user.role === 'super_admin' ? selectedTenantId : user.tenantId) : selectedTenantId;
         return (
-          <BizPilotLanding 
+          <MarketForgeLanding 
             tenantId={activeTenantForLanding}
             onSelectFeature={(featureId) => {
               if (!user) {
@@ -676,6 +729,15 @@ export default function App() {
           <RestaurantManagement 
             profile={profile}
             tenantId={user.role === 'super_admin' ? selectedTenantId : user.tenantId}
+            onNavigateToWebsiteBuilder={() => setDashboardTab('website_builder')}
+            onNavigateToHotelOS={() => setDashboardTab('hotel_os')}
+          />
+        );
+      case 'hotel_os':
+        return (
+          <HotelManagement 
+            profile={profile}
+            tenantId={user.role === 'super_admin' ? selectedTenantId : user.tenantId}
           />
         );
       case 'tours_os':
@@ -698,6 +760,40 @@ export default function App() {
             profile={profile}
             tenantId={user.role === 'super_admin' ? selectedTenantId : user.tenantId}
             onLoginAsUser={handleSetActiveMember}
+          />
+        );
+
+      case 'workflow_automation':
+        return (
+          <WorkflowAutomationStudio
+            tenantId={user.role === 'super_admin' ? selectedTenantId : user.tenantId}
+            onCreateAuditLog={(type, severity, details) => handleCreateAuditLog(type, severity, details)}
+          />
+        );
+
+      case 'api_gateway':
+        return (
+          <ApiGatewayDeveloperPortal
+            tenantId={user.role === 'super_admin' ? selectedTenantId : user.tenantId}
+            onCreateAuditLog={(type, severity, details) => handleCreateAuditLog(type, severity, details)}
+          />
+        );
+
+      case 'webhook_engine':
+        return (
+          <AdvancedWebhookEngine
+            tenantId={user.role === 'super_admin' ? selectedTenantId : user.tenantId}
+            onCreateAuditLog={(type, severity, details) => handleCreateAuditLog(type, severity, details)}
+          />
+        );
+
+      case 'integrations':
+        return (
+          <IntegrationManager
+            tenantId={user.role === 'super_admin' ? selectedTenantId : user.tenantId}
+            activeCampaigns={[]}
+            onReloadOutcomes={() => {}}
+            onCreateAuditLog={(type, severity, details) => handleCreateAuditLog(type, severity, details)}
           />
         );
 
@@ -990,6 +1086,32 @@ export default function App() {
                   </select>
                 </div>
 
+                {/* Select All Toggle Button */}
+                <button
+                  onClick={() => {
+                    const filteredIds = filteredSelectionTenants.map(t => t.id);
+                    const allSelected = filteredIds.length > 0 && filteredIds.every(id => gridSelectedTenantIds.includes(id));
+                    if (allSelected) {
+                      setGridSelectedTenantIds(prev => prev.filter(id => !filteredIds.includes(id)));
+                    } else {
+                      setGridSelectedTenantIds(prev => Array.from(new Set([...prev, ...filteredIds])));
+                    }
+                  }}
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-xl border transition flex items-center gap-1.5 cursor-pointer ${
+                    filteredSelectionTenants.length > 0 && filteredSelectionTenants.every(t => gridSelectedTenantIds.includes(t.id))
+                      ? 'bg-indigo-600 text-white border-indigo-500 shadow-sm'
+                      : 'bg-white/5 hover:bg-white/10 text-slate-300 border-white/10'
+                  }`}
+                  title="Toggle multi-selection for all visible workspaces"
+                >
+                  <CheckSquare className="w-3.5 h-3.5 text-indigo-400" />
+                  <span className="hidden sm:inline">
+                    {filteredSelectionTenants.length > 0 && filteredSelectionTenants.every(t => gridSelectedTenantIds.includes(t.id))
+                      ? 'Deselect All'
+                      : 'Select All'}
+                  </span>
+                </button>
+
                 {/* Reset filters button */}
                 {isFiltered && (
                   <button
@@ -1058,64 +1180,177 @@ export default function App() {
               </button>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredSelectionTenants.map((t) => (
-                <div 
-                  key={t.id} 
-                  className="bg-[#0e101a] border border-white/5 hover:border-indigo-500/30 rounded-2xl p-5 flex flex-col justify-between transition duration-250 group relative overflow-hidden"
-                >
-                  <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/5 blur-3xl rounded-full group-hover:bg-indigo-500/10 transition" />
-                  
-                  <div>
-                    <div className="flex items-center justify-between mb-4">
-                      <span className="text-[10px] font-mono font-bold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 px-2 py-0.5 rounded">
-                        {t.plan || 'Growth'} Plan
-                      </span>
-                      <span className={`w-2 h-2 rounded-full ${t.status === 'active' ? 'bg-emerald-400' : 'bg-slate-400'}`} />
-                    </div>
+            <AnimatePresence mode="popLayout">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {filteredSelectionTenants.map((t, index) => {
+                  const isSelected = gridSelectedTenantIds.includes(t.id);
+                  return (
+                    <motion.div 
+                      key={t.id} 
+                      layout
+                      initial={{ opacity: 0, y: 20, scale: 0.96 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                      transition={{ 
+                        duration: 0.3, 
+                        delay: Math.min(index * 0.05, 0.4),
+                        ease: [0.16, 1, 0.3, 1]
+                      }}
+                      whileHover={{ y: -4, transition: { duration: 0.2 } }}
+                      className={`bg-[#0e101a] border rounded-2xl p-5 flex flex-col justify-between transition duration-250 group relative overflow-hidden shadow-lg ${
+                        isSelected 
+                          ? 'border-indigo-500/80 bg-indigo-950/20 ring-1 ring-indigo-500/50' 
+                          : 'border-white/5 hover:border-indigo-500/30'
+                      }`}
+                    >
+                      <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/5 blur-3xl rounded-full group-hover:bg-indigo-500/10 transition" />
+                      
+                      <div>
+                        <div className="flex items-center justify-between mb-4">
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setGridSelectedTenantIds(prev => 
+                                  prev.includes(t.id) ? prev.filter(id => id !== t.id) : [...prev, t.id]
+                                );
+                              }}
+                              className="p-1 rounded text-slate-400 hover:text-indigo-400 transition cursor-pointer"
+                              title={isSelected ? "Deselect workspace" : "Select workspace for batch operations"}
+                            >
+                              {isSelected ? (
+                                <CheckSquare className="w-4 h-4 text-indigo-400" />
+                              ) : (
+                                <Square className="w-4 h-4 text-slate-600 hover:text-slate-400" />
+                              )}
+                            </button>
+                            <span className="text-[10px] font-mono font-bold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 px-2 py-0.5 rounded">
+                              {t.plan || 'Growth'} Plan
+                            </span>
+                          </div>
+                          <span className={`w-2 h-2 rounded-full ${t.status === 'active' ? 'bg-emerald-400' : 'bg-slate-400'}`} />
+                        </div>
 
-                    <h3 className="font-display font-bold text-base text-white mb-1 group-hover:text-indigo-400 transition">
-                      {t.name}
-                    </h3>
-                    <p className="text-xs font-mono text-slate-400 mb-4 flex items-center gap-1.5">
-                      <Globe className="w-3.5 h-3.5 text-slate-500" />
-                      {t.domain}
-                    </p>
+                        <h3 className="font-display font-bold text-base text-white mb-1 group-hover:text-indigo-400 transition">
+                          {t.name}
+                        </h3>
+                        <p className="text-xs font-mono text-slate-400 mb-4 flex items-center gap-1.5">
+                          <Globe className="w-3.5 h-3.5 text-slate-500" />
+                          {t.domain}
+                        </p>
 
-                    <div className="grid grid-cols-2 gap-3 border-t border-white/5 pt-4 mb-5 text-[11px] font-mono">
-                      <div>
-                        <span className="text-slate-500 block uppercase text-[9px] font-bold">Active users</span>
-                        <span className="text-slate-200">{t.activeUsers || 0} Operators</span>
+                        <div className="grid grid-cols-2 gap-3 border-t border-white/5 pt-4 mb-5 text-[11px] font-mono">
+                          <div>
+                            <span className="text-slate-500 block uppercase text-[9px] font-bold">Active users</span>
+                            <span className="text-slate-200">{t.activeUsers || 0} Operators</span>
+                          </div>
+                          <div>
+                            <span className="text-slate-500 block uppercase text-[9px] font-bold">Workspace size</span>
+                            <span className="text-slate-200">{t.storageMb ? t.storageMb.toFixed(1) : 0} MB</span>
+                          </div>
+                          <div>
+                            <span className="text-slate-500 block uppercase text-[9px] font-bold">Operational health</span>
+                            <span className="text-emerald-400 font-bold">{t.health || 'Healthy'}</span>
+                          </div>
+                          <div>
+                            <span className="text-slate-500 block uppercase text-[9px] font-bold">MRR Contribution</span>
+                            <span className="text-indigo-400 font-bold">{formatCurrency(t.mrr || 0)}/mo</span>
+                          </div>
+                        </div>
                       </div>
-                      <div>
-                        <span className="text-slate-500 block uppercase text-[9px] font-bold">Workspace size</span>
-                        <span className="text-slate-200">{t.storageMb ? t.storageMb.toFixed(1) : 0} MB</span>
-                      </div>
-                      <div>
-                        <span className="text-slate-500 block uppercase text-[9px] font-bold">Operational health</span>
-                        <span className="text-emerald-400 font-bold">{t.health || 'Healthy'}</span>
-                      </div>
-                      <div>
-                        <span className="text-slate-500 block uppercase text-[9px] font-bold">MRR Contribution</span>
-                        <span className="text-indigo-400 font-bold">{formatCurrency(t.mrr || 0)}/mo</span>
-                      </div>
-                    </div>
+
+                      <button 
+                        onClick={() => {
+                          setSelectedTenantId(t.id);
+                          setSuperAdminView('dashboard');
+                        }}
+                        className="w-full flex items-center justify-center gap-1.5 bg-white/5 group-hover:bg-indigo-600 border border-white/10 group-hover:border-indigo-500/30 text-slate-300 group-hover:text-white font-semibold text-xs py-2.5 rounded-xl transition cursor-pointer"
+                      >
+                        Enter Workspace
+                        <ChevronRight className="w-3.5 h-3.5 transform group-hover:translate-x-0.5 transition" />
+                      </button>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            </AnimatePresence>
+          )}
+
+          {/* Floating Status Indicator & Bulk Actions Toolbar */}
+          <AnimatePresence>
+            {gridSelectedTenantIds.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: 40, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 40, scale: 0.95 }}
+                transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+                className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-[#121422]/95 backdrop-blur-md border border-indigo-500/40 text-white shadow-2xl rounded-2xl px-5 py-3.5 flex flex-wrap items-center justify-between gap-4 max-w-2xl w-[92%] sm:w-auto"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 bg-indigo-500/20 border border-indigo-500/30 rounded-xl flex items-center justify-center text-indigo-400 font-bold shrink-0">
+                    <CheckSquare className="w-5 h-5" />
                   </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-extrabold text-white">
+                        {gridSelectedTenantIds.length} {gridSelectedTenantIds.length === 1 ? 'Workspace' : 'Workspaces'} Selected
+                      </span>
+                      <span className="bg-indigo-500/20 text-indigo-300 text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border border-indigo-500/30">
+                        Batch Grid Selection
+                      </span>
+                    </div>
+                    <p className="text-[11px] font-mono text-slate-300 mt-0.5 flex flex-wrap items-center gap-2">
+                      <span>Aggregate MRR: <strong className="text-emerald-400 font-bold">{formatCurrency(
+                        tenantsList
+                          .filter(t => gridSelectedTenantIds.includes(t.id))
+                          .reduce((sum, t) => sum + (t.mrr || 0), 0)
+                      )}/mo</strong></span>
+                      <span className="text-slate-600 hidden sm:inline">\u2022</span>
+                      <span className="hidden sm:inline">Active Users: <strong className="text-indigo-300 font-bold">{
+                        tenantsList
+                          .filter(t => gridSelectedTenantIds.includes(t.id))
+                          .reduce((sum, t) => sum + (t.activeUsers || 0), 0)
+                      }</strong></span>
+                    </p>
+                  </div>
+                </div>
 
-                  <button 
+                <div className="flex items-center gap-2">
+                  <button
                     onClick={() => {
-                      setSelectedTenantId(t.id);
-                      setSuperAdminView('dashboard');
+                      const updated = tenantsList.map(t => gridSelectedTenantIds.includes(t.id) ? { ...t, status: 'suspended' } : t);
+                      setTenantsList(updated);
+                      localStorage.setItem('marketforge_sa_tenants', JSON.stringify(updated));
+                      setGridSelectedTenantIds([]);
                     }}
-                    className="w-full flex items-center justify-center gap-1.5 bg-white/5 group-hover:bg-indigo-600 border border-white/10 group-hover:border-indigo-500/30 text-slate-300 group-hover:text-white font-semibold text-xs py-2.5 rounded-xl transition cursor-pointer"
+                    className="px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/30 text-amber-300 text-xs font-bold rounded-xl transition cursor-pointer flex items-center gap-1.5"
+                    title="Suspend selected workspaces"
                   >
-                    Enter Workspace
-                    <ChevronRight className="w-3.5 h-3.5 transform group-hover:translate-x-0.5 transition" />
+                    <Ban className="w-3.5 h-3.5" /> Suspend
+                  </button>
+                  <button
+                    onClick={() => {
+                      const updated = tenantsList.map(t => gridSelectedTenantIds.includes(t.id) ? { ...t, status: 'active' } : t);
+                      setTenantsList(updated);
+                      localStorage.setItem('marketforge_sa_tenants', JSON.stringify(updated));
+                      setGridSelectedTenantIds([]);
+                    }}
+                    className="px-3 py-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/30 text-emerald-300 text-xs font-bold rounded-xl transition cursor-pointer flex items-center gap-1.5"
+                    title="Activate selected workspaces"
+                  >
+                    <PlayCircle className="w-3.5 h-3.5" /> Activate
+                  </button>
+                  <button
+                    onClick={() => setGridSelectedTenantIds([])}
+                    className="p-1.5 text-slate-400 hover:text-white hover:bg-white/10 rounded-xl transition cursor-pointer ml-1"
+                    title="Clear Selection"
+                  >
+                    <X className="w-4 h-4" />
                   </button>
                 </div>
-              ))}
-            </div>
-          )}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </main>
       </div>
     );
@@ -1131,7 +1366,7 @@ export default function App() {
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
             <span className="font-semibold">SYSTEM WORKSPACE IMPERSONATION ACTIVE</span>
-            <span>— You are actively administering</span>
+            <span>\u2014 You are actively administering</span>
             <span className="font-bold underline text-white font-mono bg-white/5 px-1.5 py-0.5 rounded">{activeTenantName}</span>
           </div>
           <div className="flex gap-4 font-semibold">
@@ -1151,7 +1386,44 @@ export default function App() {
         </div>
       )}
 
-      {/* Main Brand/Workspace Header - Only shown in active Workspace mode */}
+      {/* SuperAdmin View Mode Active Banner */}
+      {user.role === 'super_admin' && (
+        <div className="bg-gradient-to-r from-amber-950 via-slate-950 to-indigo-950 border-b border-amber-500/40 text-white px-4 sm:px-6 py-2.5 flex flex-wrap items-center justify-between gap-3 shadow-xl relative z-50">
+          <div className="flex items-center gap-3">
+            <div className="p-1.5 bg-amber-500/20 border border-amber-400/40 rounded-xl text-amber-400 shrink-0">
+              <ShieldCheck className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs font-black text-amber-300 uppercase tracking-wider">SuperAdmin View Mode: Tenant Mode</span>
+                <span className="bg-amber-400/20 text-amber-200 border border-amber-400/40 text-[10px] font-mono px-2 py-0.5 rounded font-bold">
+                  ON-BEHALF-OF ACTIVE
+                </span>
+              </div>
+              <p className="text-xs text-slate-300">
+                Operating on behalf of workspace: <strong className="text-white font-bold">{activeTenantName}</strong> (<span className="font-mono text-amber-200">{selectedTenantId}</span>)
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={() => setSuperAdminView('portal')}
+              className="px-3.5 py-1.8 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black text-xs rounded-xl shadow transition flex items-center gap-1.5 cursor-pointer"
+            >
+              <ShieldCheck className="w-3.5 h-3.5" />
+              <span>Return to SuperAdmin Portal</span>
+            </button>
+            <button 
+              onClick={() => setSuperAdminView('selection')}
+              className="px-3 py-1.8 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-xs rounded-xl transition flex items-center gap-1.5 cursor-pointer"
+            >
+              <Building2 className="w-3.5 h-3.5 text-indigo-400" />
+              <span>Business Selector</span>
+            </button>
+          </div>
+        </div>
+      )}
       <AnimatePresence mode="wait">
         {dashboardTab !== 'landing' && (
           <motion.header
@@ -1175,21 +1447,21 @@ export default function App() {
           <button
             onClick={() => setDashboardTab('landing')}
             className="flex items-center gap-3 text-left group cursor-pointer"
-            title="Open MarketBazaar OS Feature Landing Suite"
+            title="Open MarketForge OS Feature Landing Suite"
           >
-            <div className={`relative flex items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 via-purple-500 to-cyan-500 shadow-lg shadow-indigo-500/20 border border-white/20 group-hover:scale-105 transition ${isHeaderFolded ? 'w-8 h-8' : 'w-10 h-10'}`}>
-              <Cpu className={`text-white ${isHeaderFolded ? 'w-4 h-4' : 'w-5 h-5'}`} />
-              <div className="absolute -bottom-1 -right-1 w-3.5 h-3.5 bg-emerald-400 border-2 border-[#07080E] rounded-full" />
-            </div>
-            {!isHeaderFolded && (
-              <div>
-                <h1 className="font-display font-extrabold text-sm tracking-wide text-white flex items-center gap-2 uppercase group-hover:text-indigo-300 transition">
-                  {brandConfig?.brand_name || "MarketBazaar OS"}
-                  <span className="text-[10px] bg-gradient-to-r from-indigo-500/20 to-purple-500/20 text-indigo-300 px-2 py-0.5 rounded-full border border-indigo-500/30 font-mono font-bold">v5.0</span>
-                </h1>
-                <p className="text-[10px] text-slate-400 font-mono tracking-wider">
-                  {activeTenantName.toUpperCase()} • ACTIVE INSTANCE
-                </p>
+            {isHeaderFolded ? (
+              <div className="relative flex items-center justify-center w-8 h-8 group-hover:scale-105 transition">
+                <MarketForgeEmblem className="w-8 h-8" glow={true} />
+                <div className="absolute -bottom-1 -right-1 w-3.5 h-3.5 bg-emerald-400 border-2 border-[#07080E] rounded-full z-10" />
+              </div>
+            ) : (
+              <div className="flex items-center gap-3">
+                <img 
+                  src="/assets/marketforge-header-logo.svg" 
+                  alt="MarketForge OS - A True Business Transformation" 
+                  className="h-9 md:h-10 w-auto object-contain filter drop-shadow-[0_0_12px_rgba(56,189,248,0.4)] group-hover:scale-105 transition"
+                />
+                <span className="text-[10px] bg-gradient-to-r from-indigo-500/20 to-purple-500/20 text-indigo-300 px-2 py-0.5 rounded-full border border-indigo-500/30 font-mono font-bold shrink-0">v5.0</span>
               </div>
             )}
           </button>
@@ -1208,13 +1480,25 @@ export default function App() {
           </button>
         </div>
 
-        {/* Live status indicators */}
+        {/* Live status indicators & Universal Workspace Switcher */}
         <div className="flex items-center gap-3 sm:gap-4 font-mono text-[11px] text-slate-400">
-          <div className="hidden md:flex items-center gap-2">
-            <Network className="w-3.5 h-3.5 text-indigo-400" />
-            <span className="text-slate-400">TENANT:</span>
-            <span className="text-indigo-300 font-bold uppercase">{user.role === 'super_admin' ? selectedTenantId : user.tenantId}</span>
+          
+          {/* Universal Tenant Switcher Dropdown */}
+          <div className="relative hidden md:block">
+            <button
+              onClick={() => setIsSuperAdminQuickToggleOpen(!isSuperAdminQuickToggleOpen)}
+              className="flex items-center gap-2 bg-indigo-950/40 hover:bg-indigo-900/40 border border-indigo-500/30 px-3 py-1.5 rounded-xl text-xs text-indigo-200 transition cursor-pointer shadow-sm"
+              title="Switch Active Corporate Workspace Sandbox"
+            >
+              <Building2 className="w-3.5 h-3.5 text-indigo-400" />
+              <span className="font-bold uppercase tracking-wide max-w-[120px] truncate">{activeTenantName}</span>
+              <span className="text-[9px] bg-indigo-500/20 text-indigo-300 px-1.5 py-0.5 rounded font-mono font-bold">
+                {currency}
+              </span>
+              <ChevronDown className="w-3.5 h-3.5 text-indigo-400" />
+            </button>
           </div>
+
           <div className="hidden md:flex items-center gap-2">
             <Database className="w-3.5 h-3.5 text-emerald-400" />
             <span className="text-slate-400">STATUS:</span>
@@ -1267,6 +1551,7 @@ export default function App() {
                       { label: 'Generate Social Post', desc: 'Create AI social copy & media', icon: Share2, color: 'text-rose-400', tab: 'social_studio' },
                       { label: 'Create Campaign', desc: 'Formulate growth & ad strategy', icon: Layers, color: 'text-indigo-400', tab: 'planner' },
                       { label: 'Restaurant POS & Floor', desc: 'Floor layout, Waiter POS & QR', icon: Utensils, color: 'text-orange-400', tab: 'restaurant_os' },
+                      { label: 'Hotel & Resort Management', desc: 'Rooms, Reservations & Folios', icon: Bed, color: 'text-indigo-400', tab: 'hotel_os' },
                       { label: 'Manage SaaS Domains', desc: 'DNS, SSL & Custom branding', icon: Globe, color: 'text-teal-400', tab: 'domains' },
                       { label: 'Launch Website Builder', desc: 'Design landing pages & site', icon: Globe, color: 'text-fuchsia-400', tab: 'website_builder' },
                       { label: 'Revenue Intelligence', desc: 'Audit KPIs & sales forecast', icon: DollarSign, color: 'text-amber-400', tab: 'revenue_intelligence' },
@@ -1464,33 +1749,83 @@ export default function App() {
                 </button>
               </div>
 
-              {/* Navigation Items */}
-              <nav className="space-y-1">
-                {dashboardNavItems.map((item) => {
-                  const Icon = item.icon;
-                  const isActive = dashboardTab === item.id;
-                  return (
-                    <button
-                      key={item.id}
-                      id={`tab-btn-${item.id}`}
-                      onClick={() => setDashboardTab(item.id)}
-                      title={item.label}
-                      className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center px-2 py-2.5' : 'gap-3 px-3.5 py-2.5'} rounded-xl text-left text-xs font-semibold transition-all duration-200 cursor-pointer ${
-                        isActive 
-                          ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-lg shadow-indigo-600/15 border border-indigo-500/30' 
-                          : 'text-slate-400 hover:text-slate-200 hover:bg-white/5 border border-transparent'
-                      }`}
-                    >
-                      <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : item.color}`} />
-                      {!isSidebarCollapsed && <span className="truncate">{item.label}</span>}
-                    </button>
-                  );
-                })}
+              {/* Navigation Items Grouped */}
+              <nav className="space-y-4 max-h-[calc(100vh-220px)] overflow-y-auto pr-1">
+                {[
+                  {
+                    category: 'Core Operations',
+                    items: [
+                      { id: 'command', label: 'Command Center', icon: Terminal, color: 'text-emerald-400' },
+                      { id: 'business_ops', label: 'Team & Roster Ops', icon: Briefcase, color: 'text-blue-400' },
+                      { id: 'subscription', label: 'Subscription & Billing', icon: Receipt, color: 'text-emerald-400' },
+                    ]
+                  },
+                  {
+                    category: 'Industry Verticals',
+                    items: [
+                      { id: 'restaurant_os', label: 'Restaurant OS', icon: Building2, color: 'text-orange-400' },
+                      { id: 'hotel_os', label: 'Hotel & Resort OS', icon: Bed, color: 'text-indigo-400' },
+                      { id: 'tours_os', label: 'Tours & Travels', icon: Compass, color: 'text-cyan-400' },
+                      { id: 'website_builder', label: 'AI Website Builder', icon: Globe, color: 'text-fuchsia-400' },
+                    ]
+                  },
+                  {
+                    category: 'Growth & Intelligence',
+                    items: [
+                      { id: 'planner', label: 'Marketing Planner', icon: Layers, color: 'text-indigo-400' },
+                      { id: 'ad_studio', label: 'Ad Copy Studio', icon: Sparkles, color: 'text-purple-400' },
+                      { id: 'email_studio', label: 'Email Studio', icon: Mail, color: 'text-cyan-400' },
+                      { id: 'social_studio', label: 'Social Engine', icon: Share2, color: 'text-rose-400' },
+                      { id: 'revenue_intelligence', label: 'Revenue OS', icon: DollarSign, color: 'text-amber-400' },
+                    ]
+                  },
+                  {
+                    category: 'Brand & Infrastructure',
+                    items: [
+                      { id: 'whitelabel', label: 'White-Label Branding', icon: Shield, color: 'text-emerald-400' },
+                      { id: 'domains', label: 'SaaS Domains', icon: Globe, color: 'text-teal-400' },
+                      { id: 'success_center', label: 'Success Academy', icon: BookOpen, color: 'text-blue-400' },
+                      { id: 'omnicore_labs', label: 'OmniCore Labs', icon: FlaskConical, color: 'text-fuchsia-400' },
+                    ]
+                  }
+                ].map((group, groupIdx) => (
+                  <div key={groupIdx} className="space-y-1">
+                    {!isSidebarCollapsed && (
+                      <div className="text-[9px] font-mono font-bold text-slate-500 uppercase tracking-wider px-3 pt-1">
+                        {group.category}
+                      </div>
+                    )}
+                    {group.items.map((item) => {
+                      const Icon = item.icon;
+                      const isActive = dashboardTab === item.id;
+                      return (
+                        <button
+                          key={item.id}
+                          id={`tab-btn-${item.id}`}
+                          onClick={() => setDashboardTab(item.id as any)}
+                          title={item.label}
+                          className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center px-2 py-2' : 'gap-3 px-3 py-2'} rounded-xl text-left text-xs font-semibold transition-all duration-200 cursor-pointer ${
+                            isActive 
+                              ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-lg shadow-indigo-600/15 border border-indigo-500/30' 
+                              : 'text-slate-400 hover:text-slate-200 hover:bg-white/5 border border-transparent'
+                          }`}
+                        >
+                          <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : item.color}`} />
+                          {!isSidebarCollapsed && <span className="truncate">{item.label}</span>}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ))}
               </nav>
 
-              {/* Workspace Telemetry Panel with AI Sparkline */}
+              {/* Workspace Telemetry Panel with AI Sparkline & Tenant Health Monitor */}
               {!isSidebarCollapsed && (
-                <div className="mx-1 pt-2">
+                <div className="mx-1 pt-2 space-y-2">
+                  <TenantHealthMonitor
+                    tenantId={user.role === 'super_admin' ? selectedTenantId : user.tenantId}
+                    compact={true}
+                  />
                   <TelemetrySparkline
                     tenantId={user.role === 'super_admin' ? selectedTenantId : user.tenantId}
                     tenantPlan={activeTenantObj?.plan || "Growth"}
@@ -1624,6 +1959,32 @@ export default function App() {
 
               <div className="p-6 space-y-6">
                 <div className="space-y-4">
+                  {/* Theme Mode Toggle */}
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="font-bold text-slate-200">Global Theme Mode</h3>
+                      <p className="text-xs text-slate-400 mt-0.5">Switch between Dark Luxury and High-Visibility Light UI</p>
+                    </div>
+                    <div className="flex items-center bg-black/40 border border-white/10 p-1 rounded-xl gap-1">
+                      <button
+                        type="button"
+                        onClick={() => setThemeMode('dark')}
+                        className={`px-3 py-1 text-xs font-bold rounded-lg transition cursor-pointer ${themeMode === 'dark' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'}`}
+                      >
+                        {"\u{1F319}"} Dark
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setThemeMode('light')}
+                        className={`px-3 py-1 text-xs font-bold rounded-lg transition cursor-pointer ${themeMode === 'light' ? 'bg-amber-400 text-slate-950 font-extrabold shadow-sm' : 'text-slate-400 hover:text-white'}`}
+                      >
+                        {"\u2600\uFE0F"} Light
+                      </button>
+                    </div>
+                  </div>
+
+                  <hr className="border-white/5" />
+
                   <div className="flex items-center justify-between">
                     <div>
                       <h3 className="font-bold text-slate-200">High Contrast Mode</h3>
@@ -1673,7 +2034,7 @@ export default function App() {
                       className="bg-[#0e101a] border border-white/10 text-white text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block p-2"
                     >
                       <option value="USD">USD ($)</option>
-                      <option value="NPR">NPR (रू)</option>
+                      <option value="NPR">NPR (\u0930\u0942)</option>
                     </select>
                   </div>
                 </div>
@@ -1695,7 +2056,7 @@ export default function App() {
       <MemberAuthModal
         isOpen={isMemberAuthModalOpen}
         onClose={() => setIsMemberAuthModalOpen(false)}
-        tenantId={user.role === 'super_admin' ? selectedTenantId : user.tenantId}
+        tenantId={user?.role === 'super_admin' ? selectedTenantId : (user?.tenantId || 'demo-tenant')}
         tenantName={activeTenantName}
         currentMember={activeTeamMember}
         onLoginSuccess={(member) => handleSetActiveMember(member)}
@@ -1706,10 +2067,10 @@ export default function App() {
       <AiTelemetryModal
         isOpen={isAiTelemetryOpen}
         onClose={() => setIsAiTelemetryOpen(false)}
-        tenantId={user.role === 'super_admin' ? selectedTenantId : user.tenantId}
+        tenantId={user?.role === 'super_admin' ? selectedTenantId : (user?.tenantId || 'demo-tenant')}
         tenantName={activeTenantName}
         tenantPlan={activeTenantObj?.plan || "Growth"}
-        isSuperAdmin={user.role === 'super_admin'}
+        isSuperAdmin={user?.role === 'super_admin'}
       />
     </div>
   );

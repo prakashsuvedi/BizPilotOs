@@ -30,141 +30,7 @@ export const ALL_AVAILABLE_MODULES = [
 ];
 
 // Initial mock team members for default tenants
-const INITIAL_TENANT_MEMBERS: TenantTeamMember[] = [
-  // DemoCorp Tenant Members
-  {
-    id: 'tm-demo-1',
-    tenantId: 'demo-tenant',
-    name: 'Alexander Vance',
-    email: 'alex.vance@democorp.com',
-    password: 'DemoPass2026!',
-    designation: 'Tenant Administrator & CEO',
-    department: 'Executive',
-    role: 'owner',
-    status: 'active',
-    permittedModules: ['social_studio', 'email_studio', 'revenue_intelligence', 'success_center', 'restaurant_os', 'tours_os', 'website_builder', 'business_ops', 'omnicore_labs', 'super_admin'],
-    isInvestor: true,
-    investorDetails: {
-      sharePercentage: 45.0,
-      investmentAmount: 450000,
-      numberOfShares: 450000,
-      shareClass: 'Founder Equity',
-      valuationCap: 5000000,
-      vestingStatus: 'Fully Vested (Founder Pool)',
-      dividendRights: 'Pro-rata dividend distribution & voting rights',
-      notes: 'Co-Founder & Chief Executive Officer'
-    },
-    invitedAt: '2025-01-15',
-    lastActive: 'Active Now'
-  },
-  {
-    id: 'tm-demo-2',
-    tenantId: 'demo-tenant',
-    name: 'Sarah Jenkins',
-    email: 's.jenkins@democorp.com',
-    password: 'SarahPass123!',
-    designation: 'VP of Marketing & Growth',
-    department: 'Sales & Marketing',
-    role: 'admin',
-    status: 'active',
-    permittedModules: ['social_studio', 'email_studio', 'website_builder', 'business_ops'],
-    isInvestor: false,
-    invitedAt: '2025-03-10',
-    lastActive: '10 mins ago'
-  },
-  {
-    id: 'tm-demo-3',
-    tenantId: 'demo-tenant',
-    name: 'Venture Capital Partner',
-    email: 'investor@nexuscap.com',
-    password: 'InvestorKey2026!',
-    designation: 'Lead Angel Investor',
-    department: 'Investor Relations',
-    role: 'investor',
-    status: 'active',
-    permittedModules: ['revenue_intelligence', 'business_ops', 'success_center'],
-    isInvestor: true,
-    investorDetails: {
-      sharePercentage: 15.5,
-      investmentAmount: 350000,
-      numberOfShares: 155000,
-      shareClass: 'Series A Preferred',
-      valuationCap: 5000000,
-      vestingStatus: 'Immediate 100% Preferred Share Ownership',
-      dividendRights: '1.5x Liquidation Preference & Board Observer Seat',
-      notes: 'Lead Seed & Series A Capital Contributor'
-    },
-    invitedAt: '2025-04-01',
-    lastActive: 'Yesterday'
-  },
-  {
-    id: 'tm-demo-4',
-    tenantId: 'demo-tenant',
-    name: 'Marcus Brody',
-    email: 'm.brody@democorp.com',
-    password: 'MarcusPass2026!',
-    designation: 'Restaurant Operations Manager',
-    department: 'Operations',
-    role: 'writer',
-    status: 'active',
-    permittedModules: ['restaurant_os', 'business_ops'],
-    isInvestor: false,
-    invitedAt: '2025-05-12',
-    lastActive: '2 hrs ago'
-  },
-
-  // Sienna Clay Tenant Members
-  {
-    id: 'tm-sienna-1',
-    tenantId: 'sienna-tenant',
-    name: 'Evelyn Thorne',
-    email: 'evelyn@siennaclay.com',
-    password: 'EvelynSienna2026!',
-    designation: 'Founder & Managing Director',
-    department: 'Executive',
-    role: 'owner',
-    status: 'active',
-    permittedModules: ['social_studio', 'email_studio', 'revenue_intelligence', 'website_builder', 'business_ops'],
-    isInvestor: true,
-    investorDetails: {
-      sharePercentage: 80.0,
-      investmentAmount: 120000,
-      numberOfShares: 800000,
-      shareClass: 'Founder Equity',
-      valuationCap: 1500000,
-      vestingStatus: 'Fully Vested',
-      dividendRights: 'Primary Voting & Capital Distribution',
-      notes: 'Owner and Lead Craft Designer'
-    },
-    invitedAt: '2025-02-01',
-    lastActive: '1 hr ago'
-  },
-  {
-    id: 'tm-sienna-2',
-    tenantId: 'sienna-tenant',
-    name: 'Julian Hayes',
-    email: 'julian@angelgroup.org',
-    password: 'JulianAngel2026!',
-    designation: 'Angel Investor & Advisor',
-    department: 'Investor Relations',
-    role: 'investor',
-    status: 'active',
-    permittedModules: ['revenue_intelligence', 'business_ops'],
-    isInvestor: true,
-    investorDetails: {
-      sharePercentage: 10.0,
-      investmentAmount: 50000,
-      numberOfShares: 100000,
-      shareClass: 'Angel Equity',
-      valuationCap: 1500000,
-      vestingStatus: '2 Year Vesting Schedule',
-      dividendRights: 'Pro-rata Angel Dividend Rights',
-      notes: 'Strategic Advisor for E-Commerce Expansion'
-    },
-    invitedAt: '2025-04-15',
-    lastActive: '3 days ago'
-  }
-];
+const INITIAL_TENANT_MEMBERS: TenantTeamMember[] = [];
 
 export default function TenantTeamManagement({
   tenantId,
@@ -207,6 +73,7 @@ export default function TenantTeamManagement({
   const [formName, setFormName] = useState('');
   const [formEmail, setFormEmail] = useState('');
   const [formPassword, setFormPassword] = useState('Pass' + Math.floor(100000 + Math.random() * 900000) + '!');
+  const [formPinCode, setFormPinCode] = useState('1234');
   const [formDesignation, setFormDesignation] = useState('Department Manager');
   const [formDepartment, setFormDepartment] = useState('Operations');
   const [formRoleScope, setFormRoleScope] = useState<'owner' | 'admin' | 'writer' | 'viewer' | 'investor'>('admin');
@@ -263,10 +130,11 @@ export default function TenantTeamManagement({
     setFormName('');
     setFormEmail('');
     setFormPassword('Pass' + Math.floor(100000 + Math.random() * 900000) + '!');
+    setFormPinCode('1234');
     setFormDesignation('Operations Manager');
     setFormDepartment('Operations');
     setFormRoleScope('admin');
-    setFormPermittedModules(['social_studio', 'email_studio', 'revenue_intelligence', 'business_ops']);
+    setFormPermittedModules(['social_studio', 'email_studio', 'revenue_intelligence', 'business_ops', 'restaurant_os']);
     setFormIsInvestor(false);
     setFormSharePct(5.0);
     setFormInvestAmt(50000);
@@ -285,6 +153,7 @@ export default function TenantTeamManagement({
     setFormName(member.name);
     setFormEmail(member.email);
     setFormPassword(member.password || 'Pass123!');
+    setFormPinCode(member.pinCode || '1234');
     setFormDesignation(member.designation);
     setFormDepartment(member.department);
     setFormRoleScope(member.role);
@@ -340,6 +209,7 @@ export default function TenantTeamManagement({
             name: formName,
             email: formEmail,
             password: formPassword,
+            pinCode: formPinCode,
             designation: formDesignation,
             department: formDepartment,
             role: formIsInvestor && formRoleScope === 'viewer' ? 'investor' : formRoleScope,
@@ -350,7 +220,7 @@ export default function TenantTeamManagement({
         }
         return m;
       }));
-      showToast(`Updated permissions & profile for ${formName}`);
+      showToast(`Updated permissions & PIN profile for ${formName}`);
     } else {
       // Create new invited member
       const newMember: TenantTeamMember = {
@@ -358,7 +228,8 @@ export default function TenantTeamManagement({
         tenantId,
         name: formName,
         email: formEmail,
-        password: formPassword,
+        password: formPassword || 'Forge@123456',
+        pinCode: formPinCode,
         designation: formDesignation,
         department: formDepartment,
         role: formIsInvestor && formRoleScope === 'viewer' ? 'investor' : formRoleScope,
@@ -371,7 +242,32 @@ export default function TenantTeamManagement({
       };
 
       setMembers(prev => [newMember, ...prev]);
-      showToast(`Invited ${formName} (${formEmail}) with password & designation permissions!`);
+      showToast(`Inviting ${formName} (${formEmail})...`);
+
+      // Dispatch Outbound Invitation Email via Server API
+      fetch('/api/tenant/add-team-member', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tenantId,
+          name: formName,
+          email: formEmail,
+          role: formRoleScope,
+          password: formPassword || 'Forge@123456',
+          username: formName ? formName.toLowerCase().replace(/\s+/g, '') : formEmail.split('@')[0]
+        })
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          showToast(`✉️ Invitation email successfully dispatched to ${formEmail}!`);
+        } else {
+          showToast(`Member added, but email dispatch failed: ${data.error || 'SMTP timeout'}`);
+        }
+      })
+      .catch(err => {
+        showToast(`Member added locally. Server response: ${err.message}`);
+      });
     }
 
     setIsModalOpen(false);
@@ -385,13 +281,32 @@ export default function TenantTeamManagement({
   };
 
   // Apply Quick Preset Permissions based on Designation
-  const handleApplyPreset = (type: 'all' | 'restaurant' | 'marketing' | 'investor' | 'minimal') => {
+  const handleApplyPreset = (type: 'all' | 'restaurant' | 'marketing' | 'investor' | 'minimal' | 'waiter' | 'chef' | 'cashier') => {
     if (type === 'all') {
       setFormPermittedModules(ALL_AVAILABLE_MODULES.map(m => m.id));
+    } else if (type === 'waiter') {
+      setFormPermittedModules(['restaurant_os']);
+      setFormDesignation('Terrace / Dining Waiter');
+      setFormDepartment('Bar & Service');
+      setFormPinCode('8888');
+      setFormRoleScope('viewer');
+    } else if (type === 'chef') {
+      setFormPermittedModules(['restaurant_os']);
+      setFormDesignation('Head Chef & Kitchen Display Lead');
+      setFormDepartment('Kitchen & Food');
+      setFormPinCode('5555');
+      setFormRoleScope('writer');
+    } else if (type === 'cashier') {
+      setFormPermittedModules(['restaurant_os', 'business_ops']);
+      setFormDesignation('POS Cashier & Financial Reconciliation');
+      setFormDepartment('Operations');
+      setFormPinCode('1234');
+      setFormRoleScope('writer');
     } else if (type === 'restaurant') {
       setFormPermittedModules(['restaurant_os', 'business_ops', 'success_center']);
       setFormDesignation('Restaurant Lead Cashier');
       setFormDepartment('Operations');
+      setFormPinCode('1234');
     } else if (type === 'marketing') {
       setFormPermittedModules(['social_studio', 'email_studio', 'website_builder', 'business_ops']);
       setFormDesignation('Growth Marketing Specialist');
@@ -429,9 +344,44 @@ export default function TenantTeamManagement({
 
   // Copy Login Info
   const handleCopyCredentials = (member: TenantTeamMember) => {
-    const credText = `MarketForge Workspace Login Credentials:\nTenant: ${tenantName}\nEmail: ${member.email}\nPassword: ${member.password || 'Set during signup'}\nDesignation: ${member.designation}`;
+    const credText = `MarketForge Workspace Login Credentials:\nTenant: ${tenantName}\nEmail: ${member.email}\nPassword: ${member.password || 'Set during signup'}\nTouch PIN: ${member.pinCode || '1234'}\nDesignation: ${member.designation}`;
     navigator.clipboard.writeText(credText);
     showToast(`Copied login credentials for ${member.name} to clipboard!`);
+  };
+
+  // Copy Invitation Token Link
+  const handleCopyInviteLink = (member: TenantTeamMember) => {
+    const token = member.inviteToken || `inv_${Math.random().toString(36).substring(2, 10)}`;
+    const inviteUrl = `${window.location.origin}/?invite_token=${token}&tenantId=${member.tenantId}&email=${encodeURIComponent(member.email)}`;
+    navigator.clipboard.writeText(inviteUrl);
+    showToast(`Copied secure invitation URL for ${member.name}!`);
+  };
+
+  // Dispatch Real Email Invitation
+  const handleSendInviteEmail = async (member: TenantTeamMember) => {
+    showToast(`Dispatching invitation email to ${member.email}...`);
+    try {
+      const resp = await fetch('/api/tenant/add-team-member', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tenantId: member.tenantId || tenantId,
+          name: member.name,
+          email: member.email,
+          role: member.role || 'writer',
+          password: member.password || 'Forge@123456',
+          username: member.name ? member.name.toLowerCase().replace(/\s+/g, '') : member.email.split('@')[0]
+        })
+      });
+      const data = await resp.json();
+      if (data.success) {
+        showToast(`✉️ Invitation email dispatched successfully to ${member.email}!`);
+      } else {
+        showToast(`Failed to send email to ${member.email}: ${data.error || 'SMTP timeout'}`);
+      }
+    } catch (err: any) {
+      showToast(`Error dispatching email: ${err.message}`);
+    }
   };
 
   return (
@@ -507,6 +457,38 @@ export default function TenantTeamManagement({
               {formatCurrency(totalCapitalInvested)}
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* DIRECT TEAM MEMBER SELF-REGISTRATION & LOGIN LINK SHARE CARD */}
+      <div className="bg-indigo-50 border border-indigo-200 rounded-2xl p-4 flex flex-col md:flex-row items-center justify-between gap-4">
+        <div className="space-y-1 text-left">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-indigo-600" />
+            <span className="text-xs font-bold text-indigo-950">Direct Team Member Self-Registration & Login Link</span>
+            <span className="px-2 py-0.5 bg-indigo-200 text-indigo-900 rounded-md font-mono text-[10px] font-bold">Public Link</span>
+          </div>
+          <p className="text-[11px] text-slate-600">
+            Share this link with your staff or employees so they can self-register their account and access <strong className="text-slate-900">{tenantId}</strong> directly.
+          </p>
+        </div>
+        <div className="flex items-center gap-2 w-full md:w-auto shrink-0">
+          <input 
+            type="text" 
+            readOnly 
+            value={`${window.location.origin}/?tenant=${tenantId}&register=member`}
+            className="bg-white border border-indigo-200 px-3 py-1.5 rounded-xl font-mono text-xs text-indigo-900 font-semibold w-full md:w-80 focus:outline-none"
+          />
+          <button
+            onClick={() => {
+              navigator.clipboard.writeText(`${window.location.origin}/?tenant=${tenantId}&register=member`);
+              showToast("📋 Copied Direct Team Member Self-Registration & Login Link!");
+            }}
+            className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-xs transition cursor-pointer shrink-0 flex items-center gap-1.5 shadow"
+          >
+            <Copy className="w-3.5 h-3.5" />
+            <span>Copy Direct Link</span>
+          </button>
         </div>
       </div>
 
@@ -628,9 +610,14 @@ export default function TenantTeamManagement({
                       {member.department}
                     </span>
                   </div>
-                  <p className="font-bold text-xs text-slate-800 flex items-center gap-1.5">
-                    <Briefcase className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
-                    {member.designation}
+                  <p className="font-bold text-xs text-slate-800 flex items-center justify-between gap-1.5">
+                    <span className="flex items-center gap-1.5">
+                      <Briefcase className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                      {member.designation}
+                    </span>
+                    <span className="px-2 py-0.5 bg-indigo-50 text-indigo-800 border border-indigo-200 rounded-md text-[10px] font-mono font-bold">
+                      PIN: {member.pinCode || '1234'}
+                    </span>
                   </p>
                 </div>
 
@@ -685,10 +672,27 @@ export default function TenantTeamManagement({
                 <div className="flex items-center gap-1">
                   <button
                     onClick={() => handleCopyCredentials(member)}
-                    title="Copy Email & Password Credentials"
+                    title="Copy Credentials & PIN"
                     className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1"
                   >
                     <Key className="w-3.5 h-3.5 text-indigo-600" />
+                  </button>
+
+                  <button
+                    onClick={() => handleCopyInviteLink(member)}
+                    title="Copy Token Verification Invite Link"
+                    className="p-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1"
+                  >
+                    <Send className="w-3.5 h-3.5 text-indigo-600" />
+                  </button>
+
+                  <button
+                    onClick={() => handleSendInviteEmail(member)}
+                    title="Send Invitation Email via SMTP"
+                    className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-xl text-[11px] font-bold transition cursor-pointer flex items-center gap-1.5 border border-emerald-200"
+                  >
+                    <Mail className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Send Email</span>
                   </button>
 
                   {onLoginAsUser && (
@@ -896,8 +900,11 @@ export default function TenantTeamManagement({
 
       {/* MODAL: INVITE / EDIT TEAM MEMBER & DESIGNATION ACCESS */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white rounded-3xl p-6 lg:p-8 max-w-2xl w-full shadow-2xl space-y-6 border border-slate-200 animate-fade-in text-slate-900 my-8">
+        <div 
+          className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto"
+          onClick={(e) => { if (e.target === e.currentTarget) setIsModalOpen(false); }}
+        >
+          <div className="bg-white rounded-3xl p-6 lg:p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto my-auto shadow-2xl space-y-6 border border-slate-200 animate-fade-in text-slate-900 relative">
             <div className="flex justify-between items-center border-b border-slate-100 pb-4">
               <div>
                 <span className="text-[10px] font-black uppercase tracking-wider bg-indigo-100 text-indigo-800 px-2.5 py-1 rounded-full">
@@ -932,15 +939,36 @@ export default function TenantTeamManagement({
                   </button>
                   <button
                     type="button"
+                    onClick={() => handleApplyPreset('waiter')}
+                    className="px-3 py-1.5 bg-cyan-50 text-cyan-700 hover:bg-cyan-100 text-xs font-bold rounded-xl transition cursor-pointer"
+                  >
+                    🚶‍♂️ Waiter / Server
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleApplyPreset('chef')}
+                    className="px-3 py-1.5 bg-rose-50 text-rose-700 hover:bg-rose-100 text-xs font-bold rounded-xl transition cursor-pointer"
+                  >
+                    👨‍🍳 Head Chef / Kitchen
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleApplyPreset('cashier')}
+                    className="px-3 py-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 text-xs font-bold rounded-xl transition cursor-pointer"
+                  >
+                    💳 Cashier & POS
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => handleApplyPreset('restaurant')}
                     className="px-3 py-1.5 bg-orange-50 text-orange-700 hover:bg-orange-100 text-xs font-bold rounded-xl transition cursor-pointer"
                   >
-                    🍽️ Restaurant Staff
+                    🍽️ Operations Manager
                   </button>
                   <button
                     type="button"
                     onClick={() => handleApplyPreset('marketing')}
-                    className="px-3 py-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 text-xs font-bold rounded-xl transition cursor-pointer"
+                    className="px-3 py-1.5 bg-purple-50 text-purple-700 hover:bg-purple-100 text-xs font-bold rounded-xl transition cursor-pointer"
                   >
                     📣 Growth & Marketing
                   </button>
@@ -1007,6 +1035,28 @@ export default function TenantTeamManagement({
                       {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
                   </div>
+                </div>
+
+                <div>
+                  <div className="flex justify-between items-center mb-1">
+                    <label className="text-xs font-bold text-slate-700">Touch Terminal 4-Digit PIN *</label>
+                    <button
+                      type="button"
+                      onClick={() => setFormPinCode(Math.floor(1000 + Math.random() * 9000).toString())}
+                      className="text-[10px] font-bold text-indigo-600 hover:underline cursor-pointer"
+                    >
+                      Auto-Generate
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    maxLength={4}
+                    required
+                    placeholder="e.g. 1234"
+                    value={formPinCode}
+                    onChange={(e) => setFormPinCode(e.target.value)}
+                    className="w-full px-3.5 py-2 border border-slate-300 rounded-xl text-xs font-mono font-black text-center text-slate-900 focus:outline-none focus:border-indigo-500 tracking-widest bg-slate-50"
+                  />
                 </div>
 
                 <div>

@@ -22,8 +22,15 @@ export default function PaymentSuccessModal({ isOpen, onClose }: PaymentSuccessM
           initial={{ scale: 0.95, opacity: 0, y: 20 }}
           animate={{ scale: 1, opacity: 1, y: 0 }}
           exit={{ scale: 0.95, opacity: 0, y: 20 }}
-          className="bg-[#0C0D14] border border-emerald-500/30 rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden text-center p-8"
+          className="bg-[#0C0D14] border border-emerald-500/30 rounded-2xl w-full max-w-sm max-h-[90vh] overflow-y-auto my-auto shadow-2xl text-center p-8 relative"
         >
+          <button
+            onClick={onClose}
+            className="absolute top-4 right-4 p-2 text-slate-400 hover:text-white rounded-lg bg-white/5 hover:bg-white/10 transition cursor-pointer"
+            title="Close modal"
+          >
+            <X className="w-4 h-4" />
+          </button>
           <div className="flex justify-center mb-6">
              <div className="w-16 h-16 bg-emerald-500/20 rounded-full flex items-center justify-center">
                 <CheckCircle className="w-8 h-8 text-emerald-400" />

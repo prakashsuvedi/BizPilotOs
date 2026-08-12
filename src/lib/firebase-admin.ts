@@ -1,15 +1,13 @@
-import { initializeApp, getApps } from 'firebase-admin/app';
+import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
-import { cert } from 'firebase-admin';
 import firebaseConfig from '../../firebase-applet-config.json';
 import dotenv from 'dotenv';
 import * as path from 'path';
 import * as fs from 'fs';
 import { fileURLToPath } from 'url';
 
-const customFilename = typeof __filename !== 'undefined' ? __filename : fileURLToPath(import.meta.url);
-const customDirname = typeof __dirname !== 'undefined' ? __dirname : path.dirname(customFilename);
+const customDirname = typeof __dirname !== 'undefined' ? __dirname : process.cwd();
 
 // Load environment variables immediately before referencing process.env
 dotenv.config();

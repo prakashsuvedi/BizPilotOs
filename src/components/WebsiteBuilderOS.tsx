@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Globe,
   Wand2,
@@ -18,26 +18,20 @@ import {
   Layers,
   Palette,
   ShoppingBag,
-  Utensils,
   HeartPulse,
   Pill,
-  PhoneCall,
+  Store,
   Compass,
   Dumbbell,
-  Scissors,
-  Smile,
-  Package,
-  Shirt,
   Building,
-  Briefcase,
   Star,
   MapPin,
   Mail,
   Phone,
   Clock,
-  ChevronRight,
-  CheckCircle2,
   ArrowRight,
+  ArrowUp,
+  ArrowDown,
   X,
   Image as ImageIcon,
   MessageSquare,
@@ -45,811 +39,618 @@ import {
   Send,
   Zap,
   Sliders,
-  Store,
   Tag,
-  ShieldCheck
+  ShieldCheck,
+  Layout,
+  FileText,
+  Inbox,
+  Edit3,
+  HelpCircle,
+  TrendingUp,
+  CheckCircle2,
+  Download,
+  Flame,
+  Moon,
+  Sun,
+  EyeOff,
+  User,
+  Sparkle,
+  Bed,
+  Utensils,
+  Calendar,
+  Search
 } from 'lucide-react';
 import { BusinessProfile } from '../types';
 import { getTenantBranding, saveTenantBranding } from '../lib/tenantBranding';
+import { clientDb } from '../lib/firebase';
+import { logAiTaskUsage } from '../lib/aiUsageTracker';
+import AiUsageBadge from './AiUsageBadge';
 
 interface Props {
   profile: BusinessProfile;
   tenantId: string;
 }
 
-// Preset Industry Templates
-export interface IndustryPreset {
+// Section Data Types
+export type SectionType = 
+  | 'hero' 
+  | 'features' 
+  | 'products' 
+  | 'stats' 
+  | 'testimonials' 
+  | 'faq' 
+  | 'cta' 
+  | 'contact' 
+  | 'customText'
+  | 'hotelRooms'
+  | 'restaurantMenu'
+  | 'toursPackages';
+
+export interface PageSection {
   id: string;
-  name: string;
-  icon: React.ElementType;
-  badge: string;
-  heroHeadline: string;
-  heroSubtitle: string;
-  heroImage: string;
-  primaryColorTheme: string;
-  itemsLabel: string;
-  products: {
-    id: string;
-    title: string;
-    price: string;
-    category: string;
-    image: string;
-    badge: string;
-    description: string;
-  }[];
-  features: {
-    title: string;
-    desc: string;
-  }[];
-  aboutText: string;
-  contactAddress: string;
-  contactPhone: string;
-  contactEmail: string;
+  type: SectionType;
+  title: string;
+  subtitle?: string;
+  badge?: string;
+  imageUrl?: string;
+  ctaText?: string;
+  ctaLink?: string;
+  hidden?: boolean;
+  contentData?: any; // items array or custom text
 }
 
-const INDUSTRY_PRESETS: IndustryPreset[] = [
-  {
-    id: 'hospital',
-    name: 'Hospital & Healthcare',
-    icon: HeartPulse,
-    badge: 'Medical Excellence',
-    heroHeadline: 'World-Class Compassionate Care For Your Loved Ones',
-    heroSubtitle: '24/7 emergency medical response, advanced diagnostics, expert multi-specialty doctors, and modern clinical facilities.',
-    heroImage: 'https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?auto=format&fit=crop&w=1200&q=80',
-    primaryColorTheme: 'emerald',
-    itemsLabel: 'Departments & Specialties',
-    products: [
-      {
-        id: 'p1',
-        title: 'Emergency & Critical ICU Care',
-        price: '24/7 Active',
-        category: 'Emergency',
-        image: 'https://images.unsplash.com/photo-1516549655169-df83a0774514?auto=format&fit=crop&w=600&q=80',
-        badge: 'Priority 1',
-        description: 'Immediate trauma response with fully equipped cardiac life support ambulances.'
-      },
-      {
-        id: 'p2',
-        title: 'Comprehensive Cardiology Suite',
-        price: 'Consultation $80',
-        category: 'Specialties',
-        image: 'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?auto=format&fit=crop&w=600&q=80',
-        badge: 'Top Rated',
-        description: 'Advanced ECG, 2D Echo, stress testing, and expert interventional cardiology.'
-      },
-      {
-        id: 'p3',
-        title: 'Digital Radiology & MRI Scans',
-        price: 'From $120',
-        category: 'Diagnostics',
-        image: 'https://images.unsplash.com/photo-1516549655169-df83a0774514?auto=format&fit=crop&w=600&q=80',
-        badge: 'High Precision',
-        description: 'Ultra-low radiation 3D CT scans and high-resolution MRI imaging.'
-      }
-    ],
-    features: [
-      { title: 'JCI Accredited Facility', desc: 'Compliant with international healthcare safety and hygiene protocols.' },
-      { title: '50+ Specialist Doctors', desc: 'Renowned surgeons, pediatricians, cardiologists, and neurologists.' },
-      { title: 'Digital Health Records', desc: 'Secure online patient portal to access prescriptions and test results.' }
-    ],
-    aboutText: 'Dedicated to providing patient-first medical treatments with cutting-edge medical technology and empathetic healthcare teams.',
-    contactAddress: '102 Medical Boulevard, Health City Zone',
-    contactPhone: '+1 (800) 555-0199',
-    contactEmail: 'care@medicalcenter.org'
-  },
-  {
-    id: 'pharmacy',
-    name: 'Pharmacy & Wellness',
-    icon: Pill,
-    badge: '100% Genuine Medicines',
-    heroHeadline: 'Your Trusted Neighborhood Pharmacy & Health Hub',
-    heroSubtitle: 'Authentic prescription medicines, wellness supplements, home delivery within 30 minutes, and online prescription refills.',
-    heroImage: 'https://images.unsplash.com/photo-1586015555751-63c205739221?auto=format&fit=crop&w=1200&q=80',
-    primaryColorTheme: 'teal',
-    itemsLabel: 'Featured Medicines & Supplements',
-    products: [
-      {
-        id: 'ph1',
-        title: 'Daily Multi-Vitamin & Mineral Boost',
-        price: '$24.99',
-        category: 'Supplements',
-        image: 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?auto=format&fit=crop&w=600&q=80',
-        badge: 'Best Seller',
-        description: 'High potency essential vitamins for immunity, stamina, and bone health.'
-      },
-      {
-        id: 'ph2',
-        title: 'Automatic Digital Blood Pressure Monitor',
-        price: '$45.00',
-        category: 'Medical Devices',
-        image: 'https://images.unsplash.com/photo-1631815588090-d4bfec5b1cdb?auto=format&fit=crop&w=600&q=80',
-        badge: 'FDA Approved',
-        description: 'One-touch pulse and BP checker with memory recall for 2 users.'
-      },
-      {
-        id: 'ph3',
-        title: 'Organic Herbal Sleep & Immunity Tea',
-        price: '$14.50',
-        category: 'Wellness',
-        image: 'https://images.unsplash.com/photo-1544787219-7f47ccb76574?auto=format&fit=crop&w=600&q=80',
-        badge: '100% Natural',
-        description: 'Soothing chamomile and ashwagandha blend for restful night recovery.'
-      }
-    ],
-    features: [
-      { title: 'Express 30-Min Delivery', desc: 'Urgent medications delivered direct to your doorstep safely.' },
-      { title: 'Prescription Auto-Refill', desc: 'Never run out of essential monthly chronic disease care medicines.' },
-      { title: 'Licensed Pharmacists', desc: 'Free consultation on dosage, side effects, and drug interactions.' }
-    ],
-    aboutText: 'Bridging healthcare with convenience. We source 100% certified pharmaceutical supplies from verified manufacturers globally.',
-    contactAddress: '45 Health Avenue, Care Square',
-    contactPhone: '+1 (800) 444-MEDS',
-    contactEmail: 'order@pharmacyhub.com'
-  },
-  {
-    id: 'mobile_shop',
-    name: 'Mobile & Tech Electronics',
-    icon: PhoneCall,
-    badge: 'Latest Smartphones & Gadgets',
-    heroHeadline: 'Upgrade to Flagship Smartphones & Smart Accessories',
-    heroSubtitle: 'Explore the newest smartphones, wireless earbuds, smartwatches, and laptop accessories with official warranty and easy EMI.',
-    heroImage: 'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?auto=format&fit=crop&w=1200&q=80',
-    primaryColorTheme: 'indigo',
-    itemsLabel: 'Hot Selling Tech & Devices',
-    products: [
-      {
-        id: 'm1',
-        title: 'Ultra Pro Max 5G Smartphone (256GB)',
-        price: '$999.00',
-        category: 'Smartphones',
-        image: 'https://images.unsplash.com/photo-1592899677977-9c10ca588bbd?auto=format&fit=crop&w=600&q=80',
-        badge: 'New Release',
-        description: 'A18 Pro chip, OLED 120Hz display, titanium body, and 108MP camera.'
-      },
-      {
-        id: 'm2',
-        title: 'Active Noise Canceling Wireless Earbuds',
-        price: '$149.00',
-        category: 'Audio',
-        image: 'https://images.unsplash.com/photo-1590658268037-6bf12165a8df?auto=format&fit=crop&w=600&q=80',
-        badge: '30h Battery',
-        description: 'Spatial audio with dynamic head tracking and IPX5 water resistance.'
-      },
-      {
-        id: 'm3',
-        title: 'Titanium Smartwatch with ECG & GPS',
-        price: '$220.00',
-        category: 'Wearables',
-        image: 'https://images.unsplash.com/photo-1508685096489-7aacd43bd3b1?auto=format&fit=crop&w=600&q=80',
-        badge: 'Fitness Pro',
-        description: 'Continuous heart rate, blood oxygen sensor, and dual-frequency GPS.'
-      }
-    ],
-    features: [
-      { title: 'Official Brand Warranty', desc: '100% genuine products with 1-year brand replacement warranty.' },
-      { title: 'Instant Exchange Offer', desc: 'Trade in your old device for maximum cash back toward new upgrades.' },
-      { title: 'Zero% Interest EMI', desc: 'Flexible monthly installment plans with major credit cards.' }
-    ],
-    aboutText: 'Your one-stop destination for authentic smartphones, audio gear, smart wearables, and professional device repair services.',
-    contactAddress: '78 Tech Plaza, Cyber Avenue',
-    contactPhone: '+1 (800) 888-TECH',
-    contactEmail: 'sales@techmobile.com'
-  },
-  {
-    id: 'restaurant',
-    name: 'Restaurant & Cafe',
-    icon: Utensils,
-    badge: 'Artisanal Dining Experience',
-    heroHeadline: 'Savor Exquisite Gourmet Flavors & Artisan Recipes',
-    heroSubtitle: 'Handcrafted wood-fired pizzas, chef special delicacies, organic ingredients, and cozy ambience for memorable celebrations.',
-    heroImage: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1200&q=80',
-    primaryColorTheme: 'amber',
-    itemsLabel: 'Chef Signature Specials',
-    products: [
-      {
-        id: 'r1',
-        title: 'Truffle & Wild Mushroom Wood-fired Pizza',
-        price: '$22.50',
-        category: 'Main Course',
-        image: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=600&q=80',
-        badge: 'Chef Favorite',
-        description: 'Fresh mozzarella, black truffle oil, wild mushrooms, and fresh basil leaves.'
-      },
-      {
-        id: 'r2',
-        title: 'Grilled Salmon with Citrus Herb Glaze',
-        price: '$28.00',
-        category: 'Seafood',
-        image: 'https://images.unsplash.com/photo-1467003909585-2f8a72700288?auto=format&fit=crop&w=600&q=80',
-        badge: 'Fresh Catch',
-        description: 'Wild Atlantic salmon served with roasted asparagus and garlic butter quinoa.'
-      },
-      {
-        id: 'r3',
-        title: 'Artisan Espresso Tiramisu & Gelato',
-        price: '$9.50',
-        category: 'Desserts',
-        image: 'https://images.unsplash.com/photo-1571877227200-a0d98ea607e9?auto=format&fit=crop&w=600&q=80',
-        badge: 'Handmade',
-        description: 'Traditional mascarpone cheese cream layered with espresso-soaked ladyfingers.'
-      }
-    ],
-    features: [
-      { title: 'Farm-to-Table Fresh', desc: '100% organic produce sourced daily from local sustainable farms.' },
-      { title: 'Online Table Reservation', desc: 'Book private booths or outdoor terrace seating in seconds.' },
-      { title: 'Contactless QR Menu', desc: 'Instant digital ordering and table payment gateway.' }
-    ],
-    aboutText: 'Blending traditional culinary techniques with modern gastronomy to create dining moments you will cherish with friends and family.',
-    contactAddress: '12 Gourmet Street, Culinary Haven',
-    contactPhone: '+1 (800) 333-FOOD',
-    contactEmail: 'reserve@bistrogourmet.com'
-  },
-  {
-    id: 'mart',
-    name: 'Departmental Mart & Grocery',
-    icon: Store,
-    badge: 'Lowest Prices Guaranteed',
-    heroHeadline: 'Fresh Farm Groceries & Everyday Supermarket Deals',
-    heroSubtitle: 'Over 10,000+ household items, fresh vegetables, organic dairy, snacks, and imported pantry items delivered directly to your home.',
-    heroImage: 'https://images.unsplash.com/photo-1578916171728-46686eac8d58?auto=format&fit=crop&w=1200&q=80',
-    primaryColorTheme: 'emerald',
-    itemsLabel: 'Super Saver Daily Grocery Deals',
-    products: [
-      {
-        id: 'mrt1',
-        title: 'Farm Fresh Organic Milk & Dairy Basket',
-        price: '$6.99',
-        category: 'Dairy & Eggs',
-        image: 'https://images.unsplash.com/photo-1528750997573-59b89d56f4f7?auto=format&fit=crop&w=600&q=80',
-        badge: 'Farm Fresh',
-        description: 'Pure pasteurized whole milk, fresh butter, and free-range brown eggs.'
-      },
-      {
-        id: 'mrt2',
-        title: 'Premium Organic Exotic Fruits Box',
-        price: '$18.50',
-        category: 'Fresh Produce',
-        image: 'https://images.unsplash.com/photo-1610832958506-aa56368176cf?auto=format&fit=crop&w=600&q=80',
-        badge: 'Vitamin Pack',
-        description: 'Selected ripe avocados, dragon fruit, blueberries, and kiwi.'
-      },
-      {
-        id: 'mrt3',
-        title: 'Whole Grain Bakery Bread & Artisan Snacks',
-        price: '$4.25',
-        category: 'Pantry',
-        image: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=600&q=80',
-        badge: 'Baked Today',
-        description: 'Stone-ground sourdough bread baked fresh every morning.'
-      }
-    ],
-    features: [
-      { title: 'Wholesale Discount Pricing', desc: 'Bulk discount rewards on weekly family supermarket baskets.' },
-      { title: 'Doorstep Delivery in 2 Hours', desc: 'Temperature-controlled delivery vehicles keep produce fresh.' },
-      { title: 'Quality Assurance Guarantee', desc: '100% hassle-free refund if you are dissatisfied with fresh items.' }
-    ],
-    aboutText: 'Your reliable neighborhood department mart committed to quality, freshness, and unbeatable wholesale pricing.',
-    contactAddress: '88 Central Market Road, Mart City',
-    contactPhone: '+1 (800) 999-MART',
-    contactEmail: 'support@supermartexpress.com'
-  },
-  {
-    id: 'tours',
-    name: 'Tours, Travels & Adventure',
-    icon: Compass,
-    badge: 'Curated Dream Holidays',
-    heroHeadline: 'Explore Unforgettable Destinations Across the Globe',
-    heroSubtitle: 'Tailor-made vacation packages, trekking expeditions, luxury resort bookings, and hassle-free visa assistance.',
-    heroImage: 'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?auto=format&fit=crop&w=1200&q=80',
-    primaryColorTheme: 'sky',
-    itemsLabel: 'Featured Holiday & Tour Packages',
-    products: [
-      {
-        id: 't1',
-        title: 'Himalayan Mountain Expedition (7 Days)',
-        price: '$899 / person',
-        category: 'Adventure Trek',
-        image: 'https://images.unsplash.com/photo-1544735716-392fe2489ffa?auto=format&fit=crop&w=600&q=80',
-        badge: 'All Inclusive',
-        description: 'Guided trek with mountain lodges, campfire nights, and helicopter rescue insurance.'
-      },
-      {
-        id: 't2',
-        title: 'Tropical Island Beach Villa Resort (5 Days)',
-        price: '$1,250 / couple',
-        category: 'Luxury Vacation',
-        image: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=600&q=80',
-        badge: 'Popular Choice',
-        description: 'Private oceanfront bungalow, spa credits, speed boat transfers, and seafood buffets.'
-      },
-      {
-        id: 't3',
-        title: 'European Heritage & Cultural Tour (10 Days)',
-        price: '$2,400 / person',
-        category: 'International',
-        image: 'https://images.unsplash.com/photo-1499856871958-5b9627545d1a?auto=format&fit=crop&w=600&q=80',
-        badge: 'Guided Group',
-        description: 'Paris, Rome, and Zurich with bullet train passes, museum entrances, and English guides.'
-      }
-    ],
-    features: [
-      { title: 'Zero Cancellation Fee', desc: 'Flexibility to reschedule or cancel up to 48 hours before trip departure.' },
-      { title: '24/7 On-Tour Support', desc: 'Local travel concierge reachable at any point during your holiday.' },
-      { title: 'Custom Itinerary Builder', desc: 'Craft personalized travel itineraries matching your exact budget.' }
-    ],
-    aboutText: 'Passionate travel experts helping thousands of travelers create lifelong memories across 40+ countries.',
-    contactAddress: '204 Destination Towers, Transit Square',
-    contactPhone: '+1 (800) 777-TOUR',
-    contactEmail: 'holidays@worldtours.com'
-  },
-  {
-    id: 'fitness',
-    name: 'Fitness Gym, Crossfit & Zumba',
-    icon: Dumbbell,
-    badge: 'Transform Your Mind & Body',
-    heroHeadline: 'Unleash Your Full Athletic Potential Today',
-    heroSubtitle: 'State-of-the-art heavy lifting gear, high-energy Zumba dance cardio classes, personal trainers, and steam sauna.',
-    heroImage: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&w=1200&q=80',
-    primaryColorTheme: 'rose',
-    itemsLabel: 'Membership Memberships & Training Modules',
-    products: [
-      {
-        id: 'f1',
-        title: 'All-Access Monthly Gym & Cardio Pass',
-        price: '$49 / month',
-        category: 'Memberships',
-        image: 'https://images.unsplash.com/photo-1517838277536-f5f99be501cd?auto=format&fit=crop&w=600&q=80',
-        badge: 'Best Value',
-        description: 'Unlimited access to weight floor, cardio zone, lockers, and sauna rooms.'
-      },
-      {
-        id: 'f2',
-        title: 'High-Energy Zumba & Dance Fitness Group',
-        price: '$35 / 10 Sessions',
-        category: 'Group Classes',
-        image: 'https://images.unsplash.com/photo-1518611012118-696072aa579a?auto=format&fit=crop&w=600&q=80',
-        badge: 'Fun Cardio',
-        description: 'Latin dance cardio routines led by certified Zumba instructors for fast calorie burn.'
-      },
-      {
-        id: 'f3',
-        title: '1-on-1 Elite Personal Body Sculpting',
-        price: '$120 / month',
-        category: 'Personal Coaching',
-        image: 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?auto=format&fit=crop&w=600&q=80',
-        badge: 'Guaranteed Results',
-        description: 'Customized weight loss / muscle gain workouts with personalized nutrition meal planning.'
-      }
-    ],
-    features: [
-      { title: 'Biometric Body Composition', desc: 'Monthly InBody 3D muscle mass and body fat percentage scanning.' },
-      { title: 'Hygienic Sanitized Equipment', desc: 'Sanitized workout zones with filtered air circulation.' },
-      { title: 'Free Trial Class', desc: 'Experience a free workout session before committing to membership.' }
-    ],
-    aboutText: 'A high-energy fitness community empowering individuals of all fitness levels to build strength, confidence, and longevity.',
-    contactAddress: '55 Power Gym Complex, Arena Boulevard',
-    contactPhone: '+1 (800) 666-FITNESS',
-    contactEmail: 'join@powerhousegym.com'
-  },
-  {
-    id: 'beauty',
-    name: 'Beauty Parlor, Salon & Spa',
-    icon: Scissors,
-    badge: 'Glow With Elegance',
-    heroHeadline: 'Premium Hair Styling, Skincare & Luxury Spa Care',
-    heroSubtitle: 'Pamper yourself with organic facials, bridal makeup, trendsetting hair coloring, nail art, and therapeutic massages.',
-    heroImage: 'https://images.unsplash.com/photo-1560066984-138dadb4c035?auto=format&fit=crop&w=1200&q=80',
-    primaryColorTheme: 'rose',
-    itemsLabel: 'Signature Beauty Packages',
-    products: [
-      {
-        id: 'b1',
-        title: 'Hydra-Glow Anti-Aging Facial Spa',
-        price: '$85.00',
-        category: 'Skincare',
-        image: 'https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?auto=format&fit=crop&w=600&q=80',
-        badge: 'Instant Radiance',
-        description: 'Deep pore extraction, hyaluronic acid infusion, and collagen LED mask massage.'
-      },
-      {
-        id: 'b2',
-        title: 'Bridal Glam & HD Makeup Package',
-        price: '$250.00',
-        category: 'Bridal Studio',
-        image: 'https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?auto=format&fit=crop&w=600&q=80',
-        badge: 'Waterproof HD',
-        description: 'Complete wedding makeover including hair draping, lash extensions, and touch-up kit.'
-      },
-      {
-        id: 'b3',
-        title: 'Keratin Hair Smoothing & Color Balayage',
-        price: '$140.00',
-        category: 'Hair Care',
-        image: 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?auto=format&fit=crop&w=600&q=80',
-        badge: 'Frizz Free',
-        description: 'Deep nourishing keratin therapy with customized dimensional balayage highlights.'
-      }
-    ],
-    features: [
-      { title: 'International Products', desc: 'Exclusive use of Loreal, Olaplex, and Dermalogica certified lines.' },
-      { title: 'Private VIP Spa Rooms', desc: 'Relaxing ambient room with aromatherapy and soothing music.' },
-      { title: 'Instant Online Appointment', desc: 'Pick your preferred beauty artist and slot without waiting.' }
-    ],
-    aboutText: 'Dedicated to highlighting your inner beauty through bespoke aesthetic treatments, skilled stylists, and relaxing sanctuary spaces.',
-    contactAddress: '108 Glamour Lane, Beauty Zone',
-    contactPhone: '+1 (800) 222-GLOW',
-    contactEmail: 'book@beautysalon.com'
-  },
-  {
-    id: 'dentist',
-    name: 'Dental Clinic & Orthodontics',
-    icon: Smile,
-    badge: 'Gentle Dental Care',
-    heroHeadline: 'Achieve a Radiant, Healthy & Confident Smile',
-    heroSubtitle: 'Painless teeth whitening, laser dentistry, invisible aligners, dental implants, and pediatric dental checkups.',
-    heroImage: 'https://images.unsplash.com/photo-1629909613654-28e377c37b09?auto=format&fit=crop&w=1200&q=80',
-    primaryColorTheme: 'cyan',
-    itemsLabel: 'Dental Treatments & Cosmetic Care',
-    products: [
-      {
-        id: 'd1',
-        title: '3D Laser Teeth Whitening Treatment',
-        price: '$199.00',
-        category: 'Cosmetic Dentistry',
-        image: 'https://images.unsplash.com/photo-1588776814546-1ffcf47267a5?auto=format&fit=crop&w=600&q=80',
-        badge: '3 Shades Brighter',
-        description: 'Single-session painless laser bleaching removing deep tea, coffee, and tobacco stains.'
-      },
-      {
-        id: 'd2',
-        title: 'Clear Invisible Braces & Aligners',
-        price: 'From $1,400',
-        category: 'Orthodontics',
-        image: 'https://images.unsplash.com/photo-1606811841689-23dfddce3e95?auto=format&fit=crop&w=600&q=80',
-        badge: 'Discreet',
-        description: 'Custom 3D scanned transparent aligners to straighten teeth without metal wires.'
-      },
-      {
-        id: 'd3',
-        title: 'Single Tooth Swiss Dental Implant',
-        price: '$850.00',
-        category: 'Restorative',
-        image: 'https://images.unsplash.com/photo-1598256989800-fe5f95da9787?auto=format&fit=crop&w=600&q=80',
-        badge: 'Lifetime Warranty',
-        description: 'Biocompatible titanium root with natural-looking porcelain crown.'
-      }
-    ],
-    features: [
-      { title: '100% Painless Laser Tech', desc: 'Micro-invasive procedures with minimal healing downtime.' },
-      { title: 'Ultra-Sterilized Environment', desc: 'Hospital-grade autoclave sterilization for every instrument.' },
-      { title: 'Emergency Dental Response', desc: 'Same-day urgent appointments for severe toothache or injuries.' }
-    ],
-    aboutText: 'Combining dental art with medical precision. Our clinic provides gentle dental experiences for patients of all ages.',
-    contactAddress: '302 Smile Plaza, Healthcare Way',
-    contactPhone: '+1 (800) 111-SMILE',
-    contactEmail: 'appointment@dentalcare.com'
-  },
-  {
-    id: 'wholesale',
-    name: 'Wholesale & B2B Distributor',
-    icon: Package,
-    badge: 'B2B Bulk Supply Partner',
-    heroHeadline: 'Direct Factory Prices & High Volume B2B Bulk Supply',
-    heroSubtitle: 'Source high-demand merchandise, raw materials, consumer goods, and industrial components with guaranteed MOQ terms and global freight.',
-    heroImage: 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&w=1200&q=80',
-    primaryColorTheme: 'indigo',
-    itemsLabel: 'Bulk Supply Catalog & Containers',
-    products: [
-      {
-        id: 'w1',
-        title: 'Industrial Electronics & Cable Master Cartons',
-        price: '$12.50 / unit (MOQ 100)',
-        category: 'Hardware',
-        image: 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=600&q=80',
-        badge: 'ISO Certified',
-        description: 'High-purity copper wiring, heavy-duty connectors, and heat-resistant shielding.'
-      },
-      {
-        id: 'w2',
-        title: 'Eco-Friendly Biodegradable Packaging Boxes',
-        price: '$0.45 / box (MOQ 1000)',
-        category: 'Packaging',
-        image: 'https://images.unsplash.com/photo-1530587191325-3db32d826c18?auto=format&fit=crop&w=600&q=80',
-        badge: 'Eco-Friendly',
-        description: 'Heavy 3-ply corrugated boxes ideal for e-commerce and retail shipment.'
-      },
-      {
-        id: 'w3',
-        title: 'Commercial Cleaning & Sanitizer Drums (200L)',
-        price: '$180 / Drum',
-        category: 'Chemicals',
-        image: 'https://images.unsplash.com/photo-1584813470613-5b1c1cad3d69?auto=format&fit=crop&w=600&q=80',
-        badge: 'Hospital Grade',
-        description: '75% alcohol disinfectant solution formulated for large enterprise buildings.'
-      }
-    ],
-    features: [
-      { title: 'Tiered Bulk Volume Discount', desc: 'Save up to 40% when ordering full container loads (FCL).' },
-      { title: 'Dedicated Key Account Manager', desc: 'Single point contact for contract quotes and customs clearance.' },
-      { title: 'Net 30/60 Credit Terms', desc: 'Flexible trade credit options for verified business partners.' }
-    ],
-    aboutText: 'Leading global B2B distributor providing reliable supply chain continuity for retailers, factories, and corporate clients.',
-    contactAddress: '500 Logistics Logistics Hub, Port Road',
-    contactPhone: '+1 (800) 555-BULK',
-    contactEmail: 'b2b@wholesaledirect.com'
-  },
-  {
-    id: 'fashion',
-    name: 'Fashion, Boutique & Clothes',
-    icon: Shirt,
-    badge: 'New Season Collection',
-    heroHeadline: 'Discover Timeless Style & Runway Fashion Trends',
-    heroSubtitle: 'Handpicked apparel, designer dresses, streetwear coats, footwear, and accessories tailored for modern elegance.',
-    heroImage: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&w=1200&q=80',
-    primaryColorTheme: 'purple',
-    itemsLabel: 'New Season Fashion Arrivals',
-    products: [
-      {
-        id: 'fa1',
-        title: 'Handcrafted Cashmere Wool Trench Coat',
-        price: '$189.00',
-        category: 'Outerwear',
-        image: 'https://images.unsplash.com/photo-1539533018447-63fcce2678e3?auto=format&fit=crop&w=600&q=80',
-        badge: '100% Cashmere',
-        description: 'Double-breasted classic silhouette lined with soft silk for luxury comfort.'
-      },
-      {
-        id: 'fa2',
-        title: 'Vintage Leather Shoulder Crossbody Bag',
-        price: '$95.00',
-        category: 'Accessories',
-        image: 'https://images.unsplash.com/photo-1548036328-c9fa89d128fa?auto=format&fit=crop&w=600&q=80',
-        badge: 'Genuine Leather',
-        description: 'Full-grain Italian leather with brass hardware and adjustable strap.'
-      },
-      {
-        id: 'fa3',
-        title: 'Urban Minimalist Unisex Sneakers',
-        price: '$110.00',
-        category: 'Footwear',
-        image: 'https://images.unsplash.com/photo-1560769629-975ec94e6a86?auto=format&fit=crop&w=600&q=80',
-        badge: 'Limited Edition',
-        description: 'Breathable canvas upper with memory foam cushioned rubber soles.'
-      }
-    ],
-    features: [
-      { title: 'Free Global Express Shipping', desc: 'Complimentary tracked courier delivery on orders over $100.' },
-      { title: '30-Day Easy Exchange', desc: 'Hassle-free size exchange and store credit policy.' },
-      { title: 'Sustainable Organic Fabrics', desc: 'Ethically manufactured with low impact eco-dyes.' }
-    ],
-    aboutText: 'Curating modern wardrobes that express individuality, confidence, and effortless sophistication.',
-    contactAddress: '15 Fashion Avenue, Style Quarter',
-    contactPhone: '+1 (800) 888-STYLE',
-    contactEmail: 'concierge@boutiquefashion.com'
-  }
-];
-
-// Color Theme Map
-export interface ColorThemeOption {
+export interface WebsitePage {
   id: string;
   name: string;
-  headerBg: string;
-  heroGradient: string;
+  slug: string;
+  sections: PageSection[];
+}
+
+export interface WebTheme {
+  id: string;
+  name: string;
+  description: string;
+  bgCanvas: string;
+  cardBg: string;
+  textColor: string;
+  headingColor: string;
   accentBtn: string;
   accentText: string;
   badgeBg: string;
+  headerBg: string;
+  fontFamily: string;
+  borderColor: string;
 }
 
-const COLOR_THEMES: Record<string, ColorThemeOption> = {
-  emerald: {
-    id: 'emerald',
-    name: 'Clean Medical Emerald',
-    headerBg: 'bg-[#061811]',
-    heroGradient: 'from-emerald-950 via-[#061811] to-[#040D0A]',
-    accentBtn: 'bg-emerald-500 hover:bg-emerald-400 text-[#040D0A]',
-    accentText: 'text-emerald-400',
-    badgeBg: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+export const WORLD_CLASS_THEMES: Record<string, WebTheme> = {
+  cyber_obsidian: {
+    id: 'cyber_obsidian',
+    name: 'Cyber Obsidian (Dark Luxury)',
+    description: 'Deep midnight obsidian with violet & cyan glow accents, glassy cards, ultra-modern tech aesthetic.',
+    bgCanvas: 'bg-[#07080E]',
+    cardBg: 'bg-[#0D0E17]/90 backdrop-blur-md border border-white/10',
+    textColor: 'text-slate-300',
+    headingColor: 'text-white',
+    accentBtn: 'bg-gradient-to-r from-indigo-600 via-purple-600 to-cyan-500 hover:from-indigo-500 hover:to-cyan-400 text-white shadow-lg shadow-indigo-600/30',
+    accentText: 'text-cyan-400',
+    badgeBg: 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/40',
+    headerBg: 'bg-[#090A10]/95 backdrop-blur-md',
+    fontFamily: 'font-sans',
+    borderColor: 'border-white/10'
   },
-  teal: {
-    id: 'teal',
-    name: 'Teal Wellness',
-    headerBg: 'bg-[#041618]',
-    heroGradient: 'from-teal-950 via-[#041618] to-[#020A0B]',
-    accentBtn: 'bg-teal-400 hover:bg-teal-300 text-slate-950',
-    accentText: 'text-teal-300',
-    badgeBg: 'bg-teal-500/20 text-teal-200 border-teal-500/30'
-  },
-  indigo: {
-    id: 'indigo',
-    name: 'Cyberpunk Tech Indigo',
-    headerBg: 'bg-[#0A0D1D]',
-    heroGradient: 'from-indigo-950 via-[#0A0D1D] to-[#05060F]',
-    accentBtn: 'bg-indigo-600 hover:bg-indigo-500 text-white',
-    accentText: 'text-indigo-400',
-    badgeBg: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30'
-  },
-  amber: {
-    id: 'amber',
-    name: 'Warm Gourmet Amber',
-    headerBg: 'bg-[#1C1206]',
-    heroGradient: 'from-amber-950 via-[#1C1206] to-[#0F0A03]',
-    accentBtn: 'bg-amber-500 hover:bg-amber-400 text-slate-950',
+  lux_gold: {
+    id: 'lux_gold',
+    name: 'Midnight Gold & Serif Luxury',
+    description: 'High-end gold accents on dark slate with Playfair serif headlines for premium brand prestige.',
+    bgCanvas: 'bg-[#0A0D14]',
+    cardBg: 'bg-[#111622] border border-amber-500/20 shadow-xl',
+    textColor: 'text-amber-100/80',
+    headingColor: 'text-amber-100 font-serif',
+    accentBtn: 'bg-gradient-to-r from-amber-500 via-amber-600 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 font-extrabold shadow-lg shadow-amber-600/20',
     accentText: 'text-amber-400',
-    badgeBg: 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+    badgeBg: 'bg-amber-500/10 text-amber-300 border border-amber-500/30',
+    headerBg: 'bg-[#070A10]/95 backdrop-blur-md border-b border-amber-500/20',
+    fontFamily: 'font-serif',
+    borderColor: 'border-amber-500/20'
   },
-  sky: {
-    id: 'sky',
-    name: 'Ocean Sky Blue',
-    headerBg: 'bg-[#061320]',
-    heroGradient: 'from-sky-950 via-[#061320] to-[#020810]',
-    accentBtn: 'bg-sky-500 hover:bg-sky-400 text-slate-950',
-    accentText: 'text-sky-400',
-    badgeBg: 'bg-sky-500/20 text-sky-300 border-sky-500/30'
+  clean_saas: {
+    id: 'clean_saas',
+    name: 'Clean Crisp Tech SaaS (Light)',
+    description: 'Ultra-clean white/slate canvas with high-contrast crisp blue geometry and sharp typography.',
+    bgCanvas: 'bg-slate-50',
+    cardBg: 'bg-white border border-slate-200 shadow-sm',
+    textColor: 'text-slate-600',
+    headingColor: 'text-slate-900',
+    accentBtn: 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-md shadow-indigo-600/20',
+    accentText: 'text-indigo-600',
+    badgeBg: 'bg-indigo-50 text-indigo-700 border border-indigo-200',
+    headerBg: 'bg-white/95 backdrop-blur-md border-b border-slate-200',
+    fontFamily: 'font-sans',
+    borderColor: 'border-slate-200'
   },
-  rose: {
-    id: 'rose',
-    name: 'Vibrant Beauty Rose',
-    headerBg: 'bg-[#1C0913]',
-    heroGradient: 'from-rose-950 via-[#1C0913] to-[#0F040A]',
-    accentBtn: 'bg-rose-500 hover:bg-rose-400 text-white',
+  nordic_emerald: {
+    id: 'nordic_emerald',
+    name: 'Nordic Organic Emerald',
+    description: 'Deep forest green and warm cream highlights with organic rounded curves and peaceful vibe.',
+    bgCanvas: 'bg-[#05140E]',
+    cardBg: 'bg-[#0A241A] border border-emerald-500/20 shadow-lg',
+    textColor: 'text-emerald-100/80',
+    headingColor: 'text-emerald-50',
+    accentBtn: 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold shadow-md shadow-emerald-500/20',
+    accentText: 'text-emerald-400',
+    badgeBg: 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30',
+    headerBg: 'bg-[#040F0A]/95 backdrop-blur-md border-b border-emerald-500/20',
+    fontFamily: 'font-sans',
+    borderColor: 'border-emerald-500/20'
+  },
+  vibrant_sunset: {
+    id: 'vibrant_sunset',
+    name: 'Vibrant Sunset Coral',
+    description: 'High-energy coral red and amber gradients designed for creative agencies and e-commerce.',
+    bgCanvas: 'bg-[#12080C]',
+    cardBg: 'bg-[#1E0E15] border border-rose-500/20 shadow-xl',
+    textColor: 'text-rose-100/80',
+    headingColor: 'text-white',
+    accentBtn: 'bg-gradient-to-r from-rose-500 via-orange-500 to-amber-500 hover:from-rose-400 hover:to-amber-400 text-white shadow-lg shadow-rose-500/30',
     accentText: 'text-rose-400',
-    badgeBg: 'bg-rose-500/20 text-rose-300 border-rose-500/30'
+    badgeBg: 'bg-rose-500/20 text-rose-300 border border-rose-500/30',
+    headerBg: 'bg-[#0E060A]/95 backdrop-blur-md border-b border-rose-500/20',
+    fontFamily: 'font-sans',
+    borderColor: 'border-rose-500/20'
   },
-  cyan: {
-    id: 'cyan',
-    name: 'Radiant Cyan',
-    headerBg: 'bg-[#04161B]',
-    heroGradient: 'from-cyan-950 via-[#04161B] to-[#020B0E]',
-    accentBtn: 'bg-cyan-400 hover:bg-cyan-300 text-slate-950',
+  synthwave_neon: {
+    id: 'synthwave_neon',
+    name: 'Cyberpunk Synthwave Neon',
+    description: 'Electric pink and cyber cyan neon contrast on grid dark purple backdrop.',
+    bgCanvas: 'bg-[#0B0612]',
+    cardBg: 'bg-[#150B24] border border-fuchsia-500/30 shadow-2xl',
+    textColor: 'text-fuchsia-100/80',
+    headingColor: 'text-fuchsia-50',
+    accentBtn: 'bg-gradient-to-r from-fuchsia-600 to-cyan-500 hover:from-fuchsia-500 hover:to-cyan-400 text-white font-extrabold shadow-lg shadow-fuchsia-500/40',
     accentText: 'text-cyan-300',
-    badgeBg: 'bg-cyan-500/20 text-cyan-200 border-cyan-500/30'
-  },
-  purple: {
-    id: 'purple',
-    name: 'Luxury Royal Purple',
-    headerBg: 'bg-[#140A1C]',
-    heroGradient: 'from-purple-950 via-[#140A1C] to-[#0A040E]',
-    accentBtn: 'bg-purple-600 hover:bg-purple-500 text-white',
-    accentText: 'text-purple-300',
-    badgeBg: 'bg-purple-500/20 text-purple-300 border-purple-500/30'
+    badgeBg: 'bg-fuchsia-500/20 text-fuchsia-300 border border-fuchsia-500/40',
+    headerBg: 'bg-[#08040E]/95 backdrop-blur-md border-b border-fuchsia-500/30',
+    fontFamily: 'font-sans',
+    borderColor: 'border-fuchsia-500/30'
   }
 };
 
 export default function WebsiteBuilderOS({ profile, tenantId }: Props) {
-  // Config state
-  const [selectedIndustryId, setSelectedIndustryId] = useState<string>('hospital');
-  const currentIndustry = INDUSTRY_PRESETS.find(i => i.id === selectedIndustryId) || INDUSTRY_PRESETS[0];
-
-  const [activeThemeKey, setActiveThemeKey] = useState<string>(currentIndustry.primaryColorTheme);
-  const activeTheme = COLOR_THEMES[activeThemeKey] || COLOR_THEMES.indigo;
-
-  // Custom Editable State
-  const [siteName, setSiteName] = useState<string>(profile.name || currentIndustry.name);
-  const [heroHeadline, setHeroHeadline] = useState<string>(currentIndustry.heroHeadline);
-  const [heroSubtitle, setHeroSubtitle] = useState<string>(currentIndustry.heroSubtitle);
-  const [heroImage, setHeroImage] = useState<string>(currentIndustry.heroImage);
-  const [aboutText, setAboutText] = useState<string>(currentIndustry.aboutText);
-  const [contactAddress, setContactAddress] = useState<string>(currentIndustry.contactAddress);
-  const [contactPhone, setContactPhone] = useState<string>(currentIndustry.contactPhone);
-  const [contactEmail, setContactEmail] = useState<string>(currentIndustry.contactEmail);
-
-  // Products state
-  const [productsList, setProductsList] = useState(currentIndustry.products);
-  const [newProduct, setNewProduct] = useState({
-    title: '',
-    price: '',
-    category: 'General',
-    image: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=600&q=80',
-    badge: 'Popular',
-    description: ''
-  });
-  const [isAddingProductModal, setIsAddingProductModal] = useState(false);
-
-  // UI state
+  // Global Website Configuration State
+  const [siteName, setSiteName] = useState(profile.name || 'Enterprise MarketForge Studio');
+  const [activeThemeId, setActiveThemeId] = useState<string>('cyber_obsidian');
   const [viewportMode, setViewportMode] = useState<'desktop' | 'tablet' | 'mobile'>('desktop');
-  const [activeTab, setActiveTab] = useState<'preset' | 'theme' | 'content' | 'products' | 'publish'>('preset');
-  const [isGeneratingAI, setIsGeneratingAI] = useState(false);
-  const [isPublished, setIsPublished] = useState(false);
-  const [publishedUrl, setPublishedUrl] = useState('');
-  const [showCodeModal, setShowCodeModal] = useState(false);
-  const [codeType, setCodeType] = useState<'html' | 'react'>('html');
-  const [copiedCode, setCopiedCode] = useState(false);
+  const [activeTab, setActiveTab] = useState<'pages' | 'sections' | 'themes' | 'leads' | 'export'>('pages');
 
-  // Contact form state in preview
-  const [formSubmitted, setFormSubmitted] = useState(false);
-  const [formData, setFormData] = useState({ name: '', phone: '', email: '', message: '' });
-
-  // Handle Preset change
-  const handleSelectIndustry = (preset: IndustryPreset) => {
-    setSelectedIndustryId(preset.id);
-    setActiveThemeKey(preset.primaryColorTheme);
-    setHeroHeadline(preset.heroHeadline);
-    setHeroSubtitle(preset.heroSubtitle);
-    setHeroImage(preset.heroImage);
-    setAboutText(preset.aboutText);
-    setContactAddress(preset.contactAddress);
-    setContactPhone(preset.contactPhone);
-    setContactEmail(preset.contactEmail);
-    setProductsList(preset.products);
-  };
-
-  // AI Auto Synthesize
-  const handleAISynthesize = () => {
-    setIsGeneratingAI(true);
-    setTimeout(() => {
-      setIsGeneratingAI(false);
-      setHeroHeadline(`Elite ${currentIndustry.name} Solutions Designed For Exceptional Impact`);
-      setHeroSubtitle(`Leveraging high-precision workflows, certified expertise, and instant client satisfaction for ${profile.name}.`);
-    }, 1500);
-  };
-
-  // Add Product handler
-  const handleAddProduct = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newProduct.title) return;
-    const item = {
-      id: 'p_' + Date.now(),
-      ...newProduct
-    };
-    setProductsList([...productsList, item]);
-    setNewProduct({
-      title: '',
-      price: '',
-      category: 'General',
-      image: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=600&q=80',
-      badge: 'New',
-      description: ''
-    });
-    setIsAddingProductModal(false);
-  };
-
-  const handleRemoveProduct = (id: string) => {
-    setProductsList(productsList.filter(p => p.id !== id));
-  };
-
-  // Handle Publish & Auto Sync to Tenant White-Label Engine
-  const handlePublishSite = async () => {
-    const slug = siteName.toLowerCase().replace(/[^a-z0-9]/g, '-');
-    const domain = `https://${slug || 'business'}.marketbazaaros.site`;
-    setPublishedUrl(domain);
-    setIsPublished(true);
-
-    // Auto-sync published website data with Tenant White-Labeling Engine
-    try {
-      const currentBranding = getTenantBranding(tenantId || 'demo-tenant');
-      const updatedBranding = {
-        ...currentBranding,
-        tenantId: tenantId || 'demo-tenant',
-        companyName: siteName || currentBranding.companyName,
-        tagline: heroHeadline || currentBranding.tagline,
-        address: contactAddress || currentBranding.address,
-        phone: contactPhone || currentBranding.phone,
-        supportEmail: contactEmail || currentBranding.supportEmail,
-        homepageSource: 'website_builder' as const,
-        customLandingData: {
-          heroTitle: heroHeadline,
-          heroSubtitle: heroSubtitle,
-          heroImageUrl: heroImage,
-          ctaButtonText: 'Explore Collection',
-          aboutText: aboutText,
-          productsCatalog: productsList.map(p => ({
-            id: p.id,
-            title: p.title,
-            price: p.price,
-            image: p.image,
-            category: p.category,
-            badge: p.badge,
-            description: p.description
-          }))
+  // Multi-Page state
+  const [pages, setPages] = useState<WebsitePage[]>([
+    {
+      id: 'page_home',
+      name: 'Home',
+      slug: '/',
+      sections: [
+        {
+          id: 'sec_hero_1',
+          type: 'hero',
+          title: 'Transform Your Business Operations With AI Intelligence',
+          subtitle: 'Automate customer growth, optimize campaign conversions, and publish high-converting enterprise digital storefronts in seconds.',
+          badge: 'Next-Gen Enterprise Engine',
+          imageUrl: 'https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?auto=format&fit=crop&w=1200&q=80',
+          ctaText: 'Explore Collection',
+          ctaLink: '#catalog'
+        },
+        {
+          id: 'sec_features_1',
+          type: 'features',
+          title: 'Engineered For High Growth Businesses',
+          subtitle: 'Our key competitive advantages and operational standards',
+          contentData: [
+            { title: 'AI-Powered Automation', desc: 'Instant campaign generation with Gemini 2.5 intelligence.' },
+            { title: 'Omnichannel Publishing', desc: 'Sync landing pages, WhatsApp bots, and social feeds in 1-click.' },
+            { title: 'Real-Time ROI Analytics', desc: 'Track ad spend, customer pipelines, and token consumption.' }
+          ]
+        },
+        {
+          id: 'sec_products_1',
+          type: 'products',
+          title: 'Featured Offerings & Premium Services',
+          subtitle: 'Browse our top-tier catalog items engineered for maximum quality',
+          contentData: [
+            { id: 'p1', title: 'Enterprise Growth Package', price: '$499/mo', category: 'Subscription', image: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=600&q=80', badge: 'Top Seller', description: 'Full access to AI marketing automation, lead scoring, and dedicated CRM.' },
+            { id: 'p2', title: 'AEO Knowledge Base Optimizer', price: '$299', category: 'Optimization', image: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=600&q=80', badge: 'High Impact', description: 'Index your business across Perplexity, Gemini, and ChatGPT search bots.' },
+            { id: 'p3', title: 'Custom Whitelabel Portal', price: '$899', category: 'Enterprise', image: 'https://images.unsplash.com/photo-1507679799987-c73779587ccf?auto=format&fit=crop&w=600&q=80', badge: 'Custom', description: 'Your logo, custom domain, BYOK API key integration, and multi-user RBAC.' }
+          ]
+        },
+        {
+          id: 'sec_stats_1',
+          type: 'stats',
+          title: 'Proven Enterprise Performance',
+          subtitle: 'Real metrics backed by global customer results',
+          contentData: [
+            { metric: '99.99%', label: 'Cloud Network Uptime' },
+            { metric: '10x', label: 'Faster Lead Processing' },
+            { metric: '$4.2M+', label: 'Attributed Client Revenue' }
+          ]
+        },
+        {
+          id: 'sec_contact_1',
+          type: 'contact',
+          title: 'Get In Touch With Our Executive Team',
+          subtitle: 'Send us a message and receive a custom solution proposal within 2 hours.',
+          ctaText: 'Submit Inquiry'
         }
-      };
-      await saveTenantBranding(updatedBranding);
+      ]
+    },
+    {
+      id: 'page_about',
+      name: 'About Us',
+      slug: '/about',
+      sections: [
+        {
+          id: 'sec_about_hero',
+          type: 'hero',
+          title: 'Pioneering The Future Of Autonomous Business Operations',
+          subtitle: 'Founded with a mission to eliminate manual marketing friction and empower companies to scale effortlessly.',
+          badge: 'Our Corporate Mission',
+          imageUrl: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=1200&q=80'
+        },
+        {
+          id: 'sec_about_text',
+          type: 'customText',
+          title: 'Behind MarketForge Studio',
+          subtitle: 'We combine generative AI, real-time analytics, and white-label multi-tenancy into a singular operating system.',
+          contentData: 'MarketForge was built from the ground up to handle high-concurrency enterprise workloads. Whether you run a single boutique agency or manage a multi-location healthcare network, our platform adapts to your brand guidelines automatically.'
+        }
+      ]
+    }
+  ]);
+
+  const [activePageId, setActivePageId] = useState<string>('page_home');
+  const [selectedSectionId, setSelectedSectionId] = useState<string | null>('sec_hero_1');
+
+  // Leads state
+  const [receivedLeads, setReceivedLeads] = useState<any[]>([]);
+
+  // Preview Submission Form State inside preview iframe
+  const [leadName, setLeadName] = useState('');
+  const [leadEmail, setLeadEmail] = useState('');
+  const [leadPhone, setLeadPhone] = useState('');
+  const [leadMessage, setLeadMessage] = useState('');
+  const [leadSubmittedStatus, setLeadSubmittedStatus] = useState<string | null>(null);
+
+  // Status & Publishing
+  const [isPublishing, setIsPublishing] = useState(false);
+  const [publishedUrl, setPublishedUrl] = useState<string | null>(null);
+  const [isGeneratingAI, setIsGeneratingAI] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
+
+  // Load configuration from Firestore on mount
+  useEffect(() => {
+    loadSavedWebsiteConfig();
+    loadLeads();
+  }, [tenantId]);
+
+  const loadSavedWebsiteConfig = async () => {
+    try {
+      const configDoc = await clientDb.getDocById('website_config', tenantId);
+      if (configDoc) {
+        if (configDoc.siteName) setSiteName(configDoc.siteName);
+        if (configDoc.activeThemeId) setActiveThemeId(configDoc.activeThemeId);
+        if (configDoc.pages && configDoc.pages.length > 0) setPages(configDoc.pages);
+      }
     } catch (err) {
-      console.warn('Failed auto-syncing website builder to tenant white-label:', err);
+      console.warn("Could not load website_config from Firestore:", err);
     }
   };
 
-  const generatedHtmlCode = `<!DOCTYPE html>
+  const loadLeads = async () => {
+    try {
+      const docs = await clientDb.getCollection('leads', tenantId);
+      if (docs && docs.length > 0) {
+        setReceivedLeads(docs);
+      } else {
+        if (tenantId === 'demo-tenant' || tenantId === 'sienna-tenant') {
+          // Template showcase sample leads
+          setReceivedLeads([
+            { id: 'lead-1', name: 'Alexander Wright', email: 'alex@apexcorp.com', phone: '+1 555-0182', message: 'Interested in the Enterprise Whitelabel Portal integration.', createdAt: new Date().toISOString() },
+            { id: 'lead-2', name: 'Samantha Vance', email: 'sam@lumina.io', phone: '+1 555-0492', message: 'Would like a quick demo of the AEO Knowledge Base Optimizer.', createdAt: new Date(Date.now() - 3600000).toISOString() }
+          ]);
+        } else {
+          setReceivedLeads([]);
+        }
+      }
+    } catch (err) {
+      console.warn("Could not load leads:", err);
+    }
+  };
+
+  const activePage = pages.find(p => p.id === activePageId) || pages[0];
+  const activeTheme = WORLD_CLASS_THEMES[activeThemeId] || WORLD_CLASS_THEMES.cyber_obsidian;
+
+  // Helper to save website state to Firestore
+  const saveWebsiteToDb = async (updatedPages: WebsitePage[], updatedThemeId: string, updatedName: string) => {
+    const payload = {
+      id: tenantId,
+      siteName: updatedName,
+      activeThemeId: updatedThemeId,
+      pages: updatedPages,
+      updatedAt: new Date().toISOString()
+    };
+    try {
+      await clientDb.addDocToTenant('website_config', payload, tenantId);
+    } catch (err) {
+      console.warn("Failed saving website config to Firestore:", err);
+    }
+  };
+
+  // Section Manipulation Handlers
+  const handleAddSection = (type: SectionType) => {
+    const newSecId = `sec_${type}_${Date.now()}`;
+    let newSec: PageSection;
+
+    switch (type) {
+      case 'hero':
+        newSec = { id: newSecId, type, title: 'New Catchy Hero Headline', subtitle: 'Detailed subtitle explaining your value proposition', badge: 'New Feature', imageUrl: 'https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?auto=format&fit=crop&w=1200&q=80', ctaText: 'Get Started' };
+        break;
+      case 'features':
+        newSec = { id: newSecId, type, title: 'Core Competitive Advantages', subtitle: 'Why clients choose us over competitors', contentData: [{ title: 'Advantage 1', desc: 'Description of key feature' }, { title: 'Advantage 2', desc: 'Description of another key capability' }] };
+        break;
+      case 'products':
+        newSec = { id: newSecId, type, title: 'Featured Products & Services', subtitle: 'Explore our catalog offerings', contentData: [{ id: `p_${Date.now()}`, title: 'Premium Service Item', price: '$199', category: 'General', image: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=600&q=80', badge: 'Hot', description: 'Item description text.' }] };
+        break;
+      case 'stats':
+        newSec = { id: newSecId, type, title: 'Key Milestones', subtitle: 'Numbers that speak for themselves', contentData: [{ metric: '100+', label: 'Clients Served' }, { metric: '99.8%', label: 'Satisfaction' }] };
+        break;
+      case 'testimonials':
+        newSec = { id: newSecId, type, title: 'What Our Clients Say', subtitle: 'Real testimonials from industry leaders', contentData: [{ quote: 'MarketForge completely revolutionized our lead conversion rate.', author: 'Elena Rostova', role: 'CEO, Apex Media' }] };
+        break;
+      case 'faq':
+        newSec = { id: newSecId, type, title: 'Frequently Asked Questions', subtitle: 'Everything you need to know about our services', contentData: [{ q: 'How fast can I get started?', a: 'You can launch your digital workspace in less than 5 minutes.' }, { q: 'Do you offer custom SLA support?', a: 'Yes, 24/7 dedicated account managers are available.' }] };
+        break;
+      case 'cta':
+        newSec = { id: newSecId, type, title: 'Ready To Accelerate Your Growth?', subtitle: 'Join over 5,000+ businesses running on our engine today.', ctaText: 'Claim Your Free Trial' };
+        break;
+      case 'contact':
+        newSec = { id: newSecId, type, title: 'Contact Us', subtitle: 'Fill out the form below to reach our team directly.', ctaText: 'Send Message' };
+        break;
+      case 'hotelRooms':
+        newSec = {
+          id: newSecId,
+          type,
+          title: 'Luxury Guest Rooms & Suites',
+          subtitle: 'Experience world-class hospitality with direct online room reservations.',
+          badge: 'Live Room Availability',
+          contentData: [
+            { id: 'hr-1', roomNumber: '401', type: 'Presidential Ocean Suite', pricePerNight: 450, maxOccupancy: 4, amenities: ['Private Balcony', 'King Bed', 'Jacuzzi', 'High-Speed Wi-Fi'], image: 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?auto=format&fit=crop&w=600&q=80' },
+            { id: 'hr-2', roomNumber: '302', type: 'Executive Skyline Suite', pricePerNight: 280, maxOccupancy: 2, amenities: ['City View', 'Work Desk', 'Mini Bar', 'Breakfast Included'], image: 'https://images.unsplash.com/photo-1618773928121-c32242e63f39?auto=format&fit=crop&w=600&q=80' },
+            { id: 'hr-3', roomNumber: '205', type: 'Deluxe King Room', pricePerNight: 180, maxOccupancy: 2, amenities: ['King Bed', 'Ensuite Bathroom', 'Smart TV'], image: 'https://images.unsplash.com/photo-1566665797739-1674de7a421a?auto=format&fit=crop&w=600&q=80' }
+          ]
+        };
+        break;
+      case 'restaurantMenu':
+        newSec = {
+          id: newSecId,
+          type,
+          title: 'Chef Selected Gourmet Dining Menu',
+          subtitle: 'Artisanal culinary creations prepared with organic local ingredients.',
+          badge: 'Gourmet Dining',
+          contentData: [
+            { id: 'rm-1', name: 'Truffle Glazed Wagyu Ribeye', category: 'Main Course', price: 68, prepTimeMins: 25, isVeg: false, image: 'https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=600&q=80', description: 'Dry-aged Wagyu ribeye served with black truffle reduction.' },
+            { id: 'rm-2', name: 'Wild Mushroom & Spinach Risotto', category: 'Main Course', price: 34, prepTimeMins: 20, isVeg: true, image: 'https://images.unsplash.com/photo-1633964913295-ceb43826e7c9?auto=format&fit=crop&w=600&q=80', description: 'Creamy Arborio rice with porcini mushrooms and truffle oil.' },
+            { id: 'rm-3', name: 'Artisan Burrata & Heirloom Salad', category: 'Starters', price: 24, prepTimeMins: 12, isVeg: true, image: 'https://images.unsplash.com/photo-1592417817098-8f3d6eb19655?auto=format&fit=crop&w=600&q=80', description: 'Fresh Italian burrata with heirloom tomatoes and basil oil.' }
+          ]
+        };
+        break;
+      case 'toursPackages':
+        newSec = {
+          id: newSecId,
+          type,
+          title: 'Curated Global Expeditions & Tour Packages',
+          subtitle: 'Unforgettable journeys guided by certified experts with complete itinerary logistics.',
+          badge: 'Featured Tours',
+          contentData: [
+            { id: 'tp-1', name: '7-Day African Wildlife Safari', loc: 'Kenya & Serengeti', days: 7, price: 2400, rating: '4.9', image: 'https://images.unsplash.com/photo-1516426122078-c23e76319801?auto=format&fit=crop&w=600&q=80', description: '4x4 Land Cruiser, luxury tented camp & balloon safari.' },
+            { id: 'tp-2', name: 'Kyoto Cultural Heritage & Tea Ceremony', loc: 'Kyoto, Japan', days: 5, price: 1800, rating: '4.8', image: 'https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?auto=format&fit=crop&w=600&q=80', description: 'Shinkansen transfers, shrine pass & ryokan kaiseki dining.' },
+            { id: 'tp-3', name: 'Everest Helicopter Trek & Base Camp', loc: 'Solukhumbu, Nepal', days: 12, price: 3500, rating: '5.0', image: 'https://images.unsplash.com/photo-1544735716-392fe2489ffa?auto=format&fit=crop&w=600&q=80', description: 'Lukla flight, sherpa guides, oxygen & luxury lodge accommodation.' }
+          ]
+        };
+        break;
+      default:
+        newSec = { id: newSecId, type: 'customText', title: 'Custom Text Section', subtitle: 'Informational block', contentData: 'Add any custom company description or terms here.' };
+    }
+
+    const updatedPages = pages.map(p => {
+      if (p.id !== activePageId) return p;
+      return { ...p, sections: [...p.sections, newSec] };
+    });
+
+    setPages(updatedPages);
+    setSelectedSectionId(newSecId);
+    saveWebsiteToDb(updatedPages, activeThemeId, siteName);
+  };
+
+  const handleMoveSection = (sectionId: string, direction: 'up' | 'down') => {
+    const updatedPages = pages.map(p => {
+      if (p.id !== activePageId) return p;
+      const idx = p.sections.findIndex(s => s.id === sectionId);
+      if (idx === -1) return p;
+      const targetIdx = direction === 'up' ? idx - 1 : idx + 1;
+      if (targetIdx < 0 || targetIdx >= p.sections.length) return p;
+
+      const newSections = [...p.sections];
+      const temp = newSections[idx];
+      newSections[idx] = newSections[targetIdx];
+      newSections[targetIdx] = temp;
+      return { ...p, sections: newSections };
+    });
+
+    setPages(updatedPages);
+    saveWebsiteToDb(updatedPages, activeThemeId, siteName);
+  };
+
+  const handleDeleteSection = (sectionId: string) => {
+    const updatedPages = pages.map(p => {
+      if (p.id !== activePageId) return p;
+      return { ...p, sections: p.sections.filter(s => s.id !== sectionId) };
+    });
+    setPages(updatedPages);
+    if (selectedSectionId === sectionId) setSelectedSectionId(null);
+    saveWebsiteToDb(updatedPages, activeThemeId, siteName);
+  };
+
+  const handleToggleHideSection = (sectionId: string) => {
+    const updatedPages = pages.map(p => {
+      if (p.id !== activePageId) return p;
+      return {
+        ...p,
+        sections: p.sections.map(s => s.id === sectionId ? { ...s, hidden: !s.hidden } : s)
+      };
+    });
+    setPages(updatedPages);
+    saveWebsiteToDb(updatedPages, activeThemeId, siteName);
+  };
+
+  const handleUpdateSectionField = (sectionId: string, field: keyof PageSection, value: any) => {
+    const updatedPages = pages.map(p => {
+      if (p.id !== activePageId) return p;
+      return {
+        ...p,
+        sections: p.sections.map(s => s.id === sectionId ? { ...s, [field]: value } : s)
+      };
+    });
+    setPages(updatedPages);
+    saveWebsiteToDb(updatedPages, activeThemeId, siteName);
+  };
+
+  // Add Custom Page
+  const handleAddPage = () => {
+    const name = prompt('Enter new page title (e.g. Services, Pricing, FAQ):');
+    if (!name || !name.trim()) return;
+    const slug = '/' + name.toLowerCase().replace(/[^a-z0-9]/g, '-');
+    const newPage: WebsitePage = {
+      id: `page_${Date.now()}`,
+      name: name.trim(),
+      slug,
+      sections: [
+        {
+          id: `sec_hero_${Date.now()}`,
+          type: 'hero',
+          title: name.trim(),
+          subtitle: `Explore detailed insights and offerings on ${name.trim()}.`,
+          badge: 'Official Page'
+        }
+      ]
+    };
+
+    const updated = [...pages, newPage];
+    setPages(updated);
+    setActivePageId(newPage.id);
+    saveWebsiteToDb(updated, activeThemeId, siteName);
+  };
+
+  // Live Contact Submission inside preview frame
+  const handlePreviewSubmitLead = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!leadEmail.trim()) return;
+
+    const newLead = {
+      id: `lead_${Date.now()}`,
+      name: leadName.trim() || 'Anonymous Visitor',
+      email: leadEmail.trim(),
+      phone: leadPhone.trim() || 'N/A',
+      message: leadMessage.trim() || 'Inquiry submitted from live website preview.',
+      createdAt: new Date().toISOString()
+    };
+
+    setReceivedLeads([newLead, ...receivedLeads]);
+    setLeadSubmittedStatus('Thank you! Your message has been received.');
+    setLeadName('');
+    setLeadEmail('');
+    setLeadPhone('');
+    setLeadMessage('');
+
+    try {
+      await clientDb.addDocToTenant('leads', newLead, tenantId);
+    } catch (err) {
+      console.warn("Error saving lead:", err);
+    }
+  };
+
+  // AI Copilot Content Generator
+  const handleAiGenerativeSection = async (sectionId: string) => {
+    setIsGeneratingAI(true);
+    try {
+      const response = await fetch('/api/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: `Generate punchy high-converting website copy for business profile: ${profile.name}, industry: ${profile.industry || 'Technology'}. Return JSON with "headline", "subtitle", "badge"`
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const aiText = data.text || '';
+        let headline = 'Accelerate Business Results With Autonomous AI';
+        let subtitle = 'Eliminate manual bottlenecks and scale operations effortlessly.';
+        let badge = 'AI Optimized Copy';
+
+        try {
+          const parsed = JSON.parse(aiText);
+          if (parsed.headline) headline = parsed.headline;
+          if (parsed.subtitle) subtitle = parsed.subtitle;
+          if (parsed.badge) badge = parsed.badge;
+        } catch (e) {
+          if (aiText) headline = aiText.substring(0, 60);
+        }
+
+        handleUpdateSectionField(sectionId, 'title', headline);
+        handleUpdateSectionField(sectionId, 'subtitle', subtitle);
+        handleUpdateSectionField(sectionId, 'badge', badge);
+
+        logAiTaskUsage(tenantId, 'Website Copy Synthesizer', 'gemini-2.5-flash', 1800, 950);
+      }
+    } catch (err) {
+      console.warn("AI generation failed fallback applied:", err);
+      handleUpdateSectionField(sectionId, 'title', 'Engineered For Exponential Scale');
+      handleUpdateSectionField(sectionId, 'subtitle', 'Automate customer growth and maximize campaign ROI with intelligence.');
+    } finally {
+      setIsGeneratingAI(false);
+    }
+  };
+
+  // Publish Site Live
+  const handlePublishLive = async () => {
+    setIsPublishing(true);
+    const slug = siteName.toLowerCase().replace(/[^a-z0-9]/g, '-');
+    const url = `https://${slug || 'business'}.marketforge.site`;
+    setPublishedUrl(url);
+
+    try {
+      const currentBranding = getTenantBranding(tenantId);
+      const updatedBranding = {
+        ...currentBranding,
+        tenantId,
+        companyName: siteName,
+        homepageSource: 'website_builder' as const,
+        customLandingData: {
+          siteName,
+          pages,
+          activeThemeId
+        }
+      };
+      await saveTenantBranding(updatedBranding);
+      await saveWebsiteToDb(pages, activeThemeId, siteName);
+    } catch (err) {
+      console.warn("Error publishing site:", err);
+    } finally {
+      setIsPublishing(false);
+    }
+  };
+
+  // HTML Export Generator
+  const generateExportHtml = () => {
+    return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -857,57 +658,34 @@ export default function WebsiteBuilderOS({ profile, tenantId }: Props) {
   <title>${siteName} - Official Website</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-[#07080E] text-slate-100 font-sans">
-  <header class="${activeTheme.headerBg} border-b border-white/10 sticky top-0 z-50 py-4 px-8 flex justify-between items-center">
-    <h1 class="text-xl font-extrabold text-white">${siteName}</h1>
-    <nav class="hidden md:flex gap-6 text-xs font-semibold text-slate-300">
-      <a href="#home">Home</a>
-      <a href="#services">Services</a>
-      <a href="#about">About</a>
-      <a href="#contact">Contact</a>
+<body class="${activeTheme.bgCanvas} ${activeTheme.textColor} ${activeTheme.fontFamily}">
+  <header class="${activeTheme.headerBg} p-4 px-8 border-b ${activeTheme.borderColor} flex justify-between items-center sticky top-0 z-50">
+    <h1 class="text-xl font-bold ${activeTheme.headingColor}">${siteName}</h1>
+    <nav class="flex gap-6 text-sm font-semibold">
+      ${pages.map(p => `<a href="${p.slug}" class="hover:underline">${p.name}</a>`).join('')}
     </nav>
-    <a href="#contact" class="px-4 py-2 ${activeTheme.accentBtn} font-bold text-xs rounded-xl">Contact Us</a>
   </header>
-
-  <section id="home" class="py-20 px-8 max-w-6xl mx-auto grid md:grid-cols-2 gap-12 items-center">
-    <div class="space-y-6">
-      <span class="px-3 py-1 text-xs font-bold rounded-full ${activeTheme.badgeBg}">${currentIndustry.badge}</span>
-      <h2 class="text-4xl font-extrabold text-white leading-tight">${heroHeadline}</h2>
-      <p class="text-slate-300 text-sm leading-relaxed">${heroSubtitle}</p>
-      <a href="#contact" class="inline-block px-6 py-3 ${activeTheme.accentBtn} font-bold rounded-xl shadow-lg">Get Started Today</a>
-    </div>
-    <div>
-      <img src="${heroImage}" alt="${siteName}" class="rounded-2xl shadow-2xl border border-white/10 w-full object-cover h-96">
-    </div>
-  </section>
-
-  <!-- Products / Services -->
-  <section id="services" class="py-16 px-8 max-w-6xl mx-auto space-y-8">
-    <h3 class="text-2xl font-bold text-white text-center">${currentIndustry.itemsLabel}</h3>
-    <div class="grid md:grid-cols-3 gap-6">
-      ${productsList.map(p => `
-        <div class="bg-white/5 border border-white/10 rounded-2xl overflow-hidden p-4 space-y-3">
-          <img src="${p.image}" class="w-full h-40 object-cover rounded-xl" alt="${p.title}">
-          <div class="flex justify-between items-center">
-            <span class="text-xs font-bold text-indigo-300">${p.category}</span>
-            <span class="text-xs font-bold text-emerald-400">${p.price}</span>
-          </div>
-          <h4 class="font-bold text-white text-base">${p.title}</h4>
-          <p class="text-xs text-slate-400">${p.description}</p>
-        </div>
-      `).join('')}
-    </div>
-  </section>
-
-  <footer class="bg-black/80 border-t border-white/10 py-8 text-center text-xs text-slate-400">
-    <p>&copy; 2026 ${siteName}. All Rights Reserved. Powered by MarketBazaar OS.</p>
+  <main class="max-w-6xl mx-auto p-8 space-y-16">
+    ${activePage.sections.filter(s => !s.hidden).map(s => `
+      <section class="${activeTheme.cardBg} p-8 rounded-2xl space-y-4">
+        ${s.badge ? `<span class="px-3 py-1 rounded-full text-xs font-bold ${activeTheme.badgeBg}">${s.badge}</span>` : ''}
+        <h2 class="text-3xl font-extrabold ${activeTheme.headingColor}">${s.title}</h2>
+        ${s.subtitle ? `<p class="text-base leading-relaxed">${s.subtitle}</p>` : ''}
+      </section>
+    `).join('')}
+  </main>
+  <footer class="p-8 text-center text-xs opacity-60 border-t ${activeTheme.borderColor}">
+    © 2026 ${siteName}. All Rights Reserved. Built with MarketForge OS.
   </footer>
 </body>
 </html>`;
+  };
+
+  const selectedSection = activePage.sections.find(s => s.id === selectedSectionId);
 
   return (
-    <div className="space-y-6 animate-fade-in font-sans pb-20">
-      {/* Top OS Header Bar */}
+    <div className="space-y-6 animate-fade-in font-sans pb-20 text-slate-100">
+      {/* Top Header Controls Bar */}
       <div className="bg-[#0D0E17] border border-white/10 rounded-2xl p-6 shadow-2xl flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 relative overflow-hidden">
         <div className="flex items-center gap-4">
           <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-500 via-purple-500 to-cyan-500 p-3.5 flex items-center justify-center text-white shadow-xl">
@@ -916,50 +694,43 @@ export default function WebsiteBuilderOS({ profile, tenantId }: Props) {
           <div>
             <div className="flex items-center gap-2 mb-1">
               <span className="text-[10px] font-mono font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-2.5 py-0.5 rounded-full uppercase">
-                AI Website Builder OS
+                World-Class Website Builder OS
               </span>
-              <span className="text-xs text-slate-400 font-mono">Tenant: {tenantId}</span>
+              <AiUsageBadge tenantId={tenantId} />
             </div>
-            <h2 className="text-2xl font-extrabold text-white">Interactive Enterprise Website Studio</h2>
+            <h2 className="text-2xl font-extrabold text-white">Interactive Enterprise Storefront Studio</h2>
             <p className="text-xs text-slate-300">
-              Select company niche presets, color palettes, upload catalog products, and publish live in 1-click.
+              Drag & reorder sections, customize themes, edit pages dynamically, and capture leads directly into Firestore.
             </p>
           </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
           <button
-            onClick={handleAISynthesize}
-            disabled={isGeneratingAI}
-            className="px-4 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs rounded-xl shadow-lg border border-purple-400/30 flex items-center gap-2 transition cursor-pointer"
-          >
-            {isGeneratingAI ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4 text-amber-300" />}
-            {isGeneratingAI ? 'AI Synthesizing...' : 'AI Auto-Craft Copy'}
-          </button>
-
-          <button
-            onClick={() => setShowCodeModal(true)}
+            onClick={() => setShowExportModal(true)}
             className="px-4 py-2.5 bg-white/5 hover:bg-white/10 text-slate-200 font-bold text-xs rounded-xl border border-white/10 flex items-center gap-2 transition cursor-pointer"
           >
-            <Code className="w-4 h-4 text-cyan-400" /> Export Code
+            <Code className="w-4 h-4 text-cyan-400" /> Export HTML
           </button>
 
           <button
-            onClick={handlePublishSite}
-            className="px-5 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-emerald-600/20 border border-emerald-400/30 flex items-center gap-2 transition cursor-pointer"
+            onClick={handlePublishLive}
+            disabled={isPublishing}
+            className="px-5 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs rounded-xl shadow-lg border border-emerald-400/30 flex items-center gap-2 transition cursor-pointer"
           >
-            <UploadCloud className="w-4 h-4" /> Publish Live
+            {isPublishing ? <RefreshCw className="w-4 h-4 animate-spin" /> : <UploadCloud className="w-4 h-4" />}
+            <span>{isPublishing ? 'Publishing...' : 'Publish Live To Cloud'}</span>
           </button>
         </div>
       </div>
 
-      {/* Published Alert Notification */}
-      {isPublished && (
-        <div className="bg-emerald-950/80 border border-emerald-500/40 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-xs font-sans">
+      {/* Published Notice */}
+      {publishedUrl && (
+        <div className="bg-emerald-950/80 border border-emerald-500/40 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-xs">
           <div className="flex items-center gap-3">
             <CheckCircle2 className="w-6 h-6 text-emerald-400 shrink-0" />
             <div>
-              <p className="font-bold text-white text-sm">Website Live On MarketBazaar Cloud Network!</p>
+              <p className="font-bold text-white text-sm">Website Published & Live On Cloud Network!</p>
               <p className="text-emerald-200 font-mono mt-0.5">{publishedUrl}</p>
             </div>
           </div>
@@ -967,241 +738,367 @@ export default function WebsiteBuilderOS({ profile, tenantId }: Props) {
             href={publishedUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-[#040D0A] font-bold rounded-xl flex items-center gap-1.5 transition"
+            className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold rounded-xl flex items-center gap-1.5 transition"
           >
             <ExternalLink className="w-3.5 h-3.5" /> Visit Site
           </a>
         </div>
       )}
 
-      {/* Main Studio Workbench Grid */}
+      {/* Studio Workbench Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left Side Customizer Toolbar (4 Cols) */}
+        {/* LEFT TOOLBAR (4 Cols) */}
         <div className="lg:col-span-4 space-y-6">
-          {/* Navigation Sub-Tabs */}
+          {/* Toolbar Navigation Tabs */}
           <div className="flex items-center gap-1 bg-[#0D0E17] border border-white/10 p-1.5 rounded-2xl overflow-x-auto">
             <button
-              onClick={() => setActiveTab('preset')}
+              onClick={() => setActiveTab('pages')}
               className={`flex-1 py-2 px-3 rounded-xl text-xs font-semibold whitespace-nowrap transition cursor-pointer flex items-center justify-center gap-1.5 ${
-                activeTab === 'preset' ? 'bg-indigo-600 text-white font-bold shadow-md' : 'text-slate-400 hover:text-white'
+                activeTab === 'pages' ? 'bg-indigo-600 text-white font-bold shadow-md' : 'text-slate-400 hover:text-white'
               }`}
             >
-              <Building className="w-3.5 h-3.5" /> Niche Preset
+              <Layout className="w-3.5 h-3.5" /> Pages ({pages.length})
             </button>
+
             <button
-              onClick={() => setActiveTab('theme')}
+              onClick={() => setActiveTab('sections')}
               className={`flex-1 py-2 px-3 rounded-xl text-xs font-semibold whitespace-nowrap transition cursor-pointer flex items-center justify-center gap-1.5 ${
-                activeTab === 'theme' ? 'bg-indigo-600 text-white font-bold shadow-md' : 'text-slate-400 hover:text-white'
+                activeTab === 'sections' ? 'bg-indigo-600 text-white font-bold shadow-md' : 'text-slate-400 hover:text-white'
               }`}
             >
-              <Palette className="w-3.5 h-3.5" /> Palette
+              <Layers className="w-3.5 h-3.5" /> Sections
             </button>
+
             <button
-              onClick={() => setActiveTab('content')}
+              onClick={() => setActiveTab('themes')}
               className={`flex-1 py-2 px-3 rounded-xl text-xs font-semibold whitespace-nowrap transition cursor-pointer flex items-center justify-center gap-1.5 ${
-                activeTab === 'content' ? 'bg-indigo-600 text-white font-bold shadow-md' : 'text-slate-400 hover:text-white'
+                activeTab === 'themes' ? 'bg-indigo-600 text-white font-bold shadow-md' : 'text-slate-400 hover:text-white'
               }`}
             >
-              <Sliders className="w-3.5 h-3.5" /> Copy
+              <Palette className="w-3.5 h-3.5" /> Themes
             </button>
+
             <button
-              onClick={() => setActiveTab('products')}
+              onClick={() => setActiveTab('leads')}
               className={`flex-1 py-2 px-3 rounded-xl text-xs font-semibold whitespace-nowrap transition cursor-pointer flex items-center justify-center gap-1.5 ${
-                activeTab === 'products' ? 'bg-indigo-600 text-white font-bold shadow-md' : 'text-slate-400 hover:text-white'
+                activeTab === 'leads' ? 'bg-indigo-600 text-white font-bold shadow-md' : 'text-slate-400 hover:text-white'
               }`}
             >
-              <ShoppingBag className="w-3.5 h-3.5" /> Catalog ({productsList.length})
+              <Inbox className="w-3.5 h-3.5" /> Leads ({receivedLeads.length})
             </button>
           </div>
 
-          {/* TAB 1: Company / Niche Presets */}
-          {activeTab === 'preset' && (
+          {/* TAB 1: PAGES MANAGER */}
+          {activeTab === 'pages' && (
             <div className="bg-[#0D0E17] border border-white/10 rounded-2xl p-5 space-y-4 shadow-xl">
-              <div className="flex items-center justify-between">
-                <h3 className="font-display font-bold text-sm text-white flex items-center gap-2">
-                  <Store className="w-4 h-4 text-amber-400" />
-                  Select Business Niche
-                </h3>
-                <span className="text-[10px] font-mono text-slate-400">{INDUSTRY_PRESETS.length} Presets Available</span>
-              </div>
-
-              <div className="space-y-2.5 max-h-[500px] overflow-y-auto pr-1">
-                {INDUSTRY_PRESETS.map((preset) => {
-                  const IconComp = preset.icon;
-                  const isSelected = selectedIndustryId === preset.id;
-                  return (
-                    <button
-                      key={preset.id}
-                      onClick={() => handleSelectIndustry(preset)}
-                      className={`w-full p-3 rounded-xl border text-left transition flex items-center justify-between cursor-pointer ${
-                        isSelected
-                          ? 'bg-gradient-to-r from-indigo-900/60 to-purple-900/60 border-indigo-500 text-white shadow-lg'
-                          : 'bg-white/5 border-white/5 hover:bg-white/10 text-slate-300'
-                      }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className={`p-2 rounded-lg ${isSelected ? 'bg-indigo-600 text-white' : 'bg-white/10 text-slate-400'}`}>
-                          <IconComp className="w-4 h-4" />
-                        </div>
-                        <div>
-                          <p className="font-bold text-xs">{preset.name}</p>
-                          <p className="text-[10px] text-slate-400">{preset.badge}</p>
-                        </div>
-                      </div>
-                      {isSelected && <CheckCircle2 className="w-4 h-4 text-indigo-400" />}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* TAB 2: Color Palette */}
-          {activeTab === 'theme' && (
-            <div className="bg-[#0D0E17] border border-white/10 rounded-2xl p-5 space-y-4 shadow-xl">
-              <h3 className="font-display font-bold text-sm text-white flex items-center gap-2">
-                <Palette className="w-4 h-4 text-purple-400" />
-                Select Color Scheme
-              </h3>
-
-              <div className="grid grid-cols-2 gap-3">
-                {Object.values(COLOR_THEMES).map((theme) => {
-                  const isSelected = activeThemeKey === theme.id;
-                  return (
-                    <button
-                      key={theme.id}
-                      onClick={() => setActiveThemeKey(theme.id)}
-                      className={`p-3 rounded-xl border text-left transition cursor-pointer ${
-                        isSelected
-                          ? 'bg-white/10 border-indigo-500 ring-2 ring-indigo-500/50 text-white'
-                          : 'bg-white/5 border-white/5 hover:bg-white/10 text-slate-300'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2 mb-2">
-                        <div className={`w-3 h-3 rounded-full ${theme.accentBtn}`} />
-                        <span className="font-bold text-xs truncate">{theme.name}</span>
-                      </div>
-                      <div className="h-2 w-full rounded-full bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 border border-white/10" />
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* TAB 3: Copy & Branding Details */}
-          {activeTab === 'content' && (
-            <div className="bg-[#0D0E17] border border-white/10 rounded-2xl p-5 space-y-4 shadow-xl font-sans">
-              <h3 className="font-display font-bold text-sm text-white flex items-center gap-2">
-                <Sliders className="w-4 h-4 text-cyan-400" />
-                Customize Branding & Copy
-              </h3>
-
-              <div className="space-y-3 text-xs">
+              <div className="flex items-center justify-between border-b border-white/10 pb-3">
                 <div>
-                  <label className="block text-slate-400 mb-1 font-semibold">Business Name</label>
-                  <input
-                    type="text"
-                    value={siteName}
-                    onChange={(e) => setSiteName(e.target.value)}
-                    className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:border-indigo-500"
-                  />
+                  <h3 className="font-bold text-sm text-white flex items-center gap-2">
+                    <FileText className="w-4 h-4 text-indigo-400" /> Site Page Manager
+                  </h3>
+                  <p className="text-[11px] text-slate-400">Switch pages or add custom routes</p>
                 </div>
-
-                <div>
-                  <label className="block text-slate-400 mb-1 font-semibold">Hero Title Headline</label>
-                  <textarea
-                    rows={2}
-                    value={heroHeadline}
-                    onChange={(e) => setHeroHeadline(e.target.value)}
-                    className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:border-indigo-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-slate-400 mb-1 font-semibold">Hero Subtitle</label>
-                  <textarea
-                    rows={3}
-                    value={heroSubtitle}
-                    onChange={(e) => setHeroSubtitle(e.target.value)}
-                    className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:border-indigo-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-slate-400 mb-1 font-semibold">Unsplash Hero Image URL</label>
-                  <input
-                    type="text"
-                    value={heroImage}
-                    onChange={(e) => setHeroImage(e.target.value)}
-                    className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:border-indigo-500 font-mono text-[11px]"
-                  />
-                </div>
-
-                <div className="border-t border-white/10 pt-3">
-                  <label className="block text-slate-400 mb-1 font-semibold">Contact Address & Phone</label>
-                  <input
-                    type="text"
-                    value={contactAddress}
-                    onChange={(e) => setContactAddress(e.target.value)}
-                    className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:border-indigo-500 mb-2"
-                  />
-                  <input
-                    type="text"
-                    value={contactPhone}
-                    onChange={(e) => setContactPhone(e.target.value)}
-                    className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:border-indigo-500"
-                  />
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* TAB 4: Products / Catalog Manager */}
-          {activeTab === 'products' && (
-            <div className="bg-[#0D0E17] border border-white/10 rounded-2xl p-5 space-y-4 shadow-xl font-sans">
-              <div className="flex items-center justify-between">
-                <h3 className="font-display font-bold text-sm text-white flex items-center gap-2">
-                  <ShoppingBag className="w-4 h-4 text-emerald-400" />
-                  {currentIndustry.itemsLabel}
-                </h3>
                 <button
-                  onClick={() => setIsAddingProductModal(true)}
-                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl flex items-center gap-1 transition cursor-pointer"
+                  onClick={handleAddPage}
+                  className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl flex items-center gap-1 transition cursor-pointer"
                 >
-                  <Plus className="w-3.5 h-3.5" /> Add New
+                  <Plus className="w-3.5 h-3.5" /> Add Page
                 </button>
               </div>
 
-              <div className="space-y-3 max-h-[450px] overflow-y-auto pr-1">
-                {productsList.map((prod) => (
-                  <div key={prod.id} className="p-3 bg-white/5 border border-white/5 rounded-xl flex items-center justify-between gap-3">
-                    <img src={prod.image} alt={prod.title} className="w-12 h-12 object-cover rounded-lg shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <p className="font-bold text-white text-xs truncate">{prod.title}</p>
-                      <div className="flex items-center gap-2 text-[10px] text-slate-400">
-                        <span className="text-emerald-400 font-bold">{prod.price}</span>
-                        <span>•</span>
-                        <span>{prod.category}</span>
+              <div className="space-y-2">
+                {pages.map((p) => {
+                  const isActive = p.id === activePageId;
+                  return (
+                    <div
+                      key={p.id}
+                      onClick={() => setActivePageId(p.id)}
+                      className={`p-3 rounded-xl border transition cursor-pointer flex items-center justify-between ${
+                        isActive
+                          ? 'bg-indigo-900/40 border-indigo-500 text-white shadow-md'
+                          : 'bg-white/5 border-white/5 hover:bg-white/10 text-slate-300'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <FileText className={`w-4 h-4 ${isActive ? 'text-indigo-400' : 'text-slate-500'}`} />
+                        <div>
+                          <p className="font-bold text-xs">{p.name}</p>
+                          <p className="text-[10px] font-mono text-slate-400">{p.slug}</p>
+                        </div>
+                      </div>
+                      <span className="text-[10px] font-mono font-bold bg-white/10 px-2 py-0.5 rounded text-slate-300">
+                        {p.sections.length} Sections
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Site Title Renamer */}
+              <div className="border-t border-white/10 pt-4 space-y-2">
+                <label className="text-xs font-bold text-slate-300 block">Brand Storefront Title</label>
+                <input
+                  type="text"
+                  value={siteName}
+                  onChange={(e) => {
+                    setSiteName(e.target.value);
+                    saveWebsiteToDb(pages, activeThemeId, e.target.value);
+                  }}
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+            </div>
+          )}
+
+          {/* TAB 2: SECTIONS BUILDER & REORDERER */}
+          {activeTab === 'sections' && (
+            <div className="bg-[#0D0E17] border border-white/10 rounded-2xl p-5 space-y-4 shadow-xl">
+              <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                <h3 className="font-bold text-sm text-white flex items-center gap-2">
+                  <Layers className="w-4 h-4 text-emerald-400" /> Active Sections ({activePage.sections.length})
+                </h3>
+                <span className="text-[10px] font-mono text-indigo-300">{activePage.name}</span>
+              </div>
+
+              {/* Add Section Buttons Grid */}
+              <div className="space-y-2">
+                <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Add Section To Page</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button onClick={() => handleAddSection('hero')} className="p-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold text-left transition cursor-pointer flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-amber-400" /> + Hero Banner
+                  </button>
+                  <button onClick={() => handleAddSection('features')} className="p-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold text-left transition cursor-pointer flex items-center gap-1.5">
+                    <Zap className="w-3.5 h-3.5 text-cyan-400" /> + Features Grid
+                  </button>
+                  <button onClick={() => handleAddSection('products')} className="p-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold text-left transition cursor-pointer flex items-center gap-1.5">
+                    <ShoppingBag className="w-3.5 h-3.5 text-emerald-400" /> + Products
+                  </button>
+                  <button onClick={() => handleAddSection('stats')} className="p-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold text-left transition cursor-pointer flex items-center gap-1.5">
+                    <TrendingUp className="w-3.5 h-3.5 text-indigo-400" /> + Stats Counter
+                  </button>
+                  <button onClick={() => handleAddSection('testimonials')} className="p-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold text-left transition cursor-pointer flex items-center gap-1.5">
+                    <Star className="w-3.5 h-3.5 text-yellow-400" /> + Testimonials
+                  </button>
+                  <button onClick={() => handleAddSection('faq')} className="p-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold text-left transition cursor-pointer flex items-center gap-1.5">
+                    <HelpCircle className="w-3.5 h-3.5 text-rose-400" /> + FAQ Block
+                  </button>
+                  <button onClick={() => handleAddSection('cta')} className="p-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold text-left transition cursor-pointer flex items-center gap-1.5">
+                    <Flame className="w-3.5 h-3.5 text-orange-400" /> + CTA Banner
+                  </button>
+                  <button onClick={() => handleAddSection('contact')} className="p-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold text-left transition cursor-pointer flex items-center gap-1.5">
+                    <Mail className="w-3.5 h-3.5 text-teal-400" /> + Contact Form
+                  </button>
+                  <button onClick={() => handleAddSection('hotelRooms')} className="p-2 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 rounded-xl text-xs font-bold text-left transition cursor-pointer flex items-center gap-1.5 text-indigo-300">
+                    <Bed className="w-3.5 h-3.5 text-indigo-400" /> + Hotel Rooms
+                  </button>
+                  <button onClick={() => handleAddSection('restaurantMenu')} className="p-2 bg-orange-500/10 hover:bg-orange-500/20 border border-orange-500/30 rounded-xl text-xs font-bold text-left transition cursor-pointer flex items-center gap-1.5 text-orange-300">
+                    <Utensils className="w-3.5 h-3.5 text-orange-400" /> + Dining Menu
+                  </button>
+                  <button onClick={() => handleAddSection('toursPackages')} className="p-2 bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 rounded-xl text-xs font-bold text-left transition cursor-pointer flex items-center gap-1.5 text-cyan-300">
+                    <Compass className="w-3.5 h-3.5 text-cyan-400" /> + Tour Packages
+                  </button>
+                </div>
+              </div>
+
+              {/* Sections Reorder List */}
+              <div className="space-y-2 border-t border-white/10 pt-4 max-h-[350px] overflow-y-auto pr-1">
+                <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Current Page Order</label>
+                {activePage.sections.map((sec, index) => {
+                  const isSelected = sec.id === selectedSectionId;
+                  return (
+                    <div
+                      key={sec.id}
+                      onClick={() => setSelectedSectionId(sec.id)}
+                      className={`p-3 rounded-xl border transition cursor-pointer flex items-center justify-between gap-2 ${
+                        isSelected
+                          ? 'bg-indigo-900/50 border-indigo-500 text-white shadow-md'
+                          : 'bg-white/5 border-white/5 hover:bg-white/10 text-slate-300'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-[10px] font-mono text-slate-500 font-bold">{index + 1}</span>
+                        <p className="font-bold text-xs truncate">{sec.title || sec.type}</p>
+                        {sec.hidden && <span className="text-[9px] font-mono text-amber-400 bg-amber-500/20 px-1.5 py-0.5 rounded">(Hidden)</span>}
+                      </div>
+
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleMoveSection(sec.id, 'up'); }}
+                          className="p-1 text-slate-400 hover:text-white hover:bg-white/10 rounded"
+                          title="Move Up"
+                        >
+                          <ArrowUp className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleMoveSection(sec.id, 'down'); }}
+                          className="p-1 text-slate-400 hover:text-white hover:bg-white/10 rounded"
+                          title="Move Down"
+                        >
+                          <ArrowDown className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleToggleHideSection(sec.id); }}
+                          className="p-1 text-slate-400 hover:text-amber-300 hover:bg-white/10 rounded"
+                          title="Toggle Hide"
+                        >
+                          {sec.hidden ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleDeleteSection(sec.id); }}
+                          className="p-1 text-slate-400 hover:text-rose-400 hover:bg-white/10 rounded"
+                          title="Delete Section"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
                       </div>
                     </div>
+                  );
+                })}
+              </div>
+
+              {/* Section Live Editor Editor Panel */}
+              {selectedSection && (
+                <div className="bg-white/5 border border-indigo-500/30 rounded-2xl p-4 space-y-3 animate-fade-in">
+                  <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                    <span className="text-xs font-bold text-indigo-300 flex items-center gap-1">
+                      <Edit3 className="w-3.5 h-3.5" /> Edit Section ({selectedSection.type.toUpperCase()})
+                    </span>
                     <button
-                      onClick={() => handleRemoveProduct(prod.id)}
-                      className="p-1.5 text-slate-400 hover:text-rose-400 transition"
-                      title="Remove product"
+                      onClick={() => handleAiGenerativeSection(selectedSection.id)}
+                      disabled={isGeneratingAI}
+                      className="px-2.5 py-1 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-[10px] rounded-lg flex items-center gap-1 cursor-pointer"
                     >
-                      <Trash2 className="w-4 h-4" />
+                      {isGeneratingAI ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Wand2 className="w-3 h-3 text-amber-300" />}
+                      <span>AI Re-Write</span>
                     </button>
                   </div>
-                ))}
+
+                  <div className="space-y-2 text-xs">
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-400 block mb-1">Headline Title</label>
+                      <input
+                        type="text"
+                        value={selectedSection.title || ''}
+                        onChange={(e) => handleUpdateSectionField(selectedSection.id, 'title', e.target.value)}
+                        className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-400 block mb-1">Subtitle / Body Description</label>
+                      <textarea
+                        rows={2}
+                        value={selectedSection.subtitle || ''}
+                        onChange={(e) => handleUpdateSectionField(selectedSection.id, 'subtitle', e.target.value)}
+                        className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-400 block mb-1">Badge Tag</label>
+                      <input
+                        type="text"
+                        value={selectedSection.badge || ''}
+                        onChange={(e) => handleUpdateSectionField(selectedSection.id, 'badge', e.target.value)}
+                        className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none"
+                      />
+                    </div>
+
+                    {selectedSection.imageUrl !== undefined && (
+                      <div>
+                        <label className="text-[11px] font-bold text-slate-400 block mb-1">Image URL</label>
+                        <input
+                          type="text"
+                          value={selectedSection.imageUrl || ''}
+                          onChange={(e) => handleUpdateSectionField(selectedSection.id, 'imageUrl', e.target.value)}
+                          className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-1.5 text-[11px] font-mono text-white focus:outline-none"
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB 3: THEME SELECTOR */}
+          {activeTab === 'themes' && (
+            <div className="bg-[#0D0E17] border border-white/10 rounded-2xl p-5 space-y-4 shadow-xl">
+              <h3 className="font-bold text-sm text-white flex items-center gap-2 border-b border-white/10 pb-3">
+                <Palette className="w-4 h-4 text-purple-400" /> World-Class Theme Presets
+              </h3>
+
+              <div className="space-y-3 max-h-[480px] overflow-y-auto pr-1">
+                {Object.values(WORLD_CLASS_THEMES).map((theme) => {
+                  const isSelected = activeThemeId === theme.id;
+                  return (
+                    <button
+                      key={theme.id}
+                      onClick={() => {
+                        setActiveThemeId(theme.id);
+                        saveWebsiteToDb(pages, theme.id, siteName);
+                      }}
+                      className={`w-full p-4 rounded-2xl border text-left transition cursor-pointer flex flex-col gap-2 ${
+                        isSelected
+                          ? 'bg-gradient-to-r from-indigo-900/60 to-purple-900/60 border-indigo-500 ring-2 ring-indigo-500/40 text-white shadow-xl'
+                          : 'bg-white/5 border-white/5 hover:bg-white/10 text-slate-300'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-xs text-white flex items-center gap-2">
+                          <span className={`w-3 h-3 rounded-full ${theme.accentBtn}`} />
+                          {theme.name}
+                        </span>
+                        {isSelected && <CheckCircle2 className="w-4 h-4 text-indigo-400" />}
+                      </div>
+                      <p className="text-[11px] text-slate-400 leading-relaxed">{theme.description}</p>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* TAB 4: RECEIVED LEADS */}
+          {activeTab === 'leads' && (
+            <div className="bg-[#0D0E17] border border-white/10 rounded-2xl p-5 space-y-4 shadow-xl">
+              <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                <h3 className="font-bold text-sm text-white flex items-center gap-2">
+                  <Inbox className="w-4 h-4 text-emerald-400" /> Storefront Lead Inbox ({receivedLeads.length})
+                </h3>
+                <span className="text-[10px] font-mono text-emerald-300 bg-emerald-500/20 px-2 py-0.5 rounded">
+                  Live Firestore Sync
+                </span>
+              </div>
+
+              <div className="space-y-3 max-h-[450px] overflow-y-auto pr-1">
+                {receivedLeads.length === 0 ? (
+                  <p className="text-xs text-slate-500 text-center py-8">No leads received yet. Test the contact form in the live preview frame!</p>
+                ) : (
+                  receivedLeads.map((lead) => (
+                    <div key={lead.id} className="p-3 bg-white/5 border border-white/10 rounded-xl space-y-1 text-xs">
+                      <div className="flex justify-between items-center">
+                        <span className="font-bold text-white">{lead.name}</span>
+                        <span className="text-[10px] font-mono text-slate-400">{new Date(lead.createdAt).toLocaleTimeString()}</span>
+                      </div>
+                      <div className="text-[11px] text-indigo-300 font-mono flex items-center gap-3">
+                        <span>✉ {lead.email}</span>
+                        <span>☎ {lead.phone}</span>
+                      </div>
+                      <p className="text-slate-300 text-[11px] bg-black/40 p-2 rounded-lg border border-white/5 mt-1">
+                        "{lead.message}"
+                      </p>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           )}
         </div>
 
-        {/* Right Side Live Viewport Sandbox (8 Cols) */}
+        {/* RIGHT LIVE VIEWPORT FRAME (8 Cols) */}
         <div className="lg:col-span-8 space-y-4">
-          {/* Viewport Control Top Bar */}
+          {/* Frame Device Bar */}
           <div className="bg-[#0D0E17] border border-white/10 rounded-2xl p-3 flex items-center justify-between shadow-xl">
             <div className="flex items-center gap-2">
               <div className="flex gap-1.5">
@@ -1210,7 +1107,7 @@ export default function WebsiteBuilderOS({ profile, tenantId }: Props) {
                 <div className="w-3 h-3 rounded-full bg-emerald-500/80" />
               </div>
               <span className="ml-3 text-xs font-mono text-slate-400">
-                Live Rendering Sandbox: <strong className="text-indigo-300">{siteName.toLowerCase().replace(/[^a-z0-9]/g, '')}.omnicore.site</strong>
+                Live Preview Sandbox: <strong className="text-indigo-300">{siteName.toLowerCase().replace(/[^a-z0-9]/g, '')}.marketforge.site{activePage.slug}</strong>
               </span>
             </div>
 
@@ -1245,7 +1142,7 @@ export default function WebsiteBuilderOS({ profile, tenantId }: Props) {
             </div>
           </div>
 
-          {/* Rendered Live Website Frame */}
+          {/* RENDERED LIVE WEBSITE CANVAS */}
           <div className="bg-slate-950 border border-white/10 rounded-2xl p-2 shadow-2xl overflow-hidden min-h-[650px] flex justify-center">
             <div
               className={`transition-all duration-300 w-full overflow-y-auto max-h-[750px] rounded-xl border border-white/5 ${
@@ -1256,254 +1153,372 @@ export default function WebsiteBuilderOS({ profile, tenantId }: Props) {
                   : 'max-w-full'
               }`}
             >
-              {/* LIVE WEBSITE BODY */}
-              <div className="min-h-full bg-[#07080E] text-slate-100 font-sans selection:bg-indigo-500/30">
-                {/* Header Navbar */}
-                <header className={`${activeTheme.headerBg} border-b border-white/10 sticky top-0 z-40 px-6 py-4 flex items-center justify-between backdrop-blur-md`}>
+              {/* LIVE SITE RENDER WITH ACTIVE THEME */}
+              <div className={`min-h-full ${activeTheme.bgCanvas} ${activeTheme.textColor} ${activeTheme.fontFamily} selection:bg-indigo-500/30`}>
+                {/* Site Header */}
+                <header className={`${activeTheme.headerBg} border-b ${activeTheme.borderColor} sticky top-0 z-40 px-6 py-4 flex items-center justify-between`}>
                   <div className="flex items-center gap-2">
                     <div className={`w-8 h-8 rounded-lg ${activeTheme.accentBtn} flex items-center justify-center font-black text-sm`}>
                       {siteName.charAt(0)}
                     </div>
-                    <span className="font-display font-extrabold text-base text-white">{siteName}</span>
+                    <span className={`font-extrabold text-base ${activeTheme.headingColor}`}>{siteName}</span>
                   </div>
 
-                  <nav className="hidden md:flex items-center gap-6 text-xs font-semibold text-slate-300">
-                    <a href="#hero" className="hover:text-white transition">Home</a>
-                    <a href="#features" className="hover:text-white transition">Why Us</a>
-                    <a href="#catalog" className="hover:text-white transition">{currentIndustry.itemsLabel}</a>
-                    <a href="#about" className="hover:text-white transition">About</a>
-                    <a href="#contact" className="hover:text-white transition">Contact</a>
+                  <nav className="hidden md:flex items-center gap-6 text-xs font-semibold">
+                    {pages.map((p) => (
+                      <button
+                        key={p.id}
+                        onClick={() => setActivePageId(p.id)}
+                        className={`hover:opacity-100 transition cursor-pointer ${
+                          p.id === activePageId ? `font-bold ${activeTheme.accentText} border-b-2 border-current pb-0.5` : 'opacity-70'
+                        }`}
+                      >
+                        {p.name}
+                      </button>
+                    ))}
                   </nav>
 
                   <a
-                    href="#contact"
+                    href="#contact_section"
                     className={`px-4 py-2 ${activeTheme.accentBtn} font-bold text-xs rounded-xl shadow-md transition`}
                   >
                     Contact Us
                   </a>
                 </header>
 
-                {/* Hero Section */}
-                <section id="hero" className={`relative py-16 px-6 md:px-12 bg-gradient-to-b ${activeTheme.heroGradient} overflow-hidden`}>
-                  <div className="max-w-5xl mx-auto grid md:grid-cols-2 gap-10 items-center">
-                    <div className="space-y-6">
-                      <span className={`inline-block px-3.5 py-1 text-xs font-bold rounded-full border ${activeTheme.badgeBg}`}>
-                        {currentIndustry.badge}
-                      </span>
-                      <h1 className="font-display font-black text-3xl sm:text-4xl text-white leading-tight">
-                        {heroHeadline}
-                      </h1>
-                      <p className="text-slate-300 text-xs sm:text-sm leading-relaxed">
-                        {heroSubtitle}
-                      </p>
-                      <div className="flex flex-wrap items-center gap-3 pt-2">
-                        <a
-                          href="#contact"
-                          className={`px-6 py-3 ${activeTheme.accentBtn} font-bold text-xs rounded-xl shadow-lg flex items-center gap-2 transition`}
-                        >
-                          Book Appointment
-                          <ArrowRight className="w-4 h-4" />
-                        </a>
-                        <a
-                          href="#catalog"
-                          className="px-5 py-3 bg-white/10 hover:bg-white/15 text-white font-bold text-xs rounded-xl border border-white/10 transition"
-                        >
-                          View {currentIndustry.itemsLabel}
-                        </a>
-                      </div>
-                    </div>
-
-                    <div className="relative">
-                      <img
-                        src={heroImage}
-                        alt={siteName}
-                        className="rounded-2xl shadow-2xl border border-white/10 w-full object-cover h-80"
-                      />
-                      <div className="absolute -bottom-4 -left-4 bg-[#0D0E17]/90 backdrop-blur-md border border-white/10 p-3 rounded-xl shadow-xl flex items-center gap-3">
-                        <ShieldCheck className="w-6 h-6 text-emerald-400" />
-                        <div className="text-[11px]">
-                          <p className="font-bold text-white">Verified Enterprise Service</p>
-                          <p className="text-slate-400">100% Guaranteed Satisfaction</p>
+                {/* Render Sections */}
+                <div className="space-y-12 py-8 px-6 md:px-12">
+                  {activePage.sections.filter(s => !s.hidden).map((sec) => {
+                    const isSelected = sec.id === selectedSectionId;
+                    return (
+                      <div
+                        key={sec.id}
+                        onClick={() => setSelectedSectionId(sec.id)}
+                        className={`relative rounded-2xl transition cursor-pointer group ${
+                          isSelected ? 'ring-2 ring-indigo-500 p-2 bg-indigo-500/5' : ''
+                        }`}
+                      >
+                        {/* Section Label Overlay on hover */}
+                        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition bg-black/80 text-white text-[10px] font-mono px-2 py-1 rounded border border-white/20 z-10">
+                          Click to Edit ({sec.type.toUpperCase()})
                         </div>
-                      </div>
-                    </div>
-                  </div>
-                </section>
 
-                {/* Key Features Grid */}
-                <section id="features" className="py-12 px-6 md:px-12 max-w-5xl mx-auto space-y-6">
-                  <div className="text-center space-y-2">
-                    <h3 className="font-display font-extrabold text-xl text-white">Why Choose {siteName}?</h3>
-                    <p className="text-xs text-slate-400">Our core commitments and operational standards</p>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {currentIndustry.features.map((feat, idx) => (
-                      <div key={idx} className="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-2">
-                        <div className={`w-8 h-8 rounded-lg ${activeTheme.badgeBg} flex items-center justify-center font-bold text-xs`}>
-                          0{idx + 1}
-                        </div>
-                        <h4 className="font-bold text-white text-sm">{feat.title}</h4>
-                        <p className="text-xs text-slate-300 leading-relaxed">{feat.desc}</p>
-                      </div>
-                    ))}
-                  </div>
-                </section>
-
-                {/* Products & Services Catalog Section */}
-                <section id="catalog" className="py-12 px-6 md:px-12 bg-white/5 border-y border-white/10">
-                  <div className="max-w-5xl mx-auto space-y-8">
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                      <div>
-                        <span className={`text-xs font-mono font-bold ${activeTheme.accentText} uppercase`}>
-                          Featured Offerings
-                        </span>
-                        <h3 className="font-display font-extrabold text-2xl text-white mt-1">
-                          {currentIndustry.itemsLabel}
-                        </h3>
-                      </div>
-                      <span className="text-xs text-slate-400 font-mono">
-                        {productsList.length} Items Available
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-                      {productsList.map((prod) => (
-                        <div
-                          key={prod.id}
-                          className="bg-[#0D0E17] border border-white/10 rounded-2xl overflow-hidden hover:border-indigo-500/40 transition flex flex-col justify-between group"
-                        >
-                          <div>
-                            <div className="relative h-44 overflow-hidden">
-                              <img
-                                src={prod.image}
-                                alt={prod.title}
-                                className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
-                              />
-                              <span className="absolute top-3 left-3 bg-black/80 backdrop-blur-md text-white text-[10px] font-bold px-2.5 py-1 rounded-full border border-white/10">
-                                {prod.badge}
-                              </span>
-                            </div>
-
-                            <div className="p-4 space-y-2">
-                              <div className="flex items-center justify-between text-xs">
-                                <span className="text-slate-400 font-mono">{prod.category}</span>
-                                <span className={`font-bold text-sm ${activeTheme.accentText}`}>{prod.price}</span>
-                              </div>
-                              <h4 className="font-bold text-white text-sm">{prod.title}</h4>
-                              <p className="text-xs text-slate-300 leading-relaxed line-clamp-2">
-                                {prod.description}
+                        {/* HERO SECTION */}
+                        {sec.type === 'hero' && (
+                          <div className="grid md:grid-cols-2 gap-8 items-center py-8">
+                            <div className="space-y-4">
+                              {sec.badge && (
+                                <span className={`inline-block px-3 py-1 text-xs font-bold rounded-full ${activeTheme.badgeBg}`}>
+                                  {sec.badge}
+                                </span>
+                              )}
+                              <h1 className={`text-3xl sm:text-4xl font-black leading-tight ${activeTheme.headingColor}`}>
+                                {sec.title}
+                              </h1>
+                              <p className="text-xs sm:text-sm leading-relaxed opacity-90">
+                                {sec.subtitle}
                               </p>
+                              {sec.ctaText && (
+                                <div className="pt-2">
+                                  <a href="#contact_section" className={`px-6 py-3 ${activeTheme.accentBtn} font-bold text-xs rounded-xl shadow-lg inline-flex items-center gap-2`}>
+                                    {sec.ctaText} <ArrowRight className="w-4 h-4" />
+                                  </a>
+                                </div>
+                              )}
+                            </div>
+                            {sec.imageUrl && (
+                              <img src={sec.imageUrl} alt={sec.title} className="rounded-2xl shadow-xl w-full h-72 object-cover border border-white/10" />
+                            )}
+                          </div>
+                        )}
+
+                        {/* FEATURES SECTION */}
+                        {sec.type === 'features' && (
+                          <div className="space-y-6 py-4">
+                            <div className="text-center space-y-1">
+                              <h3 className={`text-2xl font-extrabold ${activeTheme.headingColor}`}>{sec.title}</h3>
+                              <p className="text-xs opacity-80">{sec.subtitle}</p>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                              {(sec.contentData || []).map((f: any, idx: number) => (
+                                <div key={idx} className={`${activeTheme.cardBg} p-5 rounded-2xl space-y-2`}>
+                                  <div className={`w-8 h-8 rounded-lg ${activeTheme.badgeBg} flex items-center justify-center font-bold text-xs`}>
+                                    0{idx + 1}
+                                  </div>
+                                  <h4 className={`font-bold text-sm ${activeTheme.headingColor}`}>{f.title}</h4>
+                                  <p className="text-xs opacity-80 leading-relaxed">{f.desc}</p>
+                                </div>
+                              ))}
                             </div>
                           </div>
+                        )}
 
-                          <div className="p-4 pt-0">
-                            <a
-                              href="#contact"
-                              className={`w-full py-2 bg-white/10 hover:bg-white/15 text-white font-bold text-xs rounded-xl border border-white/10 flex items-center justify-center gap-1.5 transition`}
-                            >
-                              Inquire Now
+                        {/* PRODUCTS / CATALOG SECTION */}
+                        {sec.type === 'products' && (
+                          <div className="space-y-6 py-4">
+                            <div className="text-center space-y-1">
+                              <h3 className={`text-2xl font-extrabold ${activeTheme.headingColor}`}>{sec.title}</h3>
+                              <p className="text-xs opacity-80">{sec.subtitle}</p>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+                              {(sec.contentData || []).map((p: any) => (
+                                <div key={p.id} className={`${activeTheme.cardBg} rounded-2xl overflow-hidden flex flex-col justify-between p-4 space-y-3`}>
+                                  <img src={p.image} alt={p.title} className="w-full h-36 object-cover rounded-xl" />
+                                  <div>
+                                    <div className="flex justify-between items-center text-xs">
+                                      <span className="font-bold opacity-70">{p.category}</span>
+                                      <span className={`font-bold ${activeTheme.accentText}`}>{p.price}</span>
+                                    </div>
+                                    <h4 className={`font-bold text-sm mt-1 ${activeTheme.headingColor}`}>{p.title}</h4>
+                                    <p className="text-xs opacity-80 line-clamp-2 mt-1">{p.description}</p>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* STATS SECTION */}
+                        {sec.type === 'stats' && (
+                          <div className={`${activeTheme.cardBg} p-6 rounded-2xl text-center space-y-4`}>
+                            <h3 className={`text-xl font-bold ${activeTheme.headingColor}`}>{sec.title}</h3>
+                            <div className="grid grid-cols-3 gap-4">
+                              {(sec.contentData || []).map((st: any, idx: number) => (
+                                <div key={idx}>
+                                  <span className={`text-2xl font-extrabold font-mono ${activeTheme.accentText}`}>{st.metric}</span>
+                                  <span className="text-[11px] block opacity-80 font-semibold">{st.label}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* TESTIMONIALS SECTION */}
+                        {sec.type === 'testimonials' && (
+                          <div className="space-y-4 py-4">
+                            <h3 className={`text-xl font-bold text-center ${activeTheme.headingColor}`}>{sec.title}</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              {(sec.contentData || []).map((t: any, idx: number) => (
+                                <div key={idx} className={`${activeTheme.cardBg} p-5 rounded-2xl space-y-2`}>
+                                  <p className="text-xs italic opacity-90">"{t.quote}"</p>
+                                  <div className="text-[11px] font-bold opacity-70">
+                                    — {t.author}, <span className="text-indigo-400">{t.role}</span>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* FAQ SECTION */}
+                        {sec.type === 'faq' && (
+                          <div className="space-y-4 py-4">
+                            <h3 className={`text-xl font-bold text-center ${activeTheme.headingColor}`}>{sec.title}</h3>
+                            <div className="space-y-2">
+                              {(sec.contentData || []).map((faq: any, idx: number) => (
+                                <div key={idx} className={`${activeTheme.cardBg} p-4 rounded-xl space-y-1`}>
+                                  <p className={`font-bold text-xs ${activeTheme.headingColor}`}>Q: {faq.q}</p>
+                                  <p className="text-xs opacity-80">A: {faq.a}</p>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* CTA BANNER */}
+                        {sec.type === 'cta' && (
+                          <div className={`${activeTheme.cardBg} p-8 rounded-2xl text-center space-y-4 border ${activeTheme.borderColor}`}>
+                            <h3 className={`text-2xl font-black ${activeTheme.headingColor}`}>{sec.title}</h3>
+                            <p className="text-xs opacity-90 max-w-lg mx-auto">{sec.subtitle}</p>
+                            <a href="#contact_section" className={`px-6 py-3 ${activeTheme.accentBtn} font-bold text-xs rounded-xl shadow-lg inline-block`}>
+                              {sec.ctaText || 'Get Started Now'}
                             </a>
                           </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </section>
+                        )}
 
-                {/* About & Contact Section */}
-                <section id="contact" className="py-12 px-6 md:px-12 max-w-5xl mx-auto grid md:grid-cols-2 gap-10">
-                  <div className="space-y-6">
-                    <div>
-                      <span className={`text-xs font-mono font-bold ${activeTheme.accentText} uppercase`}>
-                        Get in Touch
-                      </span>
-                      <h3 className="font-display font-extrabold text-2xl text-white mt-1">
-                        Contact Us Today
-                      </h3>
-                      <p className="text-xs text-slate-300 mt-2 leading-relaxed">
-                        {aboutText}
-                      </p>
-                    </div>
+                        {/* CONTACT FORM SECTION */}
+                        {sec.type === 'contact' && (
+                          <div id="contact_section" className={`${activeTheme.cardBg} p-6 rounded-2xl space-y-4 border ${activeTheme.borderColor}`}>
+                            <div className="text-center space-y-1">
+                              <h3 className={`text-xl font-bold ${activeTheme.headingColor}`}>{sec.title}</h3>
+                              <p className="text-xs opacity-80">{sec.subtitle}</p>
+                            </div>
 
-                    <div className="space-y-3 text-xs text-slate-300 font-sans">
-                      <div className="flex items-center gap-3">
-                        <MapPin className="w-4 h-4 text-rose-400 shrink-0" />
-                        <span>{contactAddress}</span>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <Phone className="w-4 h-4 text-emerald-400 shrink-0" />
-                        <span>{contactPhone}</span>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <Mail className="w-4 h-4 text-cyan-400 shrink-0" />
-                        <span>{contactEmail}</span>
-                      </div>
-                    </div>
-                  </div>
+                            <form onSubmit={handlePreviewSubmitLead} className="space-y-3 max-w-md mx-auto">
+                              <input
+                                type="text"
+                                required
+                                placeholder="Your Name"
+                                value={leadName}
+                                onChange={(e) => setLeadName(e.target.value)}
+                                className="w-full bg-black/30 border border-white/10 rounded-xl p-2.5 text-xs focus:outline-none"
+                              />
+                              <input
+                                type="email"
+                                required
+                                placeholder="Your Email Address"
+                                value={leadEmail}
+                                onChange={(e) => setLeadEmail(e.target.value)}
+                                className="w-full bg-black/30 border border-white/10 rounded-xl p-2.5 text-xs focus:outline-none"
+                              />
+                              <input
+                                type="text"
+                                placeholder="Phone Number"
+                                value={leadPhone}
+                                onChange={(e) => setLeadPhone(e.target.value)}
+                                className="w-full bg-black/30 border border-white/10 rounded-xl p-2.5 text-xs focus:outline-none"
+                              />
+                              <textarea
+                                rows={3}
+                                placeholder="Your Message..."
+                                value={leadMessage}
+                                onChange={(e) => setLeadMessage(e.target.value)}
+                                className="w-full bg-black/30 border border-white/10 rounded-xl p-2.5 text-xs focus:outline-none resize-none"
+                              />
+                              <button
+                                type="submit"
+                                className={`w-full py-2.5 ${activeTheme.accentBtn} font-bold text-xs rounded-xl shadow-md transition cursor-pointer`}
+                              >
+                                {sec.ctaText || 'Submit Inquiry'}
+                              </button>
+                            </form>
 
-                  {/* Interactive Contact Form Simulator */}
-                  <div className="bg-[#0D0E17] border border-white/10 rounded-2xl p-6 space-y-4 shadow-xl">
-                    <h4 className="font-bold text-white text-sm">Send a Direct Message</h4>
-                    {formSubmitted ? (
-                      <div className="bg-emerald-950/80 border border-emerald-500/40 rounded-xl p-4 text-center space-y-2">
-                        <CheckCircle2 className="w-8 h-8 text-emerald-400 mx-auto" />
-                        <p className="font-bold text-white text-xs">Message Received!</p>
-                        <p className="text-[11px] text-emerald-200">Our executive team will contact you shortly.</p>
+                            {leadSubmittedStatus && (
+                              <p className="text-center text-xs font-bold text-emerald-400 bg-emerald-500/10 p-2 rounded-xl border border-emerald-500/20">
+                                {leadSubmittedStatus}
+                              </p>
+                            )}
+                          </div>
+                        )}
+
+                        {/* HOTEL ROOMS SECTION */}
+                        {sec.type === 'hotelRooms' && (
+                          <div className="space-y-6 py-4">
+                            <div className="text-center space-y-1">
+                              <h3 className={`text-2xl font-extrabold ${activeTheme.headingColor}`}>{sec.title}</h3>
+                              <p className="text-xs opacity-80">{sec.subtitle}</p>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                              {(sec.contentData || []).map((r: any) => (
+                                <div key={r.id} className={`${activeTheme.cardBg} rounded-2xl overflow-hidden flex flex-col justify-between p-4 space-y-3`}>
+                                  <img src={r.image} alt={r.type} className="w-full h-40 object-cover rounded-xl" />
+                                  <div className="space-y-2">
+                                    <div className="flex justify-between items-center text-xs">
+                                      <span className="font-bold opacity-70">Room {r.roomNumber}</span>
+                                      <span className={`font-bold ${activeTheme.accentText}`}>${r.pricePerNight}/night</span>
+                                    </div>
+                                    <h4 className={`font-bold text-sm ${activeTheme.headingColor}`}>{r.type}</h4>
+                                    <div className="flex flex-wrap gap-1">
+                                      {(r.amenities || []).map((am: string, i: number) => (
+                                        <span key={i} className="text-[9px] bg-white/10 px-2 py-0.5 rounded text-slate-300 font-mono">
+                                          {am}
+                                        </span>
+                                      ))}
+                                    </div>
+                                    <button
+                                      onClick={() => {
+                                        setLeadMessage(`I would like to reserve Room ${r.roomNumber} (${r.type}) for $${r.pricePerNight}/night.`);
+                                        const contactEl = document.getElementById('contact_section');
+                                        if (contactEl) contactEl.scrollIntoView({ behavior: 'smooth' });
+                                      }}
+                                      className={`w-full py-2 mt-2 ${activeTheme.accentBtn} font-bold text-xs rounded-xl shadow transition cursor-pointer`}
+                                    >
+                                      Book This Suite
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* RESTAURANT MENU SECTION */}
+                        {sec.type === 'restaurantMenu' && (
+                          <div className="space-y-6 py-4">
+                            <div className="text-center space-y-1">
+                              <h3 className={`text-2xl font-extrabold ${activeTheme.headingColor}`}>{sec.title}</h3>
+                              <p className="text-xs opacity-80">{sec.subtitle}</p>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                              {(sec.contentData || []).map((m: any) => (
+                                <div key={m.id} className={`${activeTheme.cardBg} rounded-2xl overflow-hidden flex flex-col justify-between p-4 space-y-3`}>
+                                  <img src={m.image} alt={m.name} className="w-full h-36 object-cover rounded-xl" />
+                                  <div className="space-y-2">
+                                    <div className="flex justify-between items-center text-xs">
+                                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${m.isVeg ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300'}`}>
+                                        {m.isVeg ? 'Veg' : 'Non-Veg'} • {m.prepTimeMins}m
+                                      </span>
+                                      <span className={`font-bold ${activeTheme.accentText}`}>${m.price}</span>
+                                    </div>
+                                    <h4 className={`font-bold text-sm ${activeTheme.headingColor}`}>{m.name}</h4>
+                                    <p className="text-xs opacity-80 line-clamp-2">{m.description}</p>
+                                    <button
+                                      onClick={() => {
+                                        setLeadMessage(`I want to place an order/table reservation for: ${m.name} ($${m.price}).`);
+                                        const contactEl = document.getElementById('contact_section');
+                                        if (contactEl) contactEl.scrollIntoView({ behavior: 'smooth' });
+                                      }}
+                                      className={`w-full py-2 mt-2 ${activeTheme.accentBtn} font-bold text-xs rounded-xl shadow transition cursor-pointer`}
+                                    >
+                                      Order Online / Reserve
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* TOURS PACKAGES SECTION */}
+                        {sec.type === 'toursPackages' && (
+                          <div className="space-y-6 py-4">
+                            <div className="text-center space-y-1">
+                              <h3 className={`text-2xl font-extrabold ${activeTheme.headingColor}`}>{sec.title}</h3>
+                              <p className="text-xs opacity-80">{sec.subtitle}</p>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                              {(sec.contentData || []).map((tp: any) => (
+                                <div key={tp.id} className={`${activeTheme.cardBg} rounded-2xl overflow-hidden flex flex-col justify-between p-4 space-y-3`}>
+                                  <img src={tp.image} alt={tp.name} className="w-full h-40 object-cover rounded-xl" />
+                                  <div className="space-y-2">
+                                    <div className="flex justify-between items-center text-xs">
+                                      <span className="font-bold opacity-70">📍 {tp.loc}</span>
+                                      <span className={`font-bold ${activeTheme.accentText}`}>${tp.price} ({tp.days} Days)</span>
+                                    </div>
+                                    <h4 className={`font-bold text-sm ${activeTheme.headingColor}`}>{tp.name}</h4>
+                                    <p className="text-xs opacity-80 line-clamp-2">{tp.description}</p>
+                                    <button
+                                      onClick={() => {
+                                        setLeadMessage(`Inquiry for Tour Package: ${tp.name} in ${tp.loc} ($${tp.price}, ${tp.days} Days).`);
+                                        const contactEl = document.getElementById('contact_section');
+                                        if (contactEl) contactEl.scrollIntoView({ behavior: 'smooth' });
+                                      }}
+                                      className={`w-full py-2 mt-2 ${activeTheme.accentBtn} font-bold text-xs rounded-xl shadow transition cursor-pointer`}
+                                    >
+                                      Inquire & Book Package
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* CUSTOM TEXT SECTION */}
+                        {sec.type === 'customText' && (
+                          <div className={`${activeTheme.cardBg} p-6 rounded-2xl space-y-2`}>
+                            <h3 className={`text-xl font-bold ${activeTheme.headingColor}`}>{sec.title}</h3>
+                            <p className="text-xs opacity-80 leading-relaxed">{sec.contentData}</p>
+                          </div>
+                        )}
                       </div>
-                    ) : (
-                      <form
-                        onSubmit={(e) => {
-                          e.preventDefault();
-                          setFormSubmitted(true);
-                        }}
-                        className="space-y-3 text-xs"
-                      >
-                        <div>
-                          <input
-                            type="text"
-                            placeholder="Your Full Name"
-                            required
-                            value={formData.name}
-                            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                            className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
-                          />
-                        </div>
-                        <div>
-                          <input
-                            type="tel"
-                            placeholder="Phone Number"
-                            required
-                            value={formData.phone}
-                            onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                            className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
-                          />
-                        </div>
-                        <div>
-                          <textarea
-                            rows={3}
-                            placeholder="How can we assist you?"
-                            required
-                            value={formData.message}
-                            onChange={(e) => setFormData({ ...formData, message: e.target.value })}
-                            className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
-                          />
-                        </div>
-                        <button
-                          type="submit"
-                          className={`w-full py-2.5 ${activeTheme.accentBtn} font-bold text-xs rounded-xl shadow-lg flex items-center justify-center gap-2 transition cursor-pointer`}
-                        >
-                          <Send className="w-3.5 h-3.5" /> Submit Request
-                        </button>
-                      </form>
-                    )}
-                  </div>
-                </section>
+                    );
+                  })}
+                </div>
 
                 {/* Footer */}
-                <footer className="bg-black/90 border-t border-white/10 py-8 px-6 text-center text-xs text-slate-400 space-y-2">
-                  <p className="font-bold text-slate-200">{siteName}</p>
-                  <p>&copy; 2026 {siteName}. Powered by MarketBazaar OS Platform.</p>
+                <footer className={`p-8 text-center text-xs opacity-60 border-t ${activeTheme.borderColor} mt-12`}>
+                  <p>© 2026 {siteName}. All Rights Reserved. Powered by MarketForge OS.</p>
                 </footer>
               </div>
             </div>
@@ -1511,115 +1526,39 @@ export default function WebsiteBuilderOS({ profile, tenantId }: Props) {
         </div>
       </div>
 
-      {/* Modal: Add Catalog Item */}
-      {isAddingProductModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-[#0D0E17] border border-white/10 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl relative">
+      {/* HTML EXPORT MODAL */}
+      {showExportModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-[#0D0E17] border border-white/10 rounded-2xl p-6 max-w-2xl w-full space-y-4 text-slate-100 shadow-2xl">
             <div className="flex items-center justify-between border-b border-white/10 pb-3">
-              <h3 className="font-display font-bold text-base text-white">Add Product / Service Item</h3>
-              <button onClick={() => setIsAddingProductModal(false)} className="text-slate-400 hover:text-white">
+              <h3 className="font-bold text-base flex items-center gap-2">
+                <Code className="w-5 h-5 text-cyan-400" /> Export Standalone Production HTML/CSS
+              </h3>
+              <button onClick={() => setShowExportModal(false)} className="text-slate-400 hover:text-white">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleAddProduct} className="space-y-3 text-xs">
-              <div>
-                <label className="block text-slate-400 mb-1 font-semibold">Title</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Executive Health Scan"
-                  value={newProduct.title}
-                  onChange={(e) => setNewProduct({ ...newProduct, title: e.target.value })}
-                  className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:border-indigo-500"
-                />
-              </div>
+            <p className="text-xs text-slate-400">
+              Copy or download this fully self-contained HTML file. It uses Tailwind CDN and includes all page sections for <strong>{siteName}</strong>.
+            </p>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-slate-400 mb-1 font-semibold">Price Tag</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. $49 or $25/mo"
-                    value={newProduct.price}
-                    onChange={(e) => setNewProduct({ ...newProduct, price: e.target.value })}
-                    className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:border-indigo-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-slate-400 mb-1 font-semibold">Category</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Diagnostics"
-                    value={newProduct.category}
-                    onChange={(e) => setNewProduct({ ...newProduct, category: e.target.value })}
-                    className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:border-indigo-500"
-                  />
-                </div>
-              </div>
+            <textarea
+              rows={12}
+              readOnly
+              value={generateExportHtml()}
+              className="w-full bg-black/80 border border-white/10 rounded-xl p-3 text-xs font-mono text-cyan-300 focus:outline-none resize-none"
+            />
 
-              <div>
-                <label className="block text-slate-400 mb-1 font-semibold">Unsplash Image URL</label>
-                <input
-                  type="text"
-                  value={newProduct.image}
-                  onChange={(e) => setNewProduct({ ...newProduct, image: e.target.value })}
-                  className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:border-indigo-500 font-mono text-[11px]"
-                />
-              </div>
-
-              <div>
-                <label className="block text-slate-400 mb-1 font-semibold">Description</label>
-                <textarea
-                  rows={3}
-                  placeholder="Short description of this product or service..."
-                  value={newProduct.description}
-                  onChange={(e) => setNewProduct({ ...newProduct, description: e.target.value })}
-                  className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:border-indigo-500"
-                />
-              </div>
-
-              <button
-                type="submit"
-                className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl shadow-lg transition"
-              >
-                Save To Catalog
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Modal: Export Code */}
-      {showCodeModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-[#0D0E17] border border-white/10 rounded-2xl max-w-2xl w-full p-6 space-y-4 shadow-2xl relative">
-            <div className="flex items-center justify-between border-b border-white/10 pb-3">
-              <div className="flex items-center gap-3">
-                <Code className="w-5 h-5 text-cyan-400" />
-                <h3 className="font-display font-bold text-base text-white">Export Website Code</h3>
-              </div>
-              <button onClick={() => setShowCodeModal(false)} className="text-slate-400 hover:text-white">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="relative bg-slate-950 p-4 rounded-xl border border-white/10 max-h-96 overflow-y-auto font-mono text-xs text-slate-300">
-              <pre>{generatedHtmlCode}</pre>
-            </div>
-
-            <div className="flex items-center justify-between">
-              <p className="text-xs text-slate-400">Ready to drop into any server or host.</p>
+            <div className="flex justify-end gap-3 pt-2">
               <button
                 onClick={() => {
-                  navigator.clipboard.writeText(generatedHtmlCode);
-                  setCopiedCode(true);
-                  setTimeout(() => setCopiedCode(false), 2000);
+                  navigator.clipboard.writeText(generateExportHtml());
+                  alert('HTML code copied to clipboard!');
                 }}
-                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl flex items-center gap-2 transition"
+                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 transition cursor-pointer"
               >
-                {copiedCode ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
-                {copiedCode ? 'Copied to Clipboard!' : 'Copy HTML5 Code'}
+                <Copy className="w-4 h-4" /> Copy Code
               </button>
             </div>
           </div>

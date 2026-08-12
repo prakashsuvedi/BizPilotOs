@@ -1492,7 +1492,7 @@ export default function SuccessCenter({
               </div>
               <span className="text-[10px] text-indigo-300 font-mono">Workspace ID: {tenantId}</span>
             </div>
-            <h2 className="text-xl lg:text-2xl font-bold font-sans tracking-tight">Welcome to MarketBazaar OS</h2>
+            <h2 className="text-xl lg:text-2xl font-bold font-sans tracking-tight">Welcome to MarketForge OS</h2>
             <p className="text-indigo-200 text-xs leading-relaxed">
               Let's build your first marketing system. Fill company details, map tailored target client personas, establish design rules, and generate localized calendars to secure high adoption metrics.
             </p>

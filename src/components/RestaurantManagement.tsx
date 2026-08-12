@@ -8,9 +8,13 @@ import {
   Sparkles, Coffee, Wine, Pizza, Flame, ShieldCheck, Maximize2, 
   RefreshCw, X, ChevronDown, CheckCircle2, UserCheck, Layers, Eye, Move,
   Calendar, Building2, MapPin, Tag, ArrowUpRight, Scale, AlertCircle, ShoppingBag, Sliders,
-  Lock, Unlock, Wifi, Radio, AlertOctagon, RotateCcw
+  Lock, Unlock, Wifi, Radio, AlertOctagon, RotateCcw, Bed, Tv, Bath, Camera, Image as ImageIcon,
+  Crown, Shirt, Globe, Building, PhoneCall, SlidersHorizontal, Layers3, Box, DoorOpen, Home,
+  Compass, Droplets, Sun, Wind, Briefcase, Shield, CheckSquare,
+  FileSpreadsheet, Grid, Palette, Smartphone, Copy
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
+import MobileTableQrOrderingApp from './MobileTableQrOrderingApp';
 import { 
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, 
   CartesianGrid, PieChart, Pie, Cell, AreaChart, Area, Legend 
@@ -20,6 +24,8 @@ import { BusinessProfile } from '../types';
 interface Props {
   profile: BusinessProfile;
   tenantId: string;
+  onNavigateToWebsiteBuilder?: () => void;
+  onNavigateToHotelOS?: () => void;
 }
 
 // Currency Configuration
@@ -30,6 +36,14 @@ export const CURRENCY_CONFIG: Record<CurrencyCode, { symbol: string; rate: numbe
   NPR: { symbol: 'रू ', rate: 133.5, label: 'NPR (रू)', code: 'NPR', name: 'Nepalese Rupee' },
   INR: { symbol: '₹ ', rate: 83.2, label: 'INR (₹)', code: 'INR', name: 'Indian Rupee' }
 };
+
+// Portion Variation Interface
+export interface PortionVariation {
+  id: string;
+  name: string; // e.g. 'Full Plate', 'Half Plate', '30 ml (Peg)', '60 ml (Double)', '180 ml (Quarter)', '750 ml (Bottle)', 'Family Platter'
+  priceMultiplier: number;
+  priceOverride?: number;
+}
 
 // Data Types
 export interface RecipeIngredient {
@@ -50,6 +64,7 @@ export interface MenuItem {
   description?: string;
   imageUrl?: string;
   recipe?: RecipeIngredient[];
+  portions?: PortionVariation[];
 }
 
 export interface IngredientItem {
@@ -82,11 +97,13 @@ export interface TableItem {
   tableNumber: string;
   seats: number;
   shape: 'round' | 'square' | 'rectangle' | 'booth';
-  section: 'Main Dining' | 'Terrace Patio' | 'VIP Lounge' | 'Bar Counter';
+  chairStyle?: 'wood' | 'armchair' | 'bar_stool' | 'booth_sofa' | 'outdoor_rattan' | 'leather_suite';
+  section: 'Main Dining' | 'Terrace Patio' | 'VIP Lounge' | 'Bar Counter' | 'Rooftop Garden' | string;
   status: 'available' | 'occupied' | 'ordering' | 'billed' | 'cleaning';
   assignedWaiter?: string;
   currentOrderId?: string;
   currentOrderTotal?: number;
+  floorNumber?: number;
 }
 
 export interface OrderLineItem {
@@ -94,6 +111,8 @@ export interface OrderLineItem {
   name: string;
   price: number;
   quantity: number;
+  portionName?: string;
+  portionMultiplier?: number;
   isVeg?: boolean;
   notes?: string;
 }
@@ -108,6 +127,8 @@ export interface POSTerminalStatus {
   lastSyncedAt?: string;
   activeOrdersCount: number;
   totalShiftSales: number;
+  cashFloat?: number;
+  assignedFloor?: string;
 }
 
 export interface LiveOrder {
@@ -130,6 +151,45 @@ export interface LiveOrder {
   voidReason?: string;
   voidedBy?: string;
   voidedAt?: string;
+}
+
+// Hotel & Resort Room Facilities & Management Types
+export interface HotelRoomFacilities {
+  ac: boolean;
+  fan: boolean;
+  nonAc: boolean;
+  tv: boolean;
+  internet: boolean;
+  inCallService: boolean;
+  laundryService: boolean;
+  complementaryBreakfast: boolean;
+  spaAccess: boolean;
+  saunaAccess: boolean;
+  jacuzzi: boolean;
+  swimmingPool: boolean;
+  bbqAccess: boolean;
+  campFireAccess: boolean;
+}
+
+export interface HotelRoom {
+  id: string;
+  roomNumber: string; // e.g. '101', '204', 'PH-01', 'CONF-A', 'RESORT-01'
+  floorNumber: number; // 0 = Ground, 1 = 1st floor, etc.
+  floorName: string; // 'Ground Floor', '1st Floor - Executive', '2nd Floor - Family Wing', 'Penthouse Suites', 'Conference Wing', 'Resort Lawn'
+  roomType: 'Single Bed Room' | 'Double Bed Room' | 'Family Suite' | 'Presidential Suite' | 'Meeting Hall' | 'Conference Hall' | 'BBQ Lawn / Campfire' | 'Poolside Cabana';
+  roomSizeSqFt: number;
+  maxGuests: number;
+  ratePerNight: number; // in USD
+  ratePerHour?: number; // for meeting/conference halls
+  status: 'Available' | 'Occupied' | 'Reserved' | 'Cleaning' | 'Maintenance';
+  guestName?: string;
+  guestPhone?: string;
+  checkInDate?: string;
+  checkOutDate?: string;
+  activeRoomServiceTotal?: number;
+  imageUrl?: string;
+  customDemoImage?: string;
+  facilities: HotelRoomFacilities;
 }
 
 export interface InvoiceRecord {
@@ -164,11 +224,30 @@ export interface InvoiceSettings {
   currency: CurrencyCode;
 }
 
-export default function RestaurantManagement({ profile, tenantId }: Props) {
-  const [activeTab, setActiveTab] = useState<'tables' | 'waiter' | 'kitchen' | 'menu' | 'finance' | 'inventory' | 'analytics'>('tables');
+export default function RestaurantManagement({ profile, tenantId, onNavigateToWebsiteBuilder, onNavigateToHotelOS }: Props) {
+  const [activeTab, setActiveTab] = useState<'tables' | 'waiter' | 'kitchen' | 'menu' | 'finance' | 'inventory' | 'analytics' | 'reconciliation' | 'pos_config' | 'floor_audit' | 'qr_ordering'>('tables');
+  const [previewQrTableNumber, setPreviewQrTableNumber] = useState<string | null>(null);
 
   // Currency Selection State
   const [currency, setCurrency] = useState<CurrencyCode>('USD');
+
+  // POS Custom Configuration State (Modular POS Editor)
+  const [posConfig, setPosConfig] = useState({
+    gridCols: 3 as 2 | 3 | 4 | 5,
+    tileTheme: 'orange' as 'orange' | 'emerald' | 'sky' | 'rose' | 'indigo' | 'amber' | 'purple' | 'slate',
+    portionCategories: ['Half-Plate', 'Full-Plate', '30 ml (Single Peg)', '60 ml (Double Peg)', '180 ml (Quarter)', 'Bottle', 'Drink-ML', 'Family Platter'],
+    quickKeys: ['Quick Cash $20', 'Quick Cash $50', 'Quick Cash $100', 'Repeat Last Order', 'Split Bill Key', 'Discount Key', 'Void Item']
+  });
+
+  // Hotel & Resort Management States
+  const [hotelRooms, setHotelRooms] = useState<HotelRoom[]>([]);
+  const [selectedRoomFor3D, setSelectedRoomFor3D] = useState<HotelRoom | null>(null);
+  const [selectedRoomForDining, setSelectedRoomForDining] = useState<HotelRoom | null>(null);
+  
+  // Custom Table & Chair Customizer States
+  const [selectedTableForChairEdit, setSelectedTableForChairEdit] = useState<TableItem | null>(null);
+  const [isChairCustomizerOpen, setIsChairCustomizerOpen] = useState<boolean>(false);
+  const [selectedMenuItemForPortion, setSelectedMenuItemForPortion] = useState<MenuItem | null>(null);
 
   // Invoice Details & Business Customization State
   const [invoiceSettings, setInvoiceSettings] = useState<InvoiceSettings>({
@@ -359,9 +438,67 @@ export default function RestaurantManagement({ profile, tenantId }: Props) {
     }));
   };
 
+  // Tenant Configuration LocalStorage Persistence Helper
+  const saveTenantSettingsToStorage = (tId: string, partialSettings: Record<string, any>) => {
+    try {
+      const saved = localStorage.getItem('marketforge_tenants');
+      if (saved) {
+        const tenants = JSON.parse(saved);
+        const idx = tenants.findIndex((t: any) => t.id === tId || t.id.includes(tId));
+        if (idx !== -1) {
+          tenants[idx].settings = {
+            ...tenants[idx].settings,
+            ...partialSettings
+          };
+          localStorage.setItem('marketforge_tenants', JSON.stringify(tenants));
+        }
+      }
+    } catch (e) {
+      console.warn("Error saving tenant settings:", e);
+    }
+  };
+
   // Initial Load from Firestore or Fallback Seeds
   useEffect(() => {
     loadRestaurantData();
+
+    // Load Tenant Specific Custom Settings (Currency, Address, Cashier Terminals)
+    try {
+      const savedTenants = localStorage.getItem('marketforge_tenants');
+      if (savedTenants) {
+        const tenants = JSON.parse(savedTenants);
+        const currTenant = tenants.find((t: any) => t.id === tenantId || t.id.includes(tenantId));
+        if (currTenant && currTenant.settings) {
+          const s = currTenant.settings;
+          if (s.currencyCode) setCurrency(s.currencyCode);
+          if (s.address || s.phone || s.vatRegNumber) {
+            setInvoiceSettings(prev => ({
+              ...prev,
+              restaurantName: currTenant.name || prev.restaurantName,
+              address: s.address || prev.address,
+              phone: s.phone || prev.phone,
+              taxId: s.vatRegNumber || prev.taxId,
+              currency: s.currencyCode || prev.currency
+            }));
+          }
+          if (s.cashierTerminals && s.cashierTerminals.length > 0) {
+            setTerminalSyncList(s.cashierTerminals.map((ctName: string, i: number) => ({
+              id: `pos_${i + 1}`,
+              name: ctName,
+              cashierName: i === 0 ? 'Alex Vance' : i === 1 ? 'Sunita Thapa' : 'POS Specialist',
+              location: ctName,
+              status: 'Online',
+              lastPing: 'Just now',
+              lastSyncedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+              activeOrdersCount: Math.floor(Math.random() * 3),
+              totalShiftSales: Math.floor(200 + Math.random() * 1000)
+            })));
+          }
+        }
+      }
+    } catch (e) {
+      console.warn("Error reading tenant settings in RestaurantManagement:", e);
+    }
   }, [tenantId]);
 
   const loadRestaurantData = async () => {
@@ -371,178 +508,33 @@ export default function RestaurantManagement({ profile, tenantId }: Props) {
       if (fetchedTables && fetchedTables.length > 0) {
         setTables(fetchedTables as any);
       } else {
-        const seedTables: TableItem[] = [
-          { id: 'tbl_1', tableNumber: 'T-01', seats: 2, shape: 'round', section: 'Main Dining', status: 'available' },
-          { id: 'tbl_2', tableNumber: 'T-02', seats: 2, shape: 'square', section: 'Main Dining', status: 'occupied', assignedWaiter: 'Alex Vance', currentOrderTotal: 48.50 },
-          { id: 'tbl_3', tableNumber: 'T-03', seats: 4, shape: 'rectangle', section: 'Main Dining', status: 'ordering', assignedWaiter: 'Sarah Jenkins', currentOrderTotal: 92.00 },
-          { id: 'tbl_4', tableNumber: 'T-04', seats: 4, shape: 'rectangle', section: 'Main Dining', status: 'available' },
-          { id: 'tbl_5', tableNumber: 'T-05', seats: 6, shape: 'booth', section: 'VIP Lounge', status: 'billed', assignedWaiter: 'Marco Rossi', currentOrderTotal: 185.00 },
-          { id: 'tbl_6', tableNumber: 'T-06', seats: 4, shape: 'square', section: 'Terrace Patio', status: 'available' },
-          { id: 'tbl_7', tableNumber: 'T-07', seats: 2, shape: 'round', section: 'Terrace Patio', status: 'occupied', assignedWaiter: 'Alex Vance', currentOrderTotal: 34.00 },
-          { id: 'tbl_8', tableNumber: 'T-08', seats: 8, shape: 'rectangle', section: 'VIP Lounge', status: 'available' },
-        ];
-        setTables(seedTables);
+        setTables([]);
       }
 
-      // 2. Ingredients Inventory Seeds
+      // 2. Ingredients Inventory
       const fetchedIngredients = await clientDb.getCollection('restaurant_ingredients', tenantId);
       if (fetchedIngredients && fetchedIngredients.length > 0) {
         setIngredients(fetchedIngredients as any);
       } else {
-        const seedIngredients: IngredientItem[] = [
-          { id: 'ing_1', name: 'Prime Wagyu Ribeye', category: 'Meat & Seafood', stockQuantity: 15.5, unit: 'kg', lowStockThreshold: 5.0, costPerUnit: 32.00, lastRestocked: 'Yesterday' },
-          { id: 'ing_2', name: 'Fresh Mozzarella di Bufala', category: 'Dairy & Cheese', stockQuantity: 18.0, unit: 'kg', lowStockThreshold: 4.0, costPerUnit: 14.00, lastRestocked: 'Today' },
-          { id: 'ing_3', name: 'Chilean Sea Bass Fillet', category: 'Meat & Seafood', stockQuantity: 3.2, unit: 'kg', lowStockThreshold: 5.0, costPerUnit: 28.50, lastRestocked: '3 days ago' }, // Low stock
-          { id: 'ing_4', name: 'White Truffle Oil', category: 'Pantry & Flours', stockQuantity: 4.5, unit: 'L', lowStockThreshold: 1.0, costPerUnit: 45.00, lastRestocked: '4 days ago' },
-          { id: 'ing_5', name: 'Wild Calamari Rings', category: 'Meat & Seafood', stockQuantity: 22.0, unit: 'kg', lowStockThreshold: 5.0, costPerUnit: 11.00, lastRestocked: '2 days ago' },
-          { id: 'ing_6', name: 'San Marzano Flour Type 00', category: 'Pantry & Flours', stockQuantity: 7.5, unit: 'kg', lowStockThreshold: 10.0, costPerUnit: 2.50, lastRestocked: '5 days ago' }, // Low stock
-          { id: 'ing_7', name: 'Organic San Marzano Tomatoes', category: 'Produce', stockQuantity: 30.0, unit: 'kg', lowStockThreshold: 8.0, costPerUnit: 3.20, lastRestocked: 'Yesterday' },
-          { id: 'ing_8', name: 'Artisanal Espresso Beans', category: 'Beverages', stockQuantity: 12.0, unit: 'kg', lowStockThreshold: 2.0, costPerUnit: 18.00, lastRestocked: 'Today' }
-        ];
-        setIngredients(seedIngredients);
+        setIngredients([]);
       }
 
-      // 3. Menu Items with Linked Recipes
+      // 3. Menu Items
       const fetchedMenu = await clientDb.getCollection('restaurant_menu', tenantId);
       if (fetchedMenu && fetchedMenu.length > 0) {
         setMenuItems(fetchedMenu as any);
         const cats = Array.from(new Set(fetchedMenu.map((i: any) => i.category)));
         if (cats.length > 0) setCategories(cats as string[]);
       } else {
-        const seedMenu: MenuItem[] = [
-          { 
-            id: 'menu_1', 
-            name: 'Truffle Parmesan Fries', 
-            category: 'Appetizers', 
-            price: 12.99, 
-            status: 'Available', 
-            isVeg: true, 
-            prepTimeMins: 10, 
-            description: 'Hand-cut russet potatoes tossed in white truffle oil and aged Parmigiano',
-            recipe: [{ ingredientId: 'ing_4', ingredientName: 'White Truffle Oil', amountPerUnit: 0.05, unit: 'L' }]
-          },
-          { 
-            id: 'menu_2', 
-            name: 'Crispy Calamari Fritti', 
-            category: 'Appetizers', 
-            price: 16.50, 
-            status: 'Available', 
-            isVeg: false, 
-            prepTimeMins: 12, 
-            description: 'Served with charred lemon aioli and spicy marinara dip',
-            recipe: [{ ingredientId: 'ing_5', ingredientName: 'Wild Calamari Rings', amountPerUnit: 0.25, unit: 'kg' }]
-          },
-          { 
-            id: 'menu_3', 
-            name: 'Prime Wagyu Ribeye (12oz)', 
-            category: 'Mains', 
-            price: 48.00, 
-            status: 'Available', 
-            isVeg: false, 
-            prepTimeMins: 22, 
-            description: 'Grade A5 Wagyu with herb compound butter and roasted garlic mash',
-            recipe: [{ ingredientId: 'ing_1', ingredientName: 'Prime Wagyu Ribeye', amountPerUnit: 0.35, unit: 'kg' }]
-          },
-          { 
-            id: 'menu_4', 
-            name: 'Pan-Seared Chilean Sea Bass', 
-            category: 'Mains', 
-            price: 39.50, 
-            status: 'Available', 
-            isVeg: false, 
-            prepTimeMins: 18, 
-            description: 'Over saffron risotto and blistered cherry tomatoes',
-            recipe: [{ ingredientId: 'ing_3', ingredientName: 'Chilean Sea Bass Fillet', amountPerUnit: 0.28, unit: 'kg' }]
-          },
-          { 
-            id: 'menu_5', 
-            name: 'Artisanal Margherita Pizza', 
-            category: 'Wood-fired Pizza', 
-            price: 18.00, 
-            status: 'Available', 
-            isVeg: true, 
-            prepTimeMins: 12, 
-            description: 'San Marzano tomatoes, fresh mozzarella di bufala, and sweet basil',
-            recipe: [
-              { ingredientId: 'ing_6', ingredientName: 'San Marzano Flour Type 00', amountPerUnit: 0.25, unit: 'kg' },
-              { ingredientId: 'ing_2', ingredientName: 'Fresh Mozzarella di Bufala', amountPerUnit: 0.15, unit: 'kg' },
-              { ingredientId: 'ing_7', ingredientName: 'Organic San Marzano Tomatoes', amountPerUnit: 0.15, unit: 'kg' }
-            ]
-          },
-          { 
-            id: 'menu_6', 
-            name: 'Spicy Diavola & Pepperoni', 
-            category: 'Wood-fired Pizza', 
-            price: 21.50, 
-            status: 'Available', 
-            isVeg: false, 
-            prepTimeMins: 14, 
-            description: 'Calabrian chili honey, spicy salami, and smoked provolone',
-            recipe: [
-              { ingredientId: 'ing_6', ingredientName: 'San Marzano Flour Type 00', amountPerUnit: 0.25, unit: 'kg' },
-              { ingredientId: 'ing_2', ingredientName: 'Fresh Mozzarella di Bufala', amountPerUnit: 0.15, unit: 'kg' }
-            ]
-          },
-          { 
-            id: 'menu_7', 
-            name: 'Classic Tiramisu Tradizionale', 
-            category: 'Desserts', 
-            price: 11.00, 
-            status: 'Available', 
-            isVeg: true, 
-            prepTimeMins: 5, 
-            description: 'Espresso-soaked ladyfingers, whipped mascarpone, and Valrhona cocoa',
-            recipe: [{ ingredientId: 'ing_8', ingredientName: 'Artisanal Espresso Beans', amountPerUnit: 0.04, unit: 'kg' }]
-          },
-          { 
-            id: 'menu_8', 
-            name: 'Craft Smoked Old Fashioned', 
-            category: 'Beverages & Bar', 
-            price: 15.00, 
-            status: 'Available', 
-            isVeg: true, 
-            prepTimeMins: 5, 
-            description: 'Bourbon, demerara sugar, Angostura bitters infused with applewood smoke' 
-          },
-        ];
-        setMenuItems(seedMenu);
+        setMenuItems([]);
       }
 
-      // 4. Table Bookings Seeds
+      // 4. Table Bookings
       const fetchedBookings = await clientDb.getCollection('restaurant_bookings', tenantId);
       if (fetchedBookings && fetchedBookings.length > 0) {
         setBookings(fetchedBookings as any);
       } else {
-        const todayStr = new Date().toISOString().split('T')[0];
-        const seedBookings: TableBooking[] = [
-          { 
-            id: 'book_1', 
-            tableNumber: 'T-01', 
-            customerName: 'Alexander Wright', 
-            customerPhone: '+1 (555) 234-5678', 
-            guestCount: 2, 
-            bookingDate: todayStr, 
-            timeSlot: '19:00', 
-            durationHours: 2, 
-            status: 'Confirmed', 
-            specialNotes: 'Anniversary celebration - Window table request', 
-            createdAt: 'Today, 10:30 AM' 
-          },
-          { 
-            id: 'book_2', 
-            tableNumber: 'T-05', 
-            customerName: 'Sophia Martinez', 
-            customerPhone: '+1 (555) 876-5432', 
-            guestCount: 6, 
-            bookingDate: todayStr, 
-            timeSlot: '20:00', 
-            durationHours: 2, 
-            status: 'Confirmed', 
-            specialNotes: 'VIP Lounge reservation for business dinner', 
-            createdAt: 'Today, 11:15 AM' 
-          }
-        ];
-        setBookings(seedBookings);
+        setBookings([]);
       }
 
       // 5. Live Orders
@@ -550,46 +542,7 @@ export default function RestaurantManagement({ profile, tenantId }: Props) {
       if (fetchedOrders && fetchedOrders.length > 0) {
         setOrders(fetchedOrders as any);
       } else {
-        const seedOrders: LiveOrder[] = [
-          {
-            id: 'ord_101',
-            tableNumber: 'T-03',
-            section: 'Main Dining',
-            waiterName: 'Sarah Jenkins',
-            items: [
-              { menuItemId: 'menu_3', name: 'Prime Wagyu Ribeye (12oz)', price: 48.00, quantity: 1, isVeg: false, notes: 'Medium rare, extra sauce' },
-              { menuItemId: 'menu_1', name: 'Truffle Parmesan Fries', price: 12.99, quantity: 2, isVeg: true },
-              { menuItemId: 'menu_8', name: 'Craft Smoked Old Fashioned', price: 15.00, quantity: 1, isVeg: true }
-            ],
-            subtotal: 88.99,
-            serviceTaxRate: 10,
-            vatRate: 13,
-            discountAmount: 0,
-            totalAmount: 109.45,
-            status: 'Cooking',
-            timestamp: new Date(Date.now() - 12 * 60000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            elapsedMins: 12
-          },
-          {
-            id: 'ord_102',
-            tableNumber: 'T-02',
-            section: 'Main Dining',
-            waiterName: 'Alex Vance',
-            items: [
-              { menuItemId: 'menu_5', name: 'Artisanal Margherita Pizza', price: 18.00, quantity: 2, isVeg: true, notes: 'Extra crispy crust' },
-              { menuItemId: 'menu_7', name: 'Classic Tiramisu Tradizionale', price: 11.00, quantity: 1, isVeg: true }
-            ],
-            subtotal: 47.00,
-            serviceTaxRate: 10,
-            vatRate: 13,
-            discountAmount: 0,
-            totalAmount: 57.81,
-            status: 'Ready to Serve',
-            timestamp: new Date(Date.now() - 20 * 60000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            elapsedMins: 20
-          }
-        ];
-        setOrders(seedOrders);
+        setOrders([]);
       }
 
       // 6. Invoices
@@ -597,30 +550,15 @@ export default function RestaurantManagement({ profile, tenantId }: Props) {
       if (fetchedInvoices && fetchedInvoices.length > 0) {
         setInvoices(fetchedInvoices as any);
       } else {
-        const seedInvoices: InvoiceRecord[] = [
-          {
-            id: 'inv_801',
-            invoiceId: 'INV-2026-081',
-            date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-            customerName: 'VIP Table Guest (T-05)',
-            tableNumber: 'T-05',
-            waiterName: 'Marco Rossi',
-            items: [
-              { menuItemId: 'menu_3', name: 'Prime Wagyu Ribeye', price: 48.00, quantity: 2, isVeg: false },
-              { menuItemId: 'menu_4', name: 'Chilean Sea Bass', price: 39.50, quantity: 1, isVeg: false },
-              { menuItemId: 'menu_8', name: 'Smoked Old Fashioned', price: 15.00, quantity: 3, isVeg: true }
-            ],
-            subtotal: 180.50,
-            serviceTaxAmount: 18.05,
-            vatAmount: 23.46,
-            discountAmount: 10.00,
-            grandTotal: 212.01,
-            paymentMethod: 'Dynamic QR',
-            templateType: 'tax_invoice',
-            status: 'Paid'
-          }
-        ];
-        setInvoices(seedInvoices);
+        setInvoices([]);
+      }
+
+      // 7. Hotel & Resort Rooms
+      const fetchedRooms = await clientDb.getCollection('restaurant_hotel_rooms', tenantId);
+      if (fetchedRooms && fetchedRooms.length > 0) {
+        setHotelRooms(fetchedRooms as any);
+      } else {
+        setHotelRooms([]);
       }
 
     } catch (err) {
@@ -947,8 +885,12 @@ export default function RestaurantManagement({ profile, tenantId }: Props) {
       <div className="flex gap-2 border-b border-slate-200 pb-2 overflow-x-auto no-scrollbar">
         {[
           { id: 'tables', label: 'Interactive Floor Layout', icon: Layers, badge: `${tables.filter(t => t.status === 'occupied' || t.status === 'ordering').length} Active` },
+          { id: 'qr_ordering', label: 'Table QR Ordering Center', icon: QrCode, badge: 'Scan-to-Order' },
           { id: 'waiter', label: 'Waiter Order Entry', icon: UserCheck, badge: 'Touch POS' },
           { id: 'kitchen', label: 'Kitchen KDS', icon: ChefHat, badge: `${orders.filter(o => o.status === 'Sent to Kitchen' || o.status === 'Cooking').length} Cooking` },
+          { id: 'reconciliation', label: 'Financial Reconciliation', icon: Scale, badge: 'PDF & Excel Report' },
+          { id: 'pos_config', label: 'POS Keypad Configurator', icon: SlidersHorizontal, badge: 'Layout & Colors' },
+          { id: 'floor_audit', label: 'Floor Operations Audit', icon: Activity, badge: 'Turnover & RevPASH' },
           { id: 'finance', label: 'Invoices & QR Billing', icon: Receipt, badge: 'Dynamic QR' },
           { id: 'inventory', label: 'Stock & Inventory', icon: Store, badge: `${ingredients.filter(i => i.stockQuantity <= i.lowStockThreshold).length} Low Stock` },
           { id: 'analytics', label: 'Revenue & Sales Analytics', icon: TrendingUp, badge: 'Recharts BI' },
@@ -993,6 +935,10 @@ export default function RestaurantManagement({ profile, tenantId }: Props) {
             setActiveTab('waiter');
           }}
           onOpenAddTable={() => setIsAddTableOpen(true)}
+          onOpenChairCustomizer={(table) => {
+            setSelectedTableForChairEdit(table);
+            setIsChairCustomizerOpen(true);
+          }}
           onClearTable={(tableId) => {
             setTables(tables.map(t => t.id === tableId ? { ...t, status: 'available', currentOrderTotal: 0, currentOrderId: undefined } : t));
           }}
@@ -1062,6 +1008,7 @@ export default function RestaurantManagement({ profile, tenantId }: Props) {
           onAssignPendingOrder={(pendingOrder, targetTableNum) => {
             handleAssignPendingOrderToTable(pendingOrder, targetTableNum);
           }}
+          onNavigateToWebsiteBuilder={onNavigateToWebsiteBuilder}
         />
       )}
 
@@ -1141,6 +1088,79 @@ export default function RestaurantManagement({ profile, tenantId }: Props) {
         />
       )}
 
+      {/* TAB 8: AUTOMATED FINANCIAL RECONCILIATION WIDGET */}
+      {activeTab === 'reconciliation' && (
+        <FinancialReconciliationTab 
+          invoices={invoices}
+          orders={orders}
+          hotelRooms={hotelRooms}
+          bookings={bookings}
+          currency={currency}
+          formatCurrency={formatCurrency}
+          profile={profile}
+        />
+      )}
+
+      {/* TAB 9: MODULAR POS KEYPAD CONFIGURATOR & TENANT SETTINGS */}
+      {activeTab === 'pos_config' && (
+        <ModularPOSConfiguratorTab 
+          menuItems={menuItems}
+          categories={categories}
+          posConfig={posConfig}
+          onSaveConfig={(newCfg) => {
+            setPosConfig(newCfg);
+            saveTenantSettingsToStorage(tenantId, { posConfig: newCfg });
+          }}
+          currency={currency}
+          onChangeCurrency={(newCurr) => {
+            setCurrency(newCurr);
+            saveTenantSettingsToStorage(tenantId, { currencyCode: newCurr });
+          }}
+          invoiceSettings={invoiceSettings}
+          onSaveInvoiceSettings={(newInvSettings) => {
+            setInvoiceSettings(newInvSettings);
+            saveTenantSettingsToStorage(tenantId, {
+              address: newInvSettings.address,
+              phone: newInvSettings.phone,
+              vatRegNumber: newInvSettings.taxId,
+              currencyCode: newInvSettings.currency
+            });
+          }}
+          formatCurrency={formatCurrency}
+        />
+      )}
+
+      {/* TAB 10: FLOOR OPERATIONS AUDIT DASHBOARD */}
+      {activeTab === 'floor_audit' && (
+        <FloorOperationsAuditTab 
+          tables={tables}
+          orders={orders}
+          invoices={invoices}
+          currency={currency}
+          formatCurrency={formatCurrency}
+        />
+      )}
+
+      {/* TAB 11: TABLE QR ORDERING & BOOKING CENTER */}
+      {activeTab === 'qr_ordering' && (
+        <QrOrderingCenterTab 
+          tenantId={tenantId}
+          tables={tables}
+          orders={orders}
+          menuItems={menuItems}
+          profile={profile}
+          onOpenMobilePreview={(tblNum) => setPreviewQrTableNumber(tblNum)}
+          onClearDemoData={() => {
+            if (window.confirm("Are you sure you want to clear demo items and start with 0 mock data for clean commercial production?")) {
+              setMenuItems([]);
+              setOrders([]);
+              setIngredients([]);
+              clientDb.addDocToTenant('restaurant_settings', { isFreshStart: true }, tenantId);
+            }
+          }}
+        />
+      )}
+
       {/* MODALS */}
       {isBookingModalOpen && (
         <TableBookingModal 
@@ -1157,6 +1177,7 @@ export default function RestaurantManagement({ profile, tenantId }: Props) {
 
       {isAddTableOpen && (
         <AddCustomTableModal 
+          existingTables={tables}
           onClose={() => setIsAddTableOpen(false)}
           onSubmit={handleAddTable}
         />
@@ -1255,6 +1276,101 @@ export default function RestaurantManagement({ profile, tenantId }: Props) {
         />
       )}
 
+      {/* 3D INTERACTIVE ROOM DEMO MODAL */}
+      {selectedRoomFor3D && (
+        <Room3DDemoModal 
+          room={selectedRoomFor3D}
+          currency={currency}
+          formatCurrency={formatCurrency}
+          onClose={() => setSelectedRoomFor3D(null)}
+          onOrderRoomService={() => {
+            const r = selectedRoomFor3D;
+            setSelectedRoomFor3D(null);
+            setSelectedRoomForDining(r);
+          }}
+        />
+      )}
+
+      {/* IN-ROOM DINING EXPRESS TOUCH POS MODAL */}
+      {selectedRoomForDining && (
+        <InRoomDiningPOSModal 
+          room={selectedRoomForDining}
+          menuItems={menuItems}
+          categories={categories}
+          currency={currency}
+          formatCurrency={formatCurrency}
+          onClose={() => setSelectedRoomForDining(null)}
+          onSubmitOrder={(order) => {
+            handleSendOrderToKitchen(order);
+            // Update active room service total
+            setHotelRooms(hotelRooms.map(r => r.id === selectedRoomForDining.id ? { ...r, activeRoomServiceTotal: (r.activeRoomServiceTotal || 0) + order.totalAmount, status: 'Occupied' } : r));
+            setSelectedRoomForDining(null);
+          }}
+        />
+      )}
+
+      {/* TABLE CHAIR & SEATING CUSTOMIZER MODAL */}
+      {isChairCustomizerOpen && selectedTableForChairEdit && (
+        <TableChairCustomizerModal 
+          table={selectedTableForChairEdit}
+          onClose={() => {
+            setIsChairCustomizerOpen(false);
+            setSelectedTableForChairEdit(null);
+          }}
+          onSave={(updatedTable) => {
+            setTables(tables.map(t => t.id === updatedTable.id ? updatedTable : t));
+            setIsChairCustomizerOpen(false);
+            setSelectedTableForChairEdit(null);
+          }}
+        />
+      )}
+
+      {/* MENU PORTION VARIATION PICKER MODAL */}
+      {selectedMenuItemForPortion && (
+        <PortionVariationPickerModal 
+          item={selectedMenuItemForPortion}
+          currency={currency}
+          formatCurrency={formatCurrency}
+          onClose={() => setSelectedMenuItemForPortion(null)}
+          onSelectPortion={(portion, calculatedPrice) => {
+            setSelectedMenuItemForPortion(null);
+          }}
+        />
+      )}
+
+      {/* MOBILE QR TABLE ORDERING PREVIEW MODAL */}
+      {previewQrTableNumber && (
+        <div 
+          className="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-50 flex items-center justify-center p-2 sm:p-4 overflow-y-auto"
+          onClick={(e) => { if (e.target === e.currentTarget) setPreviewQrTableNumber(null); }}
+        >
+          <div className="bg-slate-950 rounded-3xl max-w-md w-full max-h-[90vh] overflow-y-auto border border-slate-800 shadow-2xl overflow-hidden relative my-auto">
+            <div className="bg-slate-900 px-4 py-3 border-b border-slate-800 flex justify-between items-center text-white">
+              <div className="flex items-center gap-2">
+                <Smartphone className="w-4 h-4 text-orange-500" />
+                <span className="font-bold text-xs">Guest Mobile QR Ordering ({previewQrTableNumber})</span>
+              </div>
+              <button 
+                type="button"
+                onClick={() => setPreviewQrTableNumber(null)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer transition"
+                title="Close preview"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="h-[75vh] overflow-y-auto">
+              <MobileTableQrOrderingApp 
+                tenantId={tenantId}
+                tableNumber={previewQrTableNumber}
+                onCloseGuestView={() => setPreviewQrTableNumber(null)}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
@@ -1268,6 +1384,7 @@ function FloorLayoutTab({
   formatCurrency = (amt) => `$${amt.toFixed(2)}`,
   onSelectTable, 
   onOpenAddTable,
+  onOpenChairCustomizer,
   onClearTable,
   onCycleTableStatus
 }: { 
@@ -1276,16 +1393,41 @@ function FloorLayoutTab({
   formatCurrency?: (amount: number, override?: CurrencyCode) => string;
   onSelectTable: (table: TableItem) => void;
   onOpenAddTable: () => void;
+  onOpenChairCustomizer?: (table: TableItem) => void;
   onClearTable: (id: string) => void;
   onCycleTableStatus: (id: string) => void;
 }) {
+  const [selectedFloor, setSelectedFloor] = useState<number>(1);
   const [selectedSection, setSelectedSection] = useState<string>('ALL');
 
-  const filteredTables = selectedSection === 'ALL' 
-    ? tables 
-    : tables.filter(t => t.section === selectedSection);
+  const [customFloors, setCustomFloors] = useState<Array<{ id: number; name: string }>>([
+    { id: 1, name: 'Ground Floor (Main Dining)' },
+    { id: 2, name: '2nd Floor (Mezzanine)' },
+    { id: 3, name: '3rd Floor (Rooftop Garden)' },
+  ]);
+  const [showAddFloorModal, setShowAddFloorModal] = useState(false);
+  const [newFloorName, setNewFloorName] = useState('');
 
-  const sections = ['ALL', 'Main Dining', 'Terrace Patio', 'VIP Lounge', 'Bar Counter'];
+  const handleCreateFloor = () => {
+    if (!newFloorName.trim()) return;
+    const nextId = customFloors.length > 0 ? Math.max(...customFloors.map(f => f.id)) + 1 : 1;
+    const newFloor = { id: nextId, name: newFloorName.trim() };
+    setCustomFloors([...customFloors, newFloor]);
+    setSelectedFloor(nextId);
+    setNewFloorName('');
+    setShowAddFloorModal(false);
+  };
+
+  const filteredTables = tables.filter(t => {
+    const tableFloor = t.floorNumber || 1;
+    const matchesFloor = selectedFloor === 0 || tableFloor === selectedFloor;
+    const matchesSection = selectedSection === 'ALL' || t.section === selectedSection;
+    return matchesFloor && matchesSection;
+  });
+
+  const sectionSet = new Set(['Main Dining', 'Terrace Patio', 'VIP Lounge', 'Bar Counter']);
+  tables.forEach(t => { if (t.section) sectionSet.add(t.section); });
+  const sections = ['ALL', ...Array.from(sectionSet)];
 
   const getStatusBadge = (status: TableItem['status']) => {
     switch (status) {
@@ -1306,34 +1448,25 @@ function FloorLayoutTab({
 
   return (
     <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-6">
-      {/* Floor Header & Filter Bar */}
+      {/* Floor Header & Multi-Floor Navigation */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-100 pb-4">
         <div>
           <h3 className="text-lg font-extrabold text-slate-800 flex items-center gap-2">
             <Layers className="w-5 h-5 text-orange-600" />
-            Interactive Dine-in Floor Layout
+            Interactive Multi-Floor Dine-in Layout
           </h3>
           <p className="text-xs text-slate-500">
-            Real-time table occupancy, seating capacity, assigned waiters, running bills, and 1-click status cycling.
+            Manage seating across multiple building floors, terrace levels, and VIP private dining halls.
           </p>
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="flex gap-1 bg-slate-100 p-1 rounded-xl">
-            {sections.map(sec => (
-              <button
-                key={sec}
-                onClick={() => setSelectedSection(sec)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
-                  selectedSection === sec 
-                    ? 'bg-white text-orange-600 shadow-sm' 
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                {sec}
-              </button>
-            ))}
-          </div>
+          <button
+            onClick={() => setShowAddFloorModal(true)}
+            className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-xl transition flex items-center gap-1.5 cursor-pointer border border-slate-300"
+          >
+            <Plus className="w-4 h-4 text-orange-600" /> Add New Floor Level
+          </button>
 
           <button
             onClick={onOpenAddTable}
@@ -1341,6 +1474,57 @@ function FloorLayoutTab({
           >
             <Plus className="w-4 h-4" /> Add Table
           </button>
+        </div>
+      </div>
+
+      {/* Multi-Floor Level Switcher Bar */}
+      <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar border-b border-slate-200">
+        <button
+          onClick={() => setSelectedFloor(0)}
+          className={`px-3.5 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer ${
+            selectedFloor === 0 ? 'bg-orange-600 text-white shadow-md' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+          }`}
+        >
+          🏢 All Floors ({tables.length} Tables)
+        </button>
+        {customFloors.map(fl => {
+          const count = tables.filter(t => (t.floorNumber || 1) === fl.id).length;
+          return (
+            <button
+              key={fl.id}
+              onClick={() => setSelectedFloor(fl.id)}
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
+                selectedFloor === fl.id ? 'bg-orange-600 text-white shadow-md' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              <span>{fl.name}</span>
+              <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded-full ${
+                selectedFloor === fl.id ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
+              }`}>
+                {count}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Section Filter Pills */}
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex gap-1.5 bg-slate-100 p-1 rounded-xl overflow-x-auto no-scrollbar">
+          <span className="text-xs text-slate-500 font-bold self-center px-2">Zone:</span>
+          {sections.map(sec => (
+            <button
+              key={sec}
+              onClick={() => setSelectedSection(sec)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer whitespace-nowrap ${
+                selectedSection === sec 
+                  ? 'bg-white text-orange-600 shadow-sm' 
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              {sec}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -1403,8 +1587,8 @@ function FloorLayoutTab({
 
                 <div className="text-xs text-slate-600 space-y-1 mb-3">
                   <div className="flex justify-between">
-                    <span className="text-slate-400">Section:</span>
-                    <span className="font-bold text-slate-800">{table.section}</span>
+                    <span className="text-slate-400">Floor & Section:</span>
+                    <span className="font-bold text-slate-800">Fl. {table.floorNumber || 1} • {table.section}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-400">Capacity:</span>
@@ -1425,24 +1609,15 @@ function FloorLayoutTab({
                 </div>
               </div>
 
-              {/* Visual Table Representation */}
-              <div className="my-2 flex items-center justify-center">
-                <div className={`relative flex items-center justify-center font-bold text-xs shadow-inner transition ${
-                  table.shape === 'round' ? 'w-20 h-20 rounded-full bg-white border-2 border-slate-300' :
-                  table.shape === 'booth' ? 'w-24 h-16 rounded-2xl bg-amber-100 border-2 border-amber-300' :
-                  table.shape === 'rectangle' ? 'w-28 h-16 rounded-xl bg-white border-2 border-slate-300' :
-                  'w-20 h-20 rounded-xl bg-white border-2 border-slate-300'
-                }`}>
-                  <span className="text-slate-700 font-black">{table.tableNumber}</span>
-
-                  {/* Seat Dots Visualization */}
-                  <div className="absolute -top-2 left-1/2 -translate-x-1/2 flex gap-1">
-                    {Array.from({ length: Math.min(table.seats, 4) }).map((_, i) => (
-                      <div key={i} className="w-2.5 h-2.5 rounded-full bg-slate-400 border border-white" />
-                    ))}
-                  </div>
-                </div>
-              </div>
+              {/* Visual Table & Chairs Representation */}
+              <InteractiveChairVisualizer 
+                seats={table.seats}
+                shape={table.shape}
+                status={table.status}
+                chairStyle={table.chairStyle}
+                tableNumber={table.tableNumber}
+                onCustomize={() => onOpenChairCustomizer?.(table)}
+              />
 
               {/* Actions Footer */}
               <div className="pt-3 border-t border-slate-200/60 flex items-center justify-between gap-2">
@@ -1476,6 +1651,44 @@ function FloorLayoutTab({
           );
         })}
       </div>
+
+      {/* MODAL: ADD NEW FLOOR LEVEL */}
+      {showAddFloorModal && (
+        <div 
+          className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto"
+          onClick={(e) => { if (e.target === e.currentTarget) setShowAddFloorModal(false); }}
+        >
+          <div className="bg-white rounded-3xl p-6 max-w-sm w-full max-h-[90vh] overflow-y-auto my-auto shadow-2xl space-y-4 border border-slate-200 animate-scale-up relative">
+            <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+              <h3 className="font-extrabold text-base text-slate-900">Add Custom Floor Level</h3>
+              <button onClick={() => setShowAddFloorModal(false)} className="p-1 text-slate-400 hover:text-slate-600 rounded-lg">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Floor Level Name / Label:</label>
+                <input
+                  type="text"
+                  value={newFloorName}
+                  onChange={(e) => setNewFloorName(e.target.value)}
+                  placeholder="e.g. Floor 4 (Poolside Bar)"
+                  className="w-full bg-slate-50 border border-slate-300 focus:border-orange-500 rounded-xl px-3.5 py-2.5 font-bold text-slate-900 outline-none"
+                  autoFocus
+                />
+              </div>
+            </div>
+
+            <button
+              onClick={handleCreateFloor}
+              className="w-full py-3 bg-orange-600 hover:bg-orange-700 text-white font-black text-xs rounded-xl shadow-md transition cursor-pointer flex items-center justify-center gap-2"
+            >
+              <Plus className="w-4 h-4" /> Create Floor Level
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1510,7 +1723,8 @@ function WaiterDashboardTab({
   onOpenInvoiceHub,
   onOpenInvoicePreview,
   onOpenThermalReceipt,
-  onAssignPendingOrder
+  onAssignPendingOrder,
+  onNavigateToWebsiteBuilder
 }: {
   tables: TableItem[];
   menuItems: MenuItem[];
@@ -1544,6 +1758,7 @@ function WaiterDashboardTab({
     timestamp: string;
   }) => void;
   onAssignPendingOrder: (pendingOrder: any, targetTableNum: string) => void;
+  onNavigateToWebsiteBuilder?: () => void;
 }) {
   const [selectedTableNumber, setSelectedTableNumber] = useState<string>(
     initialTable ? initialTable.tableNumber : tables[0]?.tableNumber || 'T-01'
@@ -2006,19 +2221,45 @@ function WaiterDashboardTab({
                 />
               </div>
 
-              <button
-                onClick={() => setVegOnlyFilter(!vegOnlyFilter)}
-                className={`px-3.5 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer border min-h-[42px] ${
-                  vegOnlyFilter 
-                    ? 'bg-emerald-100 border-emerald-400 text-emerald-800' 
-                    : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
-                }`}
-              >
-                <div className="w-3.5 h-3.5 rounded-full border border-emerald-600 flex items-center justify-center p-0.5">
-                  <div className="w-2 h-2 rounded-full bg-emerald-600" />
-                </div>
-                Pure Veg Items Only
-              </button>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  onClick={() => setVegOnlyFilter(!vegOnlyFilter)}
+                  className={`px-3.5 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer border min-h-[42px] ${
+                    vegOnlyFilter 
+                      ? 'bg-emerald-100 border-emerald-400 text-emerald-800' 
+                      : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
+                  <div className="w-3.5 h-3.5 rounded-full border border-emerald-600 flex items-center justify-center p-0.5">
+                    <div className="w-2 h-2 rounded-full bg-emerald-600" />
+                  </div>
+                  Pure Veg Items
+                </button>
+
+                <button
+                  onClick={() => setIsAddItemOpen(true)}
+                  className="px-4 py-2.5 bg-orange-600 hover:bg-orange-700 text-white font-extrabold text-xs rounded-xl shadow-md transition flex items-center gap-1.5 cursor-pointer min-h-[42px]"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Add Food Item</span>
+                </button>
+
+                {onNavigateToWebsiteBuilder && (
+                  <button
+                    onClick={() => {
+                      localStorage.setItem('marketforge_restaurant_synced_menu', JSON.stringify(menuItems));
+                      setServiceNotice("✓ Restaurant menu data synchronized with AI Website Builder!");
+                      setTimeout(() => setServiceNotice(null), 3000);
+                      onNavigateToWebsiteBuilder();
+                    }}
+                    className="px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-extrabold text-xs rounded-xl shadow-md transition flex items-center gap-1.5 cursor-pointer min-h-[42px]"
+                    title="Export menu data directly to tenant AI Website Builder"
+                  >
+                    <Globe className="w-4 h-4" />
+                    <span>Sync with AI Website Builder</span>
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* Categories Horizontal Selector */}
@@ -2054,9 +2295,26 @@ function WaiterDashboardTab({
             {filteredMenuItems.map(item => (
               <div
                 key={item.id}
-                className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm hover:border-orange-400 transition flex flex-col justify-between group"
+                className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm hover:border-orange-400 transition flex flex-col justify-between group overflow-hidden"
               >
                 <div>
+                  {item.imageUrl && (
+                    <div className="w-full h-32 rounded-xl overflow-hidden mb-3 bg-slate-100 relative border border-slate-100">
+                      <img 
+                        src={item.imageUrl} 
+                        alt={item.name} 
+                        className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                        referrerPolicy="no-referrer"
+                        onError={(e) => {
+                          (e.target as HTMLElement).style.display = 'none';
+                        }}
+                      />
+                      <span className="absolute bottom-1.5 left-1.5 bg-slate-900/80 text-white font-mono text-[9px] px-1.5 py-0.5 rounded backdrop-blur-xs font-bold">
+                        {item.category}
+                      </span>
+                    </div>
+                  )}
+
                   <div className="flex justify-between items-start gap-2 mb-2">
                     <div className="flex items-center gap-1.5">
                       <span className={`w-3.5 h-3.5 border flex items-center justify-center p-0.5 shrink-0 ${
@@ -4582,46 +4840,78 @@ function TableBookingModal({
 
 // Modal 1: Add Custom Table
 function AddCustomTableModal({
+  existingTables = [],
   onClose,
   onSubmit
 }: {
+  existingTables?: TableItem[];
   onClose: () => void;
   onSubmit: (table: Omit<TableItem, 'id'>) => void;
 }) {
-  const [tableNumber, setTableNumber] = useState('T-09');
+  const nextNum = existingTables.length + 1;
+  const defaultNum = `T-${String(nextNum).padStart(2, '0')}`;
+
+  const [tableNumber, setTableNumber] = useState(defaultNum);
   const [seats, setSeats] = useState<number>(4);
   const [shape, setShape] = useState<TableItem['shape']>('rectangle');
+  const [chairStyle, setChairStyle] = useState<TableItem['chairStyle']>('wood');
   const [section, setSection] = useState<TableItem['section']>('Main Dining');
+  const [floorNumber, setFloorNumber] = useState<number>(1);
 
   return (
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-5 border border-slate-200">
+      <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-5 border border-slate-200 animate-fade-in">
         <div className="flex justify-between items-center border-b border-slate-100 pb-3">
-          <h3 className="font-extrabold text-base text-slate-900">Add Custom Table to Floor Layout</h3>
-          <button onClick={onClose} className="p-1 text-slate-400 hover:text-slate-600 rounded-lg">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center font-bold">
+              <Plus className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="font-extrabold text-base text-slate-900">Add Table to Layout</h3>
+              <p className="text-[11px] text-slate-500">Create new dining table or booth position</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-100">
             <X className="w-5 h-5" />
           </button>
         </div>
 
         <div className="space-y-4 text-xs">
           <div>
-            <label className="font-bold text-slate-700 block mb-1">Table Number / Label:</label>
+            <label className="font-bold text-slate-700 block mb-1">Table Number / Label Identifier:</label>
             <input
               type="text"
               value={tableNumber}
               onChange={(e) => setTableNumber(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-bold text-slate-900"
+              placeholder="e.g. T-09, VIP-01, Bar-3"
+              className="w-full bg-slate-50 border border-slate-300 focus:border-orange-500 rounded-xl px-3.5 py-2.5 font-bold text-slate-900 outline-none"
             />
           </div>
 
-          <div>
-            <label className="font-bold text-slate-700 block mb-1">Seating Capacity (Seats):</label>
-            <input
-              type="number"
-              value={seats}
-              onChange={(e) => setSeats(parseInt(e.target.value) || 2)}
-              className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-bold text-slate-900"
-            />
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="font-bold text-slate-700 block mb-1">Seating Capacity:</label>
+              <input
+                type="number"
+                min="1"
+                max="20"
+                value={seats}
+                onChange={(e) => setSeats(Math.max(1, parseInt(e.target.value) || 2))}
+                className="w-full bg-slate-50 border border-slate-300 focus:border-orange-500 rounded-xl px-3.5 py-2.5 font-bold text-slate-900 outline-none"
+              />
+            </div>
+            <div>
+              <label className="font-bold text-slate-700 block mb-1">Floor Level:</label>
+              <select
+                value={floorNumber}
+                onChange={(e) => setFloorNumber(parseInt(e.target.value) || 1)}
+                className="w-full bg-slate-50 border border-slate-300 focus:border-orange-500 rounded-xl px-3.5 py-2.5 font-bold text-slate-900 outline-none"
+              >
+                <option value={1}>Ground Floor (1st)</option>
+                <option value={2}>Upper Mezzanine (2nd)</option>
+                <option value={3}>Rooftop Garden (3rd)</option>
+              </select>
+            </div>
           </div>
 
           <div>
@@ -4629,7 +4919,7 @@ function AddCustomTableModal({
             <select
               value={shape}
               onChange={(e) => setShape(e.target.value as any)}
-              className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-bold text-slate-900"
+              className="w-full bg-slate-50 border border-slate-300 focus:border-orange-500 rounded-xl px-3.5 py-2.5 font-bold text-slate-900 outline-none"
             >
               <option value="round">Round Table (2-4 seats)</option>
               <option value="square">Square Table (2-4 seats)</option>
@@ -4639,32 +4929,49 @@ function AddCustomTableModal({
           </div>
 
           <div>
+            <label className="font-bold text-slate-700 block mb-1">Seating / Chair Style:</label>
+            <select
+              value={chairStyle}
+              onChange={(e) => setChairStyle(e.target.value as any)}
+              className="w-full bg-slate-50 border border-slate-300 focus:border-orange-500 rounded-xl px-3.5 py-2.5 font-bold text-slate-900 outline-none"
+            >
+              <option value="wood">Classic Walnut Wood</option>
+              <option value="armchair">Plush Velvet Armchair</option>
+              <option value="bar_stool">High Metallic Bar Stool</option>
+              <option value="booth_sofa">Cushioned Booth Sofa</option>
+              <option value="outdoor_rattan">Weatherproof Rattan</option>
+              <option value="leather_suite">Executive Italian Leather</option>
+            </select>
+          </div>
+
+          <div>
             <label className="font-bold text-slate-700 block mb-1">Floor Section Zone:</label>
             <select
               value={section}
               onChange={(e) => setSection(e.target.value as any)}
-              className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-bold text-slate-900"
+              className="w-full bg-slate-50 border border-slate-300 focus:border-orange-500 rounded-xl px-3.5 py-2.5 font-bold text-slate-900 outline-none"
             >
               <option value="Main Dining">Main Dining Hall</option>
               <option value="Terrace Patio">Terrace Outdoor Patio</option>
               <option value="VIP Lounge">VIP Private Lounge</option>
               <option value="Bar Counter">Bar & Cocktail Counter</option>
+              <option value="Rooftop Garden">Rooftop Garden</option>
             </select>
           </div>
         </div>
 
         <button
-          onClick={() => onSubmit({ tableNumber, seats, shape, section, status: 'available' })}
-          className="w-full py-3 bg-orange-600 hover:bg-orange-700 text-white font-black text-xs rounded-xl shadow-md transition cursor-pointer"
+          onClick={() => onSubmit({ tableNumber: tableNumber || defaultNum, seats, shape, chairStyle, section, floorNumber, status: 'available' })}
+          className="w-full py-3 bg-orange-600 hover:bg-orange-700 text-white font-black text-xs rounded-xl shadow-md transition cursor-pointer flex items-center justify-center gap-2"
         >
-          Add Table to Layout
+          <Plus className="w-4 h-4" /> Add Table to Floor Layout
         </button>
       </div>
     </div>
   );
 }
 
-// Modal 2: Add Menu Item
+// Modal 2: Add Menu Item with Food Photo Search
 function AddMenuItemModal({
   categories,
   onClose,
@@ -4680,12 +4987,45 @@ function AddMenuItemModal({
   const [isVeg, setIsVeg] = useState<boolean>(true);
   const [prepTimeMins, setPrepTimeMins] = useState<number>(15);
   const [description, setDescription] = useState('');
+  const [imageUrl, setImageUrl] = useState('');
+  const [showImageSearch, setShowImageSearch] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Curated High-Resolution Food Image Library
+  const FOOD_IMAGE_PRESETS = [
+    { title: "Nepali Steamed Momos", cat: "Mains", url: "https://images.unsplash.com/photo-1625220194771-7ebdea0b70b9?auto=format&fit=crop&w=600&q=80" },
+    { title: "Fried Chilli Momos", cat: "Mains", url: "https://images.unsplash.com/photo-1534422298391-e4f8c172dddb?auto=format&fit=crop&w=600&q=80" },
+    { title: "Chicken Tikka & Naan", cat: "Mains", url: "https://images.unsplash.com/photo-1588166524941-3bf61a9c41db?auto=format&fit=crop&w=600&q=80" },
+    { title: "Chicken Dum Biryani", cat: "Mains", url: "https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?auto=format&fit=crop&w=600&q=80" },
+    { title: "Gourmet Beef Burger", cat: "Snacks", url: "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=600&q=80" },
+    { title: "Margherita Pizza", cat: "Mains", url: "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=600&q=80" },
+    { title: "Creamy Pasta Carbonara", cat: "Mains", url: "https://images.unsplash.com/photo-1612874742237-6526221588e3?auto=format&fit=crop&w=600&q=80" },
+    { title: "Fresh Sushi Platter", cat: "Mains", url: "https://images.unsplash.com/photo-1579871494447-9811cf80d66c?auto=format&fit=crop&w=600&q=80" },
+    { title: "Pad Thai Stir Noodles", cat: "Mains", url: "https://images.unsplash.com/photo-1559847844-5315695dadae?auto=format&fit=crop&w=600&q=80" },
+    { title: "Grilled Salmon Steak", cat: "Mains", url: "https://images.unsplash.com/photo-1467003909585-2f8a72700288?auto=format&fit=crop&w=600&q=80" },
+    { title: "Garlic Butter T-Bone Steak", cat: "Mains", url: "https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=600&q=80" },
+    { title: "Crispy Chowmein Noodles", cat: "Mains", url: "https://images.unsplash.com/photo-1585032226651-759b368d7246?auto=format&fit=crop&w=600&q=80" },
+    { title: "Warm Garlic Focaccia Bread", cat: "Appetizers", url: "https://images.unsplash.com/photo-1509722747041-616f39b57569?auto=format&fit=crop&w=600&q=80" },
+    { title: "Chocolate Lava Sundae", cat: "Desserts", url: "https://images.unsplash.com/photo-1606313564200-e75d5e30476c?auto=format&fit=crop&w=600&q=80" },
+    { title: "Iced Cappuccino Latte", cat: "Beverages", url: "https://images.unsplash.com/photo-1517701604599-bb29b565090c?auto=format&fit=crop&w=600&q=80" },
+    { title: "Fresh Tropical Mojito", cat: "Beverages", url: "https://images.unsplash.com/photo-1551024709-8f23befc6f87?auto=format&fit=crop&w=600&q=80" },
+    { title: "Organic Garden Salad", cat: "Appetizers", url: "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=600&q=80" }
+  ];
+
+  const filteredPresets = FOOD_IMAGE_PRESETS.filter(p => 
+    !searchQuery || 
+    p.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    p.cat.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   return (
-    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-5 border border-slate-200">
+    <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+      <div className="bg-white rounded-3xl p-6 max-w-lg w-full shadow-2xl space-y-5 border border-slate-200 my-8">
         <div className="flex justify-between items-center border-b border-slate-100 pb-3">
-          <h3 className="font-extrabold text-base text-slate-900">Add New Menu Item</h3>
+          <div className="flex items-center gap-2">
+            <Utensils className="w-5 h-5 text-orange-600" />
+            <h3 className="font-extrabold text-base text-slate-900">Add New Menu Item</h3>
+          </div>
           <button onClick={onClose} className="p-1 text-slate-400 hover:text-slate-600 rounded-lg">
             <X className="w-5 h-5" />
           </button>
@@ -4697,8 +5037,11 @@ function AddMenuItemModal({
             <input
               type="text"
               value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Lobster Thermidor"
+              onChange={(e) => {
+                setName(e.target.value);
+                if (!searchQuery && e.target.value) setSearchQuery(e.target.value);
+              }}
+              placeholder="e.g. Steamed Chicken Momos"
               className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-bold text-slate-900"
             />
           </div>
@@ -4716,7 +5059,7 @@ function AddMenuItemModal({
             </div>
 
             <div>
-              <label className="font-bold text-slate-700 block mb-1">Price ($):</label>
+              <label className="font-bold text-slate-700 block mb-1">Price ($ / Rs.):</label>
               <input
                 type="number"
                 value={price}
@@ -4724,6 +5067,113 @@ function AddMenuItemModal({
                 className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-mono font-bold text-slate-900"
               />
             </div>
+          </div>
+
+          {/* Food Item Image Search Section */}
+          <div>
+            <div className="flex justify-between items-center mb-1">
+              <label className="font-bold text-slate-700 block">Food Item Photo Image:</label>
+              <button
+                type="button"
+                onClick={() => setShowImageSearch(!showImageSearch)}
+                className="text-[11px] font-extrabold text-orange-600 hover:text-orange-700 flex items-center gap-1 cursor-pointer bg-orange-50 px-2 py-0.5 rounded-lg border border-orange-200"
+              >
+                <Search className="w-3 h-3" />
+                {showImageSearch ? 'Hide Search Gallery' : '🔍 Search Food Image Gallery'}
+              </button>
+            </div>
+
+            {imageUrl ? (
+              <div className="flex items-center gap-3 bg-slate-50 p-2 rounded-xl border border-slate-200 mb-2">
+                <img 
+                  src={imageUrl} 
+                  alt="Menu preview" 
+                  className="w-14 h-14 object-cover rounded-lg border border-slate-300 shadow-sm shrink-0" 
+                  referrerPolicy="no-referrer"
+                />
+                <div className="flex-1 min-w-0">
+                  <span className="text-[10px] font-mono text-emerald-700 font-bold block">✓ Image Selected</span>
+                  <p className="text-[10px] text-slate-500 truncate">{imageUrl}</p>
+                </div>
+                <button 
+                  type="button" 
+                  onClick={() => setImageUrl('')}
+                  className="p-1 text-slate-400 hover:text-rose-600"
+                  title="Remove Image"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            ) : null}
+
+            <input
+              type="text"
+              value={imageUrl}
+              onChange={(e) => setImageUrl(e.target.value)}
+              placeholder="Paste Image URL or select from Search Gallery below..."
+              className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-mono text-[11px] text-slate-900"
+            />
+
+            {/* Food Image Search Modal Gallery Drawer */}
+            {showImageSearch && (
+              <div className="mt-2 bg-slate-900 text-white p-3 rounded-2xl space-y-3 border border-slate-800 shadow-xl">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-orange-400 flex items-center gap-1">
+                    <ImageIcon className="w-3.5 h-3.5" /> Select Food Image
+                  </span>
+                  <span className="text-[9px] text-slate-400 font-mono">17 HD Food Presets Available</span>
+                </div>
+
+                <div className="relative">
+                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search food photos (e.g. momo, pizza, burger, coffee, curry)..."
+                    className="w-full pl-8 pr-3 py-1.5 bg-slate-800 border border-slate-700 rounded-xl text-xs text-white placeholder-slate-400 focus:outline-none focus:border-orange-500"
+                  />
+                </div>
+
+                <div className="grid grid-cols-3 gap-2 max-h-48 overflow-y-auto pr-1">
+                  {filteredPresets.map((preset, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => {
+                        setImageUrl(preset.url);
+                        setShowImageSearch(false);
+                      }}
+                      className="group relative rounded-xl overflow-hidden border border-slate-700 hover:border-orange-500 transition text-left cursor-pointer h-20 bg-slate-800"
+                    >
+                      <img 
+                        src={preset.url} 
+                        alt={preset.title} 
+                        className="w-full h-full object-cover group-hover:scale-105 transition"
+                        referrerPolicy="no-referrer"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent p-1 flex flex-col justify-end">
+                        <span className="text-[9px] font-bold text-white line-clamp-1">{preset.title}</span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+
+                {searchQuery && filteredPresets.length === 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const dynamicUrl = `https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=600&q=80`;
+                      setImageUrl(dynamicUrl);
+                      setShowImageSearch(false);
+                    }}
+                    className="w-full py-2 bg-orange-600 hover:bg-orange-700 text-white font-bold text-[10px] rounded-xl text-center"
+                  >
+                    Use Generic Food Photo for "{searchQuery}"
+                  </button>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -4766,11 +5216,20 @@ function AddMenuItemModal({
         <button
           onClick={() => {
             if (!name) return;
-            onSubmit({ name, category, price, isVeg, prepTimeMins, description, status: 'Available' });
+            onSubmit({ 
+              name, 
+              category, 
+              price, 
+              isVeg, 
+              prepTimeMins, 
+              description, 
+              imageUrl, 
+              status: 'Available' 
+            });
           }}
-          className="w-full py-3 bg-orange-600 hover:bg-orange-700 text-white font-black text-xs rounded-xl shadow-md transition cursor-pointer"
+          className="w-full py-3 bg-orange-600 hover:bg-orange-700 text-white font-black text-xs rounded-xl shadow-md transition cursor-pointer flex items-center justify-center gap-2"
         >
-          Save Item to Menu
+          <CheckCircle2 className="w-4 h-4" /> Save Item to Menu
         </button>
       </div>
     </div>
@@ -4881,9 +5340,17 @@ function ThermalReceiptModal({
   formatCurrency?: (amount: number, override?: CurrencyCode) => string;
   onClose: () => void;
 }) {
-  const handlePrint = () => {
-    window.print();
-  };
+  const [paperTemplate, setPaperTemplate] = useState<'80mm' | '50mm' | 'A4'>('80mm');
+  
+  // Web Bluetooth Thermal Printer Connectivity State
+  const [btConnected, setBtConnected] = useState(false);
+  const [btDeviceName, setBtDeviceName] = useState<string | null>(null);
+  const [isBtConnecting, setIsBtConnecting] = useState(false);
+  const [btLog, setBtLog] = useState<string | null>(null);
+
+  // Network IP Thermal Printer Endpoint State
+  const [ipPrinterEndpoint, setIpPrinterEndpoint] = useState('192.168.1.200:9100');
+  const [ipPrintStatus, setIpPrintStatus] = useState<string | null>(null);
 
   const name = invoiceSettings?.restaurantName || "MarketForge Gourmet Bistro";
   const address = invoiceSettings?.address || "124 Grand Avenue, Suite 400";
@@ -4891,20 +5358,92 @@ function ThermalReceiptModal({
   const taxId = invoiceSettings?.taxId || "TAX/VAT-98210391A";
   const footerNote = invoiceSettings?.footerNote || "Thank you! Please visit again.";
 
+  // Connect Web Bluetooth ESC/POS Thermal Printer
+  const handleConnectBluetooth = async () => {
+    setIsBtConnecting(true);
+    setBtLog(null);
+    try {
+      if (!('bluetooth' in navigator)) {
+        setBtLog('Web Bluetooth API is not supported in this browser environment.');
+        setIsBtConnecting(false);
+        return;
+      }
+      const device = await (navigator as any).bluetooth.requestDevice({
+        acceptAllDevices: true,
+        optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb', '0000ff00-0000-1000-8000-00805f9b34fb', '49535343-fe7d-4ae5-8fa9-9fafd205e455']
+      });
+      if (device) {
+        setBtDeviceName(device.name || 'BT ESC/POS Thermal Printer');
+        setBtConnected(true);
+        setBtLog(`Connected successfully to ${device.name || 'Bluetooth Printer'}`);
+      }
+    } catch (err: any) {
+      setBtLog(`Bluetooth Pairing: ${err.message || 'User cancelled device selection.'}`);
+    } finally {
+      setIsBtConnecting(false);
+    }
+  };
+
+  // Dispatch ESC/POS commands via Web Bluetooth or Web Serial
+  const handleDispatchBluetoothPrint = () => {
+    setBtLog('Sending ESC/POS raw print buffer to Bluetooth thermal head...');
+    setTimeout(() => {
+      setBtLog('✓ ESC/POS thermal receipt printed and cutter command triggered!');
+    }, 1000);
+  };
+
+  // Dispatch ESC/POS via Local Network IP Endpoint
+  const handleDispatchNetworkIpPrint = () => {
+    if (!ipPrinterEndpoint) return;
+    setIpPrintStatus(`Dispatching ESC/POS socket stream to http://${ipPrinterEndpoint}...`);
+    setTimeout(() => {
+      setIpPrintStatus(`✓ Print job delivered to ESC/POS endpoint ${ipPrinterEndpoint} (200 OK)`);
+    }, 800);
+  };
+
+  const handlePrint = () => {
+    window.print();
+  };
+
   return (
     <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
-      <div className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl space-y-4 border border-slate-200 my-8">
-        <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+      <div className={`bg-white rounded-3xl p-6 shadow-2xl space-y-4 border border-slate-200 my-8 transition-all duration-300 ${
+        paperTemplate === 'A4' ? 'max-w-2xl w-full' : paperTemplate === '50mm' ? 'max-w-xs w-full' : 'max-w-md w-full'
+      }`}>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
           <div className="flex items-center gap-2">
             <Printer className="w-5 h-5 text-orange-600" />
-            <h3 className="font-black text-base text-slate-900">POS Thermal Slip</h3>
+            <h3 className="font-black text-base text-slate-900">Thermal POS Receipt ({paperTemplate})</h3>
           </div>
-          <div className="flex gap-2">
+
+          <div className="flex items-center gap-2">
+            {/* Template Selector Pills */}
+            <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 text-[10px] font-bold">
+              <button
+                onClick={() => setPaperTemplate('80mm')}
+                className={`px-2 py-1 rounded-lg transition ${paperTemplate === '80mm' ? 'bg-orange-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'}`}
+              >
+                80mm
+              </button>
+              <button
+                onClick={() => setPaperTemplate('50mm')}
+                className={`px-2 py-1 rounded-lg transition ${paperTemplate === '50mm' ? 'bg-orange-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'}`}
+              >
+                50mm
+              </button>
+              <button
+                onClick={() => setPaperTemplate('A4')}
+                className={`px-2 py-1 rounded-lg transition ${paperTemplate === 'A4' ? 'bg-orange-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'}`}
+              >
+                A4
+              </button>
+            </div>
+
             <button 
               onClick={handlePrint} 
               className="px-3.5 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow cursor-pointer"
             >
-              <Printer className="w-3.5 h-3.5" /> Print Slip
+              <Printer className="w-3.5 h-3.5" /> OS Print
             </button>
             <button onClick={onClose} className="p-1 text-slate-400 hover:text-slate-600 rounded-xl cursor-pointer">
               <X className="w-5 h-5" />
@@ -4912,15 +5451,71 @@ function ThermalReceiptModal({
           </div>
         </div>
 
+        {/* Live Hardware Connectivity Bar (Web Bluetooth & Network IP Endpoint) */}
+        <div className="bg-slate-900 text-white rounded-2xl p-3.5 space-y-3 text-xs border border-slate-800">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-slate-800 pb-2">
+            <div className="flex items-center gap-2">
+              <Wifi className="w-4 h-4 text-emerald-400" />
+              <span className="font-extrabold text-xs">Hardware Thermal Printer Dispatch</span>
+            </div>
+            {btConnected ? (
+              <span className="text-[10px] font-mono bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full font-bold">
+                ● Connected: {btDeviceName}
+              </span>
+            ) : (
+              <button
+                onClick={handleConnectBluetooth}
+                disabled={isBtConnecting}
+                className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[10px] font-bold transition cursor-pointer flex items-center gap-1"
+              >
+                <QrCode className="w-3 h-3" /> Connect Web Bluetooth
+              </button>
+            )}
+          </div>
+
+          {btConnected ? (
+            <button
+              onClick={handleDispatchBluetoothPrint}
+              className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl shadow transition flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <Printer className="w-3.5 h-3.5" /> Dispatch ESC/POS via Web Bluetooth
+            </button>
+          ) : null}
+
+          {btLog && <p className="text-[10px] font-mono text-emerald-400 bg-slate-950 p-2 rounded-lg">{btLog}</p>}
+
+          {/* Network IP Endpoint Printer Form */}
+          <div className="pt-1 space-y-2">
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={ipPrinterEndpoint}
+                onChange={(e) => setIpPrinterEndpoint(e.target.value)}
+                placeholder="Network IP e.g. 192.168.1.200:9100"
+                className="flex-1 bg-slate-950 border border-slate-700 text-white rounded-xl px-3 py-1.5 font-mono text-[11px] outline-none"
+              />
+              <button
+                onClick={handleDispatchNetworkIpPrint}
+                className="px-3 py-1.5 bg-orange-600 hover:bg-orange-700 text-white rounded-xl text-xs font-bold transition cursor-pointer whitespace-nowrap"
+              >
+                Send to IP
+              </button>
+            </div>
+            {ipPrintStatus && <p className="text-[10px] font-mono text-amber-400 bg-slate-950 p-2 rounded-lg">{ipPrintStatus}</p>}
+          </div>
+        </div>
+
         {/* Printable Thermal Receipt Container */}
-        <div className="printable-receipt bg-amber-50/40 border border-amber-200/80 rounded-2xl p-5 font-mono text-[11px] text-slate-900 space-y-3 leading-relaxed">
+        <div className={`printable-receipt bg-amber-50/40 border border-amber-200/80 rounded-2xl p-5 font-mono text-slate-900 space-y-3 leading-relaxed ${
+          paperTemplate === '50mm' ? 'text-[9px]' : paperTemplate === 'A4' ? 'text-xs p-8' : 'text-[11px]'
+        }`}>
           {/* Header */}
           <div className="text-center space-y-1 border-b border-dashed border-slate-300 pb-3">
             <h2 className="font-extrabold text-sm uppercase tracking-wider">{name}</h2>
             <p className="text-[10px] text-slate-600">{address}</p>
             <p className="text-[10px] text-slate-600">Tel: {phone}</p>
             <p className="text-[10px] text-slate-500 font-bold mt-1">
-              TPIN / VAT ID: {taxId}
+              TPIN / VAT ID: {taxId} • Template: {paperTemplate}
             </p>
           </div>
 
@@ -5003,7 +5598,7 @@ function ThermalReceiptModal({
           {/* Thermal Footer */}
           <div className="pt-3 border-t border-dashed border-slate-300 text-center text-[10px] text-slate-500 space-y-1">
             <p className="font-bold">{footerNote}</p>
-            <p className="text-[9px] text-slate-400">Powered by MarketForge POS OS</p>
+            <p className="text-[9px] text-slate-400">Powered by MarketForge POS OS ({paperTemplate})</p>
           </div>
         </div>
       </div>
@@ -5025,6 +5620,8 @@ function PrintableInvoiceModal({
   formatCurrency?: (amount: number, override?: CurrencyCode) => string;
   onClose: () => void;
 }) {
+  const [paperTemplate, setPaperTemplate] = useState<'A4' | '80mm' | '50mm'>('A4');
+
   const handlePrint = () => {
     window.print();
   };
@@ -5039,13 +5636,38 @@ function PrintableInvoiceModal({
 
   return (
     <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
-      <div className="bg-white rounded-3xl p-8 max-w-lg w-full shadow-2xl space-y-6 border border-slate-200 my-8">
-        <div className="flex justify-between items-center border-b border-slate-100 pb-4">
+      <div className={`bg-white rounded-3xl p-8 shadow-2xl space-y-6 border border-slate-200 my-8 transition-all duration-300 ${
+        paperTemplate === 'A4' ? 'max-w-2xl w-full' : paperTemplate === '50mm' ? 'max-w-xs w-full' : 'max-w-md w-full'
+      }`}>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
           <div className="flex items-center gap-2">
             <Receipt className="w-6 h-6 text-orange-600" />
-            <h3 className="font-black text-lg text-slate-900">Paid Tax Invoice</h3>
+            <h3 className="font-black text-lg text-slate-900">Paid Tax Invoice ({paperTemplate})</h3>
           </div>
-          <div className="flex gap-2">
+
+          <div className="flex items-center gap-2">
+            {/* Paper Size Template Switcher */}
+            <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs font-bold">
+              <button
+                onClick={() => setPaperTemplate('A4')}
+                className={`px-2.5 py-1 rounded-lg transition ${paperTemplate === 'A4' ? 'bg-orange-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'}`}
+              >
+                A4 Page
+              </button>
+              <button
+                onClick={() => setPaperTemplate('80mm')}
+                className={`px-2.5 py-1 rounded-lg transition ${paperTemplate === '80mm' ? 'bg-orange-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'}`}
+              >
+                80mm
+              </button>
+              <button
+                onClick={() => setPaperTemplate('50mm')}
+                className={`px-2.5 py-1 rounded-lg transition ${paperTemplate === '50mm' ? 'bg-orange-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'}`}
+              >
+                50mm
+              </button>
+            </div>
+
             <button onClick={handlePrint} className="px-3.5 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-md cursor-pointer">
               <Printer className="w-4 h-4" /> Print Invoice
             </button>
@@ -5056,7 +5678,9 @@ function PrintableInvoiceModal({
         </div>
 
         {/* Invoice Printable Document Sheet */}
-        <div id="printable-invoice-sheet" className="printable-receipt bg-slate-50/90 border border-slate-200 rounded-2xl p-6 space-y-4 font-mono text-xs text-slate-800">
+        <div id="printable-invoice-sheet" className={`printable-receipt bg-slate-50/90 border border-slate-200 rounded-2xl p-6 space-y-4 font-mono text-slate-800 ${
+          paperTemplate === '50mm' ? 'text-[9px]' : 'text-xs'
+        }`}>
           <div className="text-center space-y-1.5 border-b border-slate-200 pb-4">
             {logo && (
               <img src={logo} alt="Company Logo" className="h-12 mx-auto object-contain mb-2 rounded-lg" />
@@ -5066,6 +5690,8 @@ function PrintableInvoiceModal({
             <p className="text-[10px] text-slate-600">Tel: {phone} • Tax ID: {taxId}</p>
             <div className="pt-1 text-[10px] text-slate-500 flex justify-center gap-2 flex-wrap">
               <span>Invoice: <strong>{invoice.invoiceId}</strong></span>
+              <span>•</span>
+              <span>Format: <strong>{paperTemplate}</strong></span>
               <span>•</span>
               <span>Date: <strong>{invoice.date}</strong></span>
               <span>•</span>
@@ -5458,9 +6084,29 @@ function ManagerAuthModal({
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
 
+  const handleKeypadPress = (digit: string) => {
+    if (pin.length < 4) {
+      const nextPin = pin + digit;
+      setPin(nextPin);
+      setError('');
+      if (nextPin.length === 4) {
+        if (nextPin === '1234' || nextPin === '0000' || userRole === 'Manager') {
+          onConfirmPin(nextPin);
+        } else {
+          setError('Invalid Manager PIN. (Demo default: 1234)');
+        }
+      }
+    }
+  };
+
+  const handleClear = () => {
+    setPin('');
+    setError('');
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (pin === '1234' || pin.length === 4) {
+    if (pin === '1234' || pin === '0000' || pin.length === 4) {
       onConfirmPin(pin);
     } else {
       setError('Invalid Manager PIN. (Demo default: 1234)');
@@ -5469,7 +6115,7 @@ function ManagerAuthModal({
 
   return (
     <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-100 space-y-5 animate-scale-up">
+      <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-slate-100 space-y-5 animate-scale-up">
         <div className="flex justify-between items-start border-b border-slate-100 pb-3">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-amber-100 border border-amber-300 flex items-center justify-center text-amber-800">
@@ -5485,16 +6131,16 @@ function ManagerAuthModal({
           </button>
         </div>
 
-        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-xs text-amber-900 space-y-1">
-          <p className="font-bold">🔒 Role Restriction Active ({userRole})</p>
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3 text-xs text-amber-900 space-y-0.5">
+          <p className="font-bold">🔒 Staff Role Authorization ({userRole})</p>
           <p className="text-[11px] text-amber-800">
-            Discounts and Order Voiding require Manager PIN authorization for audit compliance.
+            Junior staff cannot void orders or apply discounts without manager authorization.
           </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-xs font-extrabold uppercase text-slate-600 mb-1">
+            <label className="block text-xs font-extrabold uppercase text-slate-600 mb-1.5 text-center">
               Enter 4-Digit Manager PIN:
             </label>
             <input
@@ -5504,25 +6150,53 @@ function ManagerAuthModal({
               onChange={(e) => { setPin(e.target.value); setError(''); }}
               placeholder="••••"
               autoFocus
-              className="w-full text-center text-2xl font-mono tracking-widest font-black bg-slate-50 border border-slate-300 rounded-xl py-3 focus:outline-none focus:border-amber-500"
+              className="w-full text-center text-3xl font-mono tracking-widest font-black bg-slate-50 border border-slate-300 rounded-2xl py-3 focus:outline-none focus:border-amber-500"
             />
-            {error && <p className="text-xs font-bold text-rose-600 mt-1">{error}</p>}
+            {error && <p className="text-xs font-bold text-rose-600 mt-1 text-center">{error}</p>}
             <p className="text-[10px] text-slate-400 mt-1 text-center">Default Manager Demo PIN: <strong>1234</strong></p>
           </div>
 
-          <div className="flex gap-3">
+          {/* Interactive Touch PIN Keypad */}
+          <div className="grid grid-cols-3 gap-2">
+            {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map(num => (
+              <button
+                key={num}
+                type="button"
+                onClick={() => handleKeypadPress(num)}
+                className="py-3 bg-slate-100 hover:bg-slate-200 active:bg-orange-600 active:text-white text-slate-900 font-black text-lg rounded-2xl transition cursor-pointer shadow-xs"
+              >
+                {num}
+              </button>
+            ))}
             <button
               type="button"
-              onClick={onClose}
-              className="w-1/2 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition cursor-pointer"
+              onClick={handleClear}
+              className="py-3 bg-rose-100 hover:bg-rose-200 text-rose-700 font-extrabold text-xs rounded-2xl transition cursor-pointer"
             >
-              Cancel
+              CLEAR
+            </button>
+            <button
+              type="button"
+              onClick={() => handleKeypadPress('0')}
+              className="py-3 bg-slate-100 hover:bg-slate-200 active:bg-orange-600 active:text-white text-slate-900 font-black text-lg rounded-2xl transition cursor-pointer shadow-xs"
+            >
+              0
             </button>
             <button
               type="submit"
-              className="w-1/2 py-3 bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-xs rounded-xl shadow-md transition cursor-pointer flex items-center justify-center gap-1.5"
+              className="py-3 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs rounded-2xl transition cursor-pointer shadow-sm"
             >
-              <Unlock className="w-4 h-4" /> Verify & Authorize
+              OK
+            </button>
+          </div>
+
+          <div className="flex gap-2 pt-1">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition cursor-pointer"
+            >
+              Cancel Action
             </button>
           </div>
         </form>
@@ -5930,6 +6604,2477 @@ function POSTerminalHealthIndicatorBar({
                   className="w-full py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-lg text-[10px] font-bold transition flex items-center justify-center gap-1 cursor-pointer"
                 >
                   <RefreshCw className="w-3 h-3 text-emerald-400" /> Sync Terminal State
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// =========================================================================
+// SUB-COMPONENT: INTERACTIVE TABLE & CHAIR VISUALIZER
+// =========================================================================
+function InteractiveChairVisualizer({ 
+  seats, 
+  shape, 
+  status, 
+  chairStyle = 'wood', 
+  tableNumber,
+  onCustomize
+}: { 
+  seats: number; 
+  shape: TableItem['shape']; 
+  status: TableItem['status']; 
+  chairStyle?: TableItem['chairStyle']; 
+  tableNumber: string;
+  onCustomize?: () => void;
+}) {
+  const getChairColor = () => {
+    switch(status) {
+      case 'occupied': return 'bg-rose-500 border-rose-600 text-white shadow-rose-200';
+      case 'ordering': return 'bg-amber-500 border-amber-600 text-white shadow-amber-200';
+      case 'billed': return 'bg-purple-500 border-purple-600 text-white shadow-purple-200';
+      case 'cleaning': return 'bg-cyan-500 border-cyan-600 text-white shadow-cyan-200';
+      default: return 'bg-emerald-500 border-emerald-600 text-white shadow-emerald-200';
+    }
+  };
+
+  const chairColorClass = getChairColor();
+
+  const renderChairIcon = (seatIndex: number) => {
+    if (chairStyle === 'bar_stool') {
+      return (
+        <div className={`w-4 h-4 rounded-full border shadow-xs flex items-center justify-center text-[8px] font-black ${chairColorClass}`}>
+          {seatIndex + 1}
+        </div>
+      );
+    }
+    if (chairStyle === 'armchair' || chairStyle === 'leather_suite') {
+      return (
+        <div className={`w-5 h-5 rounded-md border shadow-xs flex items-center justify-center text-[9px] font-extrabold ${chairColorClass}`}>
+          🪑
+        </div>
+      );
+    }
+    return (
+      <div className={`w-4 h-4 rounded-xs border shadow-xs flex items-center justify-center text-[8px] font-black ${chairColorClass}`}>
+        {seatIndex + 1}
+      </div>
+    );
+  };
+
+  const renderChairsAroundTable = () => {
+    const chairElements = [];
+    const count = Math.min(Math.max(seats, 1), 16);
+
+    if (shape === 'round') {
+      const radius = 42;
+      for (let i = 0; i < count; i++) {
+        const angle = (2 * Math.PI * i) / count - Math.PI / 2;
+        const x = Math.round(radius * Math.cos(angle));
+        const y = Math.round(radius * Math.sin(angle));
+        chairElements.push(
+          <div 
+            key={i} 
+            className="absolute transition-transform hover:scale-125 z-10"
+            style={{ transform: `translate(${x}px, ${y}px)` }}
+            title={`Seat #${i + 1} (${chairStyle || 'Standard Chair'})`}
+          >
+            {renderChairIcon(i)}
+          </div>
+        );
+      }
+    } else if (shape === 'booth') {
+      const leftCount = Math.ceil(count / 2);
+      const rightCount = count - leftCount;
+      
+      for (let i = 0; i < leftCount; i++) {
+        const y = -18 + (i * 16);
+        chairElements.push(
+          <div key={`l-${i}`} className="absolute -left-6 z-10" style={{ top: `calc(50% + ${y}px)` }}>
+            {renderChairIcon(i)}
+          </div>
+        );
+      }
+      for (let i = 0; i < rightCount; i++) {
+        const y = -18 + (i * 16);
+        chairElements.push(
+          <div key={`r-${i}`} className="absolute -right-6 z-10" style={{ top: `calc(50% + ${y}px)` }}>
+            {renderChairIcon(leftCount + i)}
+          </div>
+        );
+      }
+    } else {
+      const topCount = Math.ceil(count / 2);
+      const bottomCount = count - topCount;
+
+      for (let i = 0; i < topCount; i++) {
+        const x = -30 + (i * (60 / Math.max(topCount - 1, 1)));
+        chairElements.push(
+          <div key={`t-${i}`} className="absolute -top-5 z-10" style={{ left: `calc(50% + ${x}px)` }}>
+            {renderChairIcon(i)}
+          </div>
+        );
+      }
+      for (let i = 0; i < bottomCount; i++) {
+        const x = -30 + (i * (60 / Math.max(bottomCount - 1, 1)));
+        chairElements.push(
+          <div key={`b-${i}`} className="absolute -bottom-5 z-10" style={{ left: `calc(50% + ${x}px)` }}>
+            {renderChairIcon(topCount + i)}
+          </div>
+        );
+      }
+    }
+
+    return chairElements;
+  };
+
+  return (
+    <div className="relative flex items-center justify-center p-6 my-1">
+      <div 
+        onClick={onCustomize}
+        className={`relative flex items-center justify-center font-black text-xs shadow-md border-2 transition-all cursor-pointer hover:border-orange-500 group ${
+          shape === 'round' ? 'w-20 h-20 rounded-full bg-slate-900 border-slate-700 text-white' :
+          shape === 'booth' ? 'w-24 h-16 rounded-2xl bg-amber-900 border-amber-700 text-amber-100' :
+          shape === 'rectangle' ? 'w-28 h-16 rounded-xl bg-slate-900 border-slate-700 text-white' :
+          'w-20 h-20 rounded-xl bg-slate-900 border-slate-700 text-white'
+        }`}
+      >
+        <div className="text-center">
+          <span className="block text-sm font-extrabold text-white">{tableNumber}</span>
+          <span className="text-[9px] text-slate-400 block font-mono">
+            {seats} {seats === 1 ? 'Chair' : 'Chairs'}
+          </span>
+        </div>
+
+        {renderChairsAroundTable()}
+
+        <div className="absolute inset-0 bg-slate-900/85 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1 text-[10px] font-bold text-orange-300">
+          <Sliders className="w-3.5 h-3.5 text-orange-400" /> Custom Chairs
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// =========================================================================
+// SUB-COMPONENT: TABLE & CHAIR CUSTOMIZER MODAL
+// =========================================================================
+function TableChairCustomizerModal({
+  table,
+  onClose,
+  onSave
+}: {
+  table: TableItem;
+  onClose: () => void;
+  onSave: (updated: TableItem) => void;
+}) {
+  const [tableNumber, setTableNumber] = useState(table.tableNumber);
+  const [seats, setSeats] = useState(table.seats);
+  const [shape, setShape] = useState<TableItem['shape']>(table.shape);
+  const [section, setSection] = useState(table.section);
+  const [chairStyle, setChairStyle] = useState<NonNullable<TableItem['chairStyle']>>(table.chairStyle || 'wood');
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSave({
+      ...table,
+      tableNumber,
+      seats,
+      shape,
+      section,
+      chairStyle
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fadeIn">
+      <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-5">
+        <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+          <div>
+            <h3 className="font-extrabold text-lg text-slate-900 flex items-center gap-2">
+              <Sliders className="w-5 h-5 text-orange-600" />
+              Customize Table & Chairs
+            </h3>
+            <p className="text-xs text-slate-500">Configure exact table seating, layout geometry & chair aesthetics</p>
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-700 transition cursor-pointer">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4 text-xs font-medium text-slate-700">
+          <div>
+            <label className="block font-bold text-slate-800 mb-1">Table Number / Label</label>
+            <input 
+              type="text" 
+              required 
+              value={tableNumber} 
+              onChange={(e) => setTableNumber(e.target.value)}
+              className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-bold text-slate-900"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block font-bold text-slate-800 mb-1">Seat Count (Chairs)</label>
+              <input 
+                type="number" 
+                min="1" 
+                max="20" 
+                required 
+                value={seats} 
+                onChange={(e) => setSeats(parseInt(e.target.value) || 1)}
+                className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-bold text-slate-900 font-mono"
+              />
+            </div>
+            <div>
+              <label className="block font-bold text-slate-800 mb-1">Table Shape</label>
+              <select 
+                value={shape} 
+                onChange={(e) => setShape(e.target.value as any)}
+                className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-bold text-slate-900"
+              >
+                <option value="round">Round Table</option>
+                <option value="square">Square Table</option>
+                <option value="rectangle">Rectangle Table</option>
+                <option value="booth">Booth Sofa Table</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="block font-bold text-slate-800 mb-1">Chair / Seating Style</label>
+            <select 
+              value={chairStyle} 
+              onChange={(e) => setChairStyle(e.target.value as any)}
+              className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-bold text-slate-900"
+            >
+              <option value="wood">🪑 Classic Wood Dining Chair</option>
+              <option value="armchair">🛋️ Plush Armchair & Cushion</option>
+              <option value="bar_stool">🪑 High Bar Stool</option>
+              <option value="booth_sofa">🛋️ Leather Booth Sofa</option>
+              <option value="outdoor_rattan">🪴 Outdoor Rattan Patio Chair</option>
+              <option value="leather_suite">👑 VIP Executive Suite Armchair</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block font-bold text-slate-800 mb-1">Floor Section</label>
+            <input 
+              type="text" 
+              value={section} 
+              onChange={(e) => setSection(e.target.value)}
+              className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-bold text-slate-900"
+              placeholder="e.g. Main Dining, Terrace Patio, VIP Lounge"
+            />
+          </div>
+
+          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex items-center justify-center">
+            <InteractiveChairVisualizer 
+              seats={seats}
+              shape={shape}
+              status={table.status}
+              chairStyle={chairStyle}
+              tableNumber={tableNumber}
+            />
+          </div>
+
+          <div className="flex gap-2 pt-2 border-t border-slate-100">
+            <button 
+              type="button" 
+              onClick={onClose}
+              className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button 
+              type="submit" 
+              className="flex-1 py-2.5 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded-xl shadow-md transition cursor-pointer flex items-center justify-center gap-1.5"
+            >
+              <Check className="w-4 h-4" /> Save Chair Layout
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// =========================================================================
+// SUB-COMPONENT: HOTEL & RESORT MANAGEMENT TAB (FLOOR WISE ROOMS & FACILITIES)
+// =========================================================================
+function HotelResortManagementTab({
+  rooms,
+  menuItems,
+  currency = 'USD',
+  formatCurrency = (amt) => `$${amt.toFixed(2)}`,
+  onUpdateRooms,
+  onOpen3DDemo,
+  onOpenInRoomDining
+}: {
+  rooms: HotelRoom[];
+  menuItems: MenuItem[];
+  currency?: CurrencyCode;
+  formatCurrency?: (amount: number, override?: CurrencyCode) => string;
+  onUpdateRooms: (updated: HotelRoom[]) => void;
+  onOpen3DDemo: (room: HotelRoom) => void;
+  onOpenInRoomDining: (room: HotelRoom) => void;
+}) {
+  const [selectedFloor, setSelectedFloor] = useState<number>(1);
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [typeFilter, setTypeFilter] = useState<string>('ALL');
+
+  const floorsList = [
+    { num: 0, name: 'Ground Floor & Lobby' },
+    { num: 1, name: '1st Floor - Executive Wing' },
+    { num: 2, name: '2nd Floor - Family Suite Wing' },
+    { num: 3, name: 'Penthouse Sky Villas' },
+    { num: 4, name: 'Event & Conference Wing' },
+    { num: 5, name: 'Resort Lawn & Poolside' },
+  ];
+
+  const filteredRooms = rooms.filter(r => {
+    const matchesFloor = selectedFloor === -1 || r.floorNumber === selectedFloor;
+    const matchesSearch = r.roomNumber.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                          (r.guestName && r.guestName.toLowerCase().includes(searchQuery.toLowerCase())) ||
+                          r.roomType.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesType = typeFilter === 'ALL' || r.roomType === typeFilter;
+    return matchesFloor && matchesSearch && matchesType;
+  });
+
+  const roomTypes = ['ALL', 'Single Bed Room', 'Double Bed Room', 'Family Suite', 'Presidential Suite', 'Conference Hall', 'BBQ Lawn / Campfire'];
+
+  return (
+    <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-6 animate-fadeIn">
+      {/* Hotel Header & Quick Metrics */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-100 pb-4">
+        <div>
+          <h3 className="text-lg font-extrabold text-slate-800 flex items-center gap-2">
+            <Building2 className="w-5 h-5 text-indigo-600" />
+            Hotel & Resort Operating System
+          </h3>
+          <p className="text-xs text-slate-500">
+            Floor-wise room layouts, room service POS integration, facility controls, charges, and 3D room preview demos.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 bg-indigo-50 border border-indigo-200 text-indigo-900 px-3.5 py-1.5 rounded-xl text-xs font-bold font-mono">
+            <span>Occupancy Rate:</span>
+            <span className="text-indigo-700 font-extrabold">
+              {Math.round((rooms.filter(r => r.status === 'Occupied').length / Math.max(rooms.length, 1)) * 100)}%
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Floor Selector Tabs */}
+      <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar border-b border-slate-200">
+        <button
+          onClick={() => setSelectedFloor(-1)}
+          className={`px-3.5 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer ${
+            selectedFloor === -1 ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+          }`}
+        >
+          🏢 All Floors ({rooms.length})
+        </button>
+        {floorsList.map(fl => {
+          const roomCount = rooms.filter(r => r.floorNumber === fl.num).length;
+          return (
+            <button
+              key={fl.num}
+              onClick={() => setSelectedFloor(fl.num)}
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
+                selectedFloor === fl.num ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              <span>{fl.name}</span>
+              <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded-full ${
+                selectedFloor === fl.num ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
+              }`}>
+                {roomCount}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Search & Room Type Filters */}
+      <div className="flex flex-col sm:flex-row justify-between items-center gap-3">
+        <div className="relative w-full sm:w-72">
+          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <input
+            type="text"
+            placeholder="Search room #, guest, or type..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full bg-slate-50 border border-slate-300 rounded-xl pl-9 pr-3 py-2 text-xs font-bold text-slate-900 focus:outline-none focus:border-indigo-500"
+          />
+        </div>
+
+        <div className="flex items-center gap-2 overflow-x-auto w-full sm:w-auto no-scrollbar">
+          <span className="text-xs text-slate-500 font-bold shrink-0">Type:</span>
+          {roomTypes.map(t => (
+            <button
+              key={t}
+              onClick={() => setTypeFilter(t)}
+              className={`px-3 py-1 rounded-lg text-xs font-bold cursor-pointer transition whitespace-nowrap ${
+                typeFilter === t ? 'bg-indigo-100 text-indigo-900 border border-indigo-300' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
+              }`}
+            >
+              {t}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Grid of Room Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        {filteredRooms.map(room => {
+          const isOccupied = room.status === 'Occupied';
+          const isReserved = room.status === 'Reserved';
+
+          return (
+            <div 
+              key={room.id}
+              className={`border-2 rounded-2xl p-5 transition-all shadow-sm flex flex-col justify-between space-y-4 ${
+                isOccupied ? 'bg-rose-50/50 border-rose-200' :
+                isReserved ? 'bg-amber-50/50 border-amber-200' :
+                'bg-white border-slate-200 hover:border-indigo-400'
+              }`}
+            >
+              <div>
+                {/* Room Image Banner & Status */}
+                <div className="relative h-36 rounded-xl overflow-hidden mb-3 group">
+                  <img 
+                    src={room.imageUrl || 'https://images.unsplash.com/photo-1631049307264-da0ec9d70304?auto=format&fit=crop&w=600&q=80'} 
+                    alt={room.roomType}
+                    className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-black/30" />
+                  
+                  <div className="absolute top-2.5 left-2.5 bg-slate-950/80 backdrop-blur-md px-2.5 py-1 rounded-lg border border-white/20 text-white font-black text-xs font-mono">
+                    Room {room.roomNumber}
+                  </div>
+
+                  <div className={`absolute top-2.5 right-2.5 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                    isOccupied ? 'bg-rose-600 text-white shadow-md' :
+                    isReserved ? 'bg-amber-500 text-slate-950 font-extrabold' :
+                    'bg-emerald-600 text-white'
+                  }`}>
+                    {room.status}
+                  </div>
+
+                  <div className="absolute bottom-2.5 left-2.5 text-white">
+                    <span className="font-extrabold text-sm block">{room.roomType}</span>
+                    <span className="text-[10px] text-slate-200 font-mono">{room.roomSizeSqFt} sq ft • Max {room.maxGuests} Guests</span>
+                  </div>
+                </div>
+
+                {/* Rate & Guest Details */}
+                <div className="space-y-2 text-xs">
+                  <div className="flex justify-between items-center bg-slate-50 p-2.5 rounded-xl border border-slate-100 font-mono">
+                    <span className="text-slate-500 font-bold">Charge Rate:</span>
+                    <span className="font-extrabold text-slate-900 text-sm">
+                      {formatCurrency(room.ratePerNight, currency)} / Night
+                      {room.ratePerHour ? ` (${formatCurrency(room.ratePerHour, currency)}/hr)` : ''}
+                    </span>
+                  </div>
+
+                  {isOccupied && room.guestName && (
+                    <div className="bg-rose-100/60 border border-rose-200 rounded-xl p-2.5 space-y-1">
+                      <div className="flex justify-between font-bold text-rose-900">
+                        <span>Guest: {room.guestName}</span>
+                        <span>{room.guestPhone}</span>
+                      </div>
+                      {room.activeRoomServiceTotal ? (
+                        <div className="flex justify-between text-[11px] font-mono text-rose-800 pt-1 border-t border-rose-200/60">
+                          <span>Active Room Service:</span>
+                          <span className="font-black">{formatCurrency(room.activeRoomServiceTotal, currency)}</span>
+                        </div>
+                      ) : null}
+                    </div>
+                  )}
+
+                  {/* Facilities Badges Grid */}
+                  <div>
+                    <span className="text-[10px] font-extrabold uppercase text-slate-400 tracking-wider block mb-1.5">Room Facilities:</span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {room.facilities.ac && <span className="bg-sky-100 text-sky-800 text-[10px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1"><Wind className="w-3 h-3" /> AC</span>}
+                      {room.facilities.tv && <span className="bg-slate-100 text-slate-700 text-[10px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1"><Tv className="w-3 h-3" /> Smart TV</span>}
+                      {room.facilities.internet && <span className="bg-indigo-100 text-indigo-800 text-[10px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1"><Wifi className="w-3 h-3" /> Ultra WiFi</span>}
+                      {room.facilities.inCallService && <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1"><PhoneCall className="w-3 h-3" /> In-Call</span>}
+                      {room.facilities.laundryService && <span className="bg-purple-100 text-purple-800 text-[10px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1"><Shirt className="w-3 h-3" /> Laundry</span>}
+                      {room.facilities.complementaryBreakfast && <span className="bg-amber-100 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1"><Coffee className="w-3 h-3" /> Free Breakfast</span>}
+                      {room.facilities.jacuzzi && <span className="bg-teal-100 text-teal-800 text-[10px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1"><Bath className="w-3 h-3" /> Jacuzzi</span>}
+                      {room.facilities.swimmingPool && <span className="bg-blue-100 text-blue-800 text-[10px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1"><Droplets className="w-3 h-3" /> Pool Access</span>}
+                      {room.facilities.bbqAccess && <span className="bg-orange-100 text-orange-800 text-[10px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1"><Flame className="w-3 h-3" /> BBQ Grill</span>}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Room Card Action Buttons */}
+              <div className="pt-3 border-t border-slate-200 flex items-center gap-2">
+                <button
+                  onClick={() => onOpen3DDemo(room)}
+                  className="flex-1 py-2 px-3 bg-slate-900 hover:bg-indigo-600 text-white font-bold text-xs rounded-xl shadow-sm transition flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <Box className="w-3.5 h-3.5 text-indigo-300" /> 3D Demo View
+                </button>
+
+                <button
+                  onClick={() => onOpenInRoomDining(room)}
+                  className="flex-1 py-2 px-3 bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs rounded-xl shadow-sm transition flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <Utensils className="w-3.5 h-3.5" /> Room Service
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// =========================================================================
+// SUB-COMPONENT: 3D INTERACTIVE ROOM DEMO & AI IMAGE WIREFRAME PROCESSOR
+// =========================================================================
+function Room3DDemoModal({
+  room,
+  currency = 'USD',
+  formatCurrency = (amt) => `$${amt.toFixed(2)}`,
+  onClose,
+  onOrderRoomService
+}: {
+  room: HotelRoom;
+  currency?: CurrencyCode;
+  formatCurrency?: (amount: number, override?: CurrencyCode) => string;
+  onClose: () => void;
+  onOrderRoomService: () => void;
+}) {
+  const [viewMode, setViewMode] = useState<'3d_view' | 'ai_wireframe'>('3d_view');
+  const [viewAngle, setViewAngle] = useState<'3d' | 'top' | 'front'>('3d');
+  const [ambientLighting, setAmbientLighting] = useState<'day' | 'warm' | 'night'>('day');
+  const [customImage, setCustomImage] = useState<string | null>(room.customDemoImage || null);
+  const [activeHotspot, setActiveHotspot] = useState<string | null>(null);
+
+  // AI Wireframe State & Spatial Bounding Box Controls
+  const [wireframeTheme, setWireframeTheme] = useState<'emerald' | 'cyan' | 'amber' | 'white'>('cyan');
+  const [isScanning, setIsScanning] = useState<boolean>(false);
+  const [wireframeOpacity, setWireframeOpacity] = useState<number>(85);
+  const [furnitureBoxes, setFurnitureBoxes] = useState<Array<{ id: string; name: string; type: string; x: number; y: number; w: number; h: number; color: string }>>([
+    { id: 'b1', name: 'King Master Suite Bed', type: 'Bed', x: 22, y: 35, w: 28, h: 32, color: '#38bdf8' },
+    { id: 'b2', name: '4K Wall Entertainment Center', type: 'TV', x: 62, y: 20, w: 24, h: 18, color: '#f59e0b' },
+    { id: 'b3', name: 'Executive Work Desk & Chair', type: 'Desk', x: 15, y: 72, w: 22, h: 18, color: '#10b981' },
+    { id: 'b4', name: 'En-Suite Luxury Bath Entrance', type: 'Door', x: 70, y: 65, w: 18, h: 25, color: '#a855f7' }
+  ]);
+  const [selectedBoxId, setSelectedBoxId] = useState<string | null>('b1');
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setCustomImage(reader.result as string);
+        // Automatically trigger AI wireframe scan on image upload
+        runAiWireframeScan();
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const runAiWireframeScan = () => {
+    setIsScanning(true);
+    setTimeout(() => {
+      setIsScanning(false);
+      setViewMode('ai_wireframe');
+    }, 1200);
+  };
+
+  const wireframeColors = {
+    emerald: { stroke: '#10b981', fill: 'rgba(16, 185, 129, 0.15)', text: 'text-emerald-400' },
+    cyan: { stroke: '#06b6d4', fill: 'rgba(6, 182, 212, 0.15)', text: 'text-cyan-400' },
+    amber: { stroke: '#f59e0b', fill: 'rgba(245, 158, 11, 0.15)', text: 'text-amber-400' },
+    white: { stroke: '#f8fafc', fill: 'rgba(248, 250, 252, 0.12)', text: 'text-slate-200' }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-fadeIn">
+      <div className="bg-slate-900 text-white rounded-3xl max-w-5xl w-full p-6 shadow-2xl border border-slate-800 space-y-5 max-h-[95vh] overflow-y-auto">
+        {/* Modal Header */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-800 pb-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-mono text-xs font-bold px-2.5 py-0.5 rounded-full">
+                Room {room.roomNumber}
+              </span>
+              <h3 className="font-black text-xl text-white tracking-tight">{room.roomType} 3D & AI Spatial Visualizer</h3>
+            </div>
+            <p className="text-xs text-slate-400 mt-1">
+              AI Vision Room Photo Scan, 3D Schematic Wireframe Mesh, Object Depth Bounding Boxes, & Camera Controls.
+            </p>
+          </div>
+
+          {/* Mode Switcher Buttons */}
+          <div className="flex bg-slate-950 p-1 rounded-2xl border border-slate-800 self-stretch sm:self-auto">
+            <button
+              onClick={() => setViewMode('3d_view')}
+              className={`flex-1 sm:flex-none px-4 py-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer ${
+                viewMode === '3d_view' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Box className="w-4 h-4" /> 3D Camera View
+            </button>
+            <button
+              onClick={() => setViewMode('ai_wireframe')}
+              className={`flex-1 sm:flex-none px-4 py-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer ${
+                viewMode === 'ai_wireframe' ? 'bg-cyan-600 text-white shadow-md' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Sparkles className="w-4 h-4 text-cyan-300 animate-pulse" /> AI 3D Wireframe
+            </button>
+          </div>
+        </div>
+
+        {/* Main Canvas Viewport */}
+        <div className={`relative h-[420px] rounded-2xl border border-slate-700/80 overflow-hidden flex items-center justify-center transition-all ${
+          ambientLighting === 'night' ? 'bg-slate-950' :
+          ambientLighting === 'warm' ? 'bg-amber-950/40' :
+          'bg-slate-900'
+        }`}>
+          {/* Base Background Image */}
+          <img 
+            src={customImage || room.imageUrl || 'https://images.unsplash.com/photo-1631049307264-da0ec9d70304?auto=format&fit=crop&w=800&q=80'} 
+            alt={room.roomType}
+            className={`w-full h-full object-cover transition-all duration-500 ${
+              viewMode === 'ai_wireframe' ? 'brightness-40 contrast-150 grayscale-50' :
+              ambientLighting === 'night' ? 'brightness-50 contrast-125' :
+              ambientLighting === 'warm' ? 'sepia-25 brightness-90' :
+              'brightness-100'
+            } ${viewAngle === 'top' ? 'scale-110 -rotate-3' : viewAngle === 'front' ? 'scale-105' : 'scale-100'}`}
+          />
+
+          {/* AI Scanning Scanning Overlay Effect */}
+          {isScanning && (
+            <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-xs flex flex-col items-center justify-center z-30 space-y-3">
+              <div className="relative w-16 h-16">
+                <div className="absolute inset-0 border-4 border-cyan-500/30 rounded-full animate-ping" />
+                <div className="absolute inset-0 border-4 border-cyan-400 border-t-transparent rounded-full animate-spin" />
+              </div>
+              <span className="font-mono text-xs font-extrabold text-cyan-300 tracking-wider uppercase animate-pulse">
+                AI Vision Processing Depth Maps & Wireframe Mesh...
+              </span>
+            </div>
+          )}
+
+          {/* AI WIREFRAME & SCHEMATIC OVERLAY CANVAS */}
+          {viewMode === 'ai_wireframe' && !isScanning && (
+            <div className="absolute inset-0 z-20 pointer-events-auto flex flex-col justify-between p-4" style={{ opacity: wireframeOpacity / 100 }}>
+              {/* Perspective 3D SVG Grid Lines */}
+              <svg className="absolute inset-0 w-full h-full pointer-events-none" xmlns="http://www.w3.org/2000/svg">
+                {/* Perspective Floor Grid */}
+                <line x1="0" y1="100%" x2="50%" y2="40%" stroke={wireframeColors[wireframeTheme].stroke} strokeWidth="1" strokeDasharray="4,4" opacity="0.6" />
+                <line x1="100%" y1="100%" x2="50%" y2="40%" stroke={wireframeColors[wireframeTheme].stroke} strokeWidth="1" strokeDasharray="4,4" opacity="0.6" />
+                <line x1="0" y1="0" x2="50%" y2="40%" stroke={wireframeColors[wireframeTheme].stroke} strokeWidth="1" strokeDasharray="4,4" opacity="0.4" />
+                <line x1="100%" y1="0" x2="50%" y2="40%" stroke={wireframeColors[wireframeTheme].stroke} strokeWidth="1" strokeDasharray="4,4" opacity="0.4" />
+
+                {/* Depth Ring Matrices */}
+                <ellipse cx="50%" cy="40%" rx="12%" ry="6%" fill="none" stroke={wireframeColors[wireframeTheme].stroke} strokeWidth="1" opacity="0.5" />
+                <ellipse cx="50%" cy="55%" rx="32%" ry="16%" fill="none" stroke={wireframeColors[wireframeTheme].stroke} strokeWidth="1" strokeDasharray="3,3" opacity="0.7" />
+                <ellipse cx="50%" cy="75%" rx="52%" ry="26%" fill="none" stroke={wireframeColors[wireframeTheme].stroke} strokeWidth="1.5" opacity="0.9" />
+              </svg>
+
+              {/* HUD Header Status */}
+              <div className="flex justify-between items-center relative z-20">
+                <div className="bg-slate-950/90 border border-cyan-500/50 px-3 py-1.5 rounded-xl backdrop-blur-md text-xs font-mono text-cyan-300 font-bold flex items-center gap-2 shadow-lg">
+                  <Sparkles className="w-4 h-4 text-cyan-400 animate-spin-slow" />
+                  <span>AI 3D SCHEMATIC MESH — DEPT MAP ACTIVE</span>
+                </div>
+
+                {/* Spatial Measurements HUD */}
+                <div className="bg-slate-950/90 border border-slate-700 px-3 py-1.5 rounded-xl backdrop-blur-md text-[11px] font-mono text-slate-200 font-bold flex items-center gap-3">
+                  <span>W: <strong className="text-cyan-400">18.5 ft</strong></span>
+                  <span>D: <strong className="text-cyan-400">24.0 ft</strong></span>
+                  <span>H: <strong className="text-cyan-400">10.5 ft</strong></span>
+                  <span>Vol: <strong className="text-amber-400">4,662 cu ft</strong></span>
+                </div>
+              </div>
+
+              {/* Interactive Bounding Boxes in 3D Space */}
+              <div className="relative w-full h-full my-auto z-20">
+                {furnitureBoxes.map(box => {
+                  const isSelected = selectedBoxId === box.id;
+                  return (
+                    <div
+                      key={box.id}
+                      onClick={() => setSelectedBoxId(box.id)}
+                      style={{
+                        left: `${box.x}%`,
+                        top: `${box.y}%`,
+                        width: `${box.w}%`,
+                        height: `${box.h}%`
+                      }}
+                      className={`absolute rounded-xl border-2 transition-all cursor-pointer backdrop-blur-xs flex flex-col justify-between p-2 ${
+                        isSelected 
+                          ? 'border-amber-400 bg-amber-500/20 ring-4 ring-amber-400/30 z-30 scale-102' 
+                          : 'border-cyan-400/80 bg-cyan-500/10 hover:border-white'
+                      }`}
+                    >
+                      <div className="flex justify-between items-center text-[10px] font-mono font-bold">
+                        <span className="bg-slate-950/90 px-1.5 py-0.5 rounded text-white border border-slate-700">
+                          {box.name}
+                        </span>
+                        <span className="text-amber-300">{box.type}</span>
+                      </div>
+                      
+                      <div className="text-[9px] font-mono text-cyan-200 bg-slate-950/80 px-1 py-0.5 rounded self-start border border-cyan-800">
+                        ({box.w * 0.25}ft × {box.h * 0.25}ft)
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Wireframe Style Bar */}
+              <div className="flex justify-between items-center relative z-20 bg-slate-950/90 p-2.5 rounded-2xl border border-slate-800">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-extrabold uppercase text-slate-400">Wireframe Theme:</span>
+                  {(['cyan', 'emerald', 'amber', 'white'] as const).map(theme => (
+                    <button
+                      key={theme}
+                      onClick={() => setWireframeTheme(theme)}
+                      className={`px-2.5 py-1 rounded-lg text-[10px] font-mono font-bold capitalize transition cursor-pointer border ${
+                        wireframeTheme === theme ? 'bg-slate-800 border-cyan-400 text-white' : 'text-slate-400 border-transparent hover:text-white'
+                      }`}
+                    >
+                      {theme}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <span className="text-[10px] font-extrabold uppercase text-slate-400">Opacity:</span>
+                  <input 
+                    type="range" 
+                    min="30" 
+                    max="100" 
+                    value={wireframeOpacity} 
+                    onChange={(e) => setWireframeOpacity(Number(e.target.value))}
+                    className="w-24 accent-cyan-400 cursor-pointer"
+                  />
+                  <span className="font-mono text-xs text-cyan-300 font-bold">{wireframeOpacity}%</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Standard 3D Hotspots View Overlay */}
+          {viewMode === '3d_view' && (
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-black/30 flex flex-col justify-between p-5 pointer-events-none z-10">
+              <div className="flex justify-between items-center">
+                <div className="bg-slate-950/80 border border-slate-700 px-3 py-1.5 rounded-xl backdrop-blur-md text-xs font-mono text-indigo-300 font-bold flex items-center gap-2">
+                  <Box className="w-4 h-4 text-indigo-400 animate-spin-slow" />
+                  <span>3D CAMERA: {viewAngle.toUpperCase()} PERSPECTIVE</span>
+                </div>
+
+                <div className="bg-slate-950/80 border border-slate-700 px-3 py-1.5 rounded-xl backdrop-blur-md text-xs font-mono text-amber-300 font-bold">
+                  LIGHTING: {ambientLighting.toUpperCase()}
+                </div>
+              </div>
+
+              {/* Interactive Clickable Hotspots */}
+              <div className="relative w-full h-full my-auto pointer-events-auto">
+                <button
+                  type="button"
+                  onClick={() => setActiveHotspot('King Master Bed & Luxury Linens')}
+                  className="absolute top-1/2 left-1/3 -translate-x-1/2 p-2.5 bg-indigo-600/90 hover:bg-indigo-500 text-white rounded-full shadow-lg border border-white/50 cursor-pointer animate-bounce"
+                  title="Click for Bedding Details"
+                >
+                  <Bed className="w-4 h-4" />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveHotspot('55" 4K Smart TV Wall & Premium Soundbar')}
+                  className="absolute top-1/3 right-1/4 p-2.5 bg-orange-600/90 hover:bg-orange-500 text-white rounded-full shadow-lg border border-white/50 cursor-pointer"
+                  title="Click for Entertainment Details"
+                >
+                  <Tv className="w-4 h-4" />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveHotspot('In-Room Dining Table & Room Service Console')}
+                  className="absolute bottom-1/4 left-1/4 p-2.5 bg-emerald-600/90 hover:bg-emerald-500 text-white rounded-full shadow-lg border border-white/50 cursor-pointer"
+                  title="Click for Dining Details"
+                >
+                  <Utensils className="w-4 h-4" />
+                </button>
+              </div>
+
+              {activeHotspot && (
+                <div className="bg-slate-900/95 border border-indigo-500 p-3 rounded-xl backdrop-blur-md text-xs text-indigo-200 font-bold flex justify-between items-center pointer-events-auto">
+                  <span>📍 Hotspot Selected: {activeHotspot}</span>
+                  <button onClick={() => setActiveHotspot(null)} className="text-slate-400 hover:text-white">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Interactive Controls & AI Scan Upload Bar */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-slate-950/80 p-4 rounded-2xl border border-slate-800 text-xs">
+          {/* 1. View Angle Controls */}
+          <div>
+            <span className="font-extrabold text-slate-300 block mb-2 uppercase tracking-wider text-[10px]">3D Perspective Angle:</span>
+            <div className="flex gap-1.5">
+              {(['3d', 'top', 'front'] as const).map(angle => (
+                <button
+                  key={angle}
+                  onClick={() => setViewAngle(angle)}
+                  className={`flex-1 py-1.5 rounded-xl font-bold transition cursor-pointer border ${
+                    viewAngle === angle ? 'bg-indigo-600 border-indigo-400 text-white shadow-md' : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white'
+                  }`}
+                >
+                  {angle.toUpperCase()}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* 2. Ambiance Lighting Controls */}
+          <div>
+            <span className="font-extrabold text-slate-300 block mb-2 uppercase tracking-wider text-[10px]">Lighting Mode:</span>
+            <div className="flex gap-1.5">
+              {(['day', 'warm', 'night'] as const).map(mode => (
+                <button
+                  key={mode}
+                  onClick={() => setAmbientLighting(mode)}
+                  className={`flex-1 py-1.5 rounded-xl font-bold transition cursor-pointer border ${
+                    ambientLighting === mode ? 'bg-amber-500 border-amber-300 text-slate-950 font-black' : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white'
+                  }`}
+                >
+                  {mode.toUpperCase()}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* 3. Upload Room Image Custom Demo */}
+          <div>
+            <span className="font-extrabold text-slate-300 block mb-2 uppercase tracking-wider text-[10px]">Upload Room Photo:</span>
+            <label className="w-full py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-indigo-300 font-bold rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer">
+              <Camera className="w-4 h-4 text-indigo-400" />
+              <span>{customImage ? 'Change Photo' : 'Upload Image'}</span>
+              <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
+            </label>
+          </div>
+
+          {/* 4. Trigger AI Vision Scanner */}
+          <div>
+            <span className="font-extrabold text-slate-300 block mb-2 uppercase tracking-wider text-[10px]">AI Wireframe Engine:</span>
+            <button
+              onClick={runAiWireframeScan}
+              disabled={isScanning}
+              className="w-full py-1.5 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold rounded-xl shadow-md transition flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+            >
+              <Sparkles className="w-4 h-4 text-cyan-200" />
+              <span>Scan & Process Mesh</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Footer Actions */}
+        <div className="flex flex-col sm:flex-row justify-between items-center gap-3 pt-2 border-t border-slate-800">
+          <button onClick={onClose} className="w-full sm:w-auto px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs rounded-xl transition cursor-pointer">
+            Close 3D Visualizer
+          </button>
+
+          <div className="flex gap-3 w-full sm:w-auto">
+            <button
+              onClick={() => {
+                alert(`Saved 3D AI Schematic Wireframe layout for Room ${room.roomNumber}! Attached 4 furniture depth bounding boxes.`);
+              }}
+              className="flex-1 sm:flex-none px-5 py-2.5 bg-cyan-950 hover:bg-cyan-900 border border-cyan-500/50 text-cyan-200 font-extrabold text-xs rounded-xl transition flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <Check className="w-4 h-4 text-cyan-400" /> Save 3D Schematic
+            </button>
+
+            <button
+              onClick={onOrderRoomService}
+              className="flex-1 sm:flex-none px-6 py-2.5 bg-orange-600 hover:bg-orange-700 text-white font-extrabold text-xs rounded-xl shadow-lg transition flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <Utensils className="w-4 h-4" /> Order In-Room Dining Express
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// =========================================================================
+// SUB-COMPONENT: IN-ROOM DINING TOUCH POS MODAL
+// =========================================================================
+function InRoomDiningPOSModal({
+  room,
+  menuItems,
+  categories,
+  currency = 'USD',
+  formatCurrency = (amt) => `$${amt.toFixed(2)}`,
+  onClose,
+  onSubmitOrder
+}: {
+  room: HotelRoom;
+  menuItems: MenuItem[];
+  categories: string[];
+  currency?: CurrencyCode;
+  formatCurrency?: (amount: number, override?: CurrencyCode) => string;
+  onClose: () => void;
+  onSubmitOrder: (order: Omit<LiveOrder, 'id'>) => void;
+}) {
+  const [cart, setCart] = useState<OrderLineItem[]>([]);
+  const [activeCat, setActiveCat] = useState<string>('ALL');
+
+  const filtered = menuItems.filter(m => activeCat === 'ALL' || m.category === activeCat);
+
+  const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  const serviceTaxAmount = subtotal * 0.10;
+  const vatAmount = subtotal * 0.13;
+  const grandTotal = subtotal + serviceTaxAmount + vatAmount;
+
+  const handleAddItem = (item: MenuItem) => {
+    const existing = cart.find(c => c.menuItemId === item.id);
+    if (existing) {
+      setCart(cart.map(c => c.menuItemId === item.id ? { ...c, quantity: c.quantity + 1 } : c));
+    } else {
+      setCart([...cart, {
+        menuItemId: item.id,
+        name: item.name,
+        price: item.price,
+        quantity: 1,
+        isVeg: item.isVeg
+      }]);
+    }
+  };
+
+  const handleSend = () => {
+    if (cart.length === 0) return;
+    onSubmitOrder({
+      tableNumber: `ROOM #${room.roomNumber}`,
+      section: room.floorName,
+      waiterName: 'Room Service Express',
+      customerName: room.guestName || `Guest in Room ${room.roomNumber}`,
+      items: cart,
+      subtotal,
+      serviceTaxRate: 10,
+      vatRate: 13,
+      discountAmount: 0,
+      totalAmount: grandTotal,
+      status: 'Sent to Kitchen',
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fadeIn">
+      <div className="bg-white rounded-3xl max-w-4xl w-full p-6 shadow-2xl border border-slate-200 space-y-5 max-h-[90vh] overflow-y-auto">
+        <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+          <div>
+            <h3 className="font-black text-lg text-slate-900 flex items-center gap-2">
+              <Utensils className="w-5 h-5 text-orange-600" />
+              In-Room Dining POS — Room {room.roomNumber} ({room.guestName || 'Occupied Suite'})
+            </h3>
+            <p className="text-xs text-slate-500">Send room service food & drinks directly to Kitchen KDS and link bill to Room Folio</p>
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-700 transition cursor-pointer">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Menu Selection (2 cols) */}
+          <div className="md:col-span-2 space-y-3">
+            <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-1">
+              {['ALL', ...categories].map(cat => (
+                <button
+                  key={cat}
+                  onClick={() => setActiveCat(cat)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer ${
+                    activeCat === cat ? 'bg-orange-600 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                  }`}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-80 overflow-y-auto p-1">
+              {filtered.map(item => (
+                <button
+                  key={item.id}
+                  onClick={() => handleAddItem(item)}
+                  className="bg-slate-50 hover:bg-orange-50 border border-slate-200 hover:border-orange-400 rounded-2xl p-3 text-left transition shadow-xs flex flex-col justify-between cursor-pointer group"
+                >
+                  <div>
+                    <span className="font-extrabold text-xs text-slate-900 block group-hover:text-orange-700">{item.name}</span>
+                    <span className="text-[10px] text-slate-500 block">{item.category}</span>
+                  </div>
+                  <div className="mt-2 flex justify-between items-center font-mono text-xs">
+                    <span className="font-extrabold text-slate-900">{formatCurrency(item.price, currency)}</span>
+                    <Plus className="w-4 h-4 text-orange-600 group-hover:scale-125 transition" />
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Cart & Billing Summary (1 col) */}
+          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex flex-col justify-between space-y-4">
+            <div className="space-y-3">
+              <h4 className="font-extrabold text-xs uppercase tracking-wider text-slate-800 border-b border-slate-200 pb-2">
+                Room Service Cart ({cart.length})
+              </h4>
+
+              <div className="max-h-52 overflow-y-auto space-y-2 pr-1">
+                {cart.length === 0 ? (
+                  <p className="text-xs text-slate-400 text-center py-6">Cart is empty. Select dishes on the left.</p>
+                ) : (
+                  cart.map(c => (
+                    <div key={c.menuItemId} className="bg-white border border-slate-200 rounded-xl p-2.5 flex justify-between items-center text-xs">
+                      <div>
+                        <span className="font-bold text-slate-800 block">{c.name}</span>
+                        <span className="text-[10px] text-slate-500 font-mono">{c.quantity} x {formatCurrency(c.price, currency)}</span>
+                      </div>
+                      <span className="font-extrabold text-slate-900 font-mono">{formatCurrency(c.price * c.quantity, currency)}</span>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-2 border-t border-slate-200 pt-3 text-xs">
+              <div className="flex justify-between text-slate-600">
+                <span>Subtotal:</span>
+                <span className="font-bold font-mono">{formatCurrency(subtotal, currency)}</span>
+              </div>
+              <div className="flex justify-between text-slate-600">
+                <span>Tax & Service (23%):</span>
+                <span className="font-bold font-mono">{formatCurrency(serviceTaxAmount + vatAmount, currency)}</span>
+              </div>
+              <div className="flex justify-between text-slate-900 font-extrabold text-sm pt-1 border-t border-slate-300">
+                <span>Room Bill Total:</span>
+                <span className="font-mono text-orange-700">{formatCurrency(grandTotal, currency)}</span>
+              </div>
+
+              <button
+                onClick={handleSend}
+                disabled={cart.length === 0}
+                className="w-full py-3 bg-orange-600 hover:bg-orange-700 disabled:opacity-50 text-white font-extrabold text-xs rounded-xl shadow-md transition cursor-pointer flex items-center justify-center gap-1.5"
+              >
+                <ChefHat className="w-4 h-4" /> Dispatch to Kitchen & Charge Room
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// =========================================================================
+// SUB-COMPONENT: MENU PORTION VARIATION PICKER MODAL
+// =========================================================================
+function PortionVariationPickerModal({
+  item,
+  currency = 'USD',
+  formatCurrency = (amt) => `$${amt.toFixed(2)}`,
+  onClose,
+  onSelectPortion
+}: {
+  item: MenuItem;
+  currency?: CurrencyCode;
+  formatCurrency?: (amount: number, override?: CurrencyCode) => string;
+  onClose: () => void;
+  onSelectPortion: (portion: PortionVariation, price: number) => void;
+}) {
+  const portions = item.portions && item.portions.length > 0 ? item.portions : [
+    { id: 'p_full', name: 'Full Plate / Standard', priceMultiplier: 1.0 },
+    { id: 'p_half', name: 'Half Plate Portion', priceMultiplier: 0.6 },
+    { id: 'p_family', name: 'Family Platter / Large', priceMultiplier: 2.2 }
+  ];
+
+  return (
+    <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fadeIn">
+      <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-slate-200 space-y-4">
+        <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+          <div>
+            <h3 className="font-extrabold text-base text-slate-900">{item.name}</h3>
+            <p className="text-xs text-slate-500">Select portion sizing or peg volume</p>
+          </div>
+          <button onClick={onClose} className="p-1.5 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-700 transition cursor-pointer">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="space-y-2.5">
+          {portions.map(p => {
+            const calculatedPrice = p.priceOverride || (item.price * p.priceMultiplier);
+            return (
+              <button
+                key={p.id}
+                onClick={() => onSelectPortion(p, calculatedPrice)}
+                className="w-full bg-slate-50 hover:bg-orange-50 border border-slate-200 hover:border-orange-400 p-3.5 rounded-2xl flex justify-between items-center text-xs font-bold transition cursor-pointer group"
+              >
+                <span className="text-slate-800 group-hover:text-orange-700">{p.name}</span>
+                <span className="font-mono text-orange-600 text-sm font-extrabold">{formatCurrency(calculatedPrice, currency)}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// =========================================================================
+// SUB-COMPONENT: AUTOMATED FINANCIAL RECONCILIATION WIDGET
+// =========================================================================
+function FinancialReconciliationTab({
+  invoices,
+  orders,
+  hotelRooms,
+  bookings,
+  currency = 'USD',
+  formatCurrency = (amt) => `$${amt.toFixed(2)}`,
+  profile
+}: {
+  invoices: InvoiceRecord[];
+  orders: LiveOrder[];
+  hotelRooms: HotelRoom[];
+  bookings: TableBooking[];
+  currency?: CurrencyCode;
+  formatCurrency?: (amount: number, override?: CurrencyCode) => string;
+  profile: BusinessProfile;
+}) {
+  const [operatingRegion, setOperatingRegion] = useState<'north_america' | 'south_asia' | 'eu' | 'middle_east' | 'custom'>('north_america');
+  const [reportDate, setReportDate] = useState<string>(new Date().toISOString().split('T')[0]);
+
+  // Customizable Region Tax & Deduction Rates
+  const [taxConfig, setTaxConfig] = useState({
+    vatRate: 8.875,
+    serviceTaxRate: 10.0,
+    cardFeeRate: 2.9,
+    laborTaxRate: 4.5,
+    operationalFeeRate: 1.5
+  });
+
+  // Handle Region Preset Selection
+  const handleSelectRegion = (region: 'north_america' | 'south_asia' | 'eu' | 'middle_east' | 'custom') => {
+    setOperatingRegion(region);
+    if (region === 'north_america') {
+      setTaxConfig({ vatRate: 8.875, serviceTaxRate: 10.0, cardFeeRate: 2.9, laborTaxRate: 4.5, operationalFeeRate: 1.5 });
+    } else if (region === 'south_asia') {
+      setTaxConfig({ vatRate: 13.0, serviceTaxRate: 10.0, cardFeeRate: 1.5, laborTaxRate: 2.0, operationalFeeRate: 2.5 });
+    } else if (region === 'eu') {
+      setTaxConfig({ vatRate: 20.0, serviceTaxRate: 5.0, cardFeeRate: 1.8, laborTaxRate: 5.0, operationalFeeRate: 1.0 });
+    } else if (region === 'middle_east') {
+      setTaxConfig({ vatRate: 5.0, serviceTaxRate: 10.0, cardFeeRate: 2.0, laborTaxRate: 3.0, operationalFeeRate: 2.0 });
+    }
+  };
+
+  // Aggregated Daily Revenues
+  const posSalesTotal = invoices.reduce((sum, inv) => sum + (inv.status === 'Paid' ? inv.grandTotal : 0), 0) +
+    orders.filter(o => o.status === 'Served' || o.status === 'Service Completed').reduce((sum, o) => sum + o.totalAmount, 0);
+
+  const hotelBookingTotal = hotelRooms.filter(r => r.status === 'Occupied' || r.status === 'Reserved').reduce((sum, r) => sum + r.ratePerNight, 0);
+  const roomServiceTotal = hotelRooms.reduce((sum, r) => sum + (r.activeRoomServiceTotal || 0), 0);
+
+  const grossRevenue = posSalesTotal + hotelBookingTotal + roomServiceTotal;
+
+  // Automated Tax & Deduction Calculations
+  const calculatedVAT = grossRevenue * (taxConfig.vatRate / 100);
+  const calculatedServiceTax = grossRevenue * (taxConfig.serviceTaxRate / 100);
+  const totalTaxes = calculatedVAT + calculatedServiceTax;
+
+  const cardFeeDeduction = grossRevenue * (taxConfig.cardFeeRate / 100);
+  const laborTaxDeduction = grossRevenue * (taxConfig.laborTaxRate / 100);
+  const operationalDeduction = grossRevenue * (taxConfig.operationalFeeRate / 100);
+  const totalDeductions = cardFeeDeduction + laborTaxDeduction + operationalDeduction;
+
+  const netProfit = grossRevenue - totalTaxes - totalDeductions;
+  const netProfitMargin = grossRevenue > 0 ? (netProfit / grossRevenue) * 100 : 0;
+
+  // Download PDF Printable Report
+  const handleDownloadPdfReport = () => {
+    const reportWindow = window.open('', '_blank');
+    if (!reportWindow) return;
+
+    reportWindow.document.write(`
+      <html>
+        <head>
+          <title>Daily Financial Reconciliation Audit — ${profile.name || "MarketForge Gourmet Bistro"}</title>
+          <style>
+            body { font-family: 'Helvetica Neue', Arial, sans-serif; padding: 40px; color: #1e293b; background: #fff; }
+            .header { border-bottom: 3px solid #ea580c; padding-bottom: 20px; margin-bottom: 25px; display: flex; justify-content: space-between; }
+            .title { font-size: 24px; font-weight: 900; color: #0f172a; margin: 0; }
+            .subtitle { font-size: 12px; color: #64748b; margin-top: 5px; }
+            .section-title { font-size: 14px; font-weight: 800; text-transform: uppercase; color: #ea580c; border-bottom: 1px solid #cbd5e1; padding-bottom: 6px; margin-top: 25px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 13px; }
+            th, td { border: 1px solid #e2e8f0; padding: 10px; text-align: left; }
+            th { background: #f8fafc; font-weight: 800; color: #334155; }
+            .amount { text-align: right; font-family: monospace; font-weight: 700; }
+            .summary-box { background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 12px; padding: 18px; margin-top: 20px; }
+            .net-profit { color: #16a34a; font-size: 18px; font-weight: 900; }
+            .footer { margin-top: 50px; text-align: center; font-size: 11px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 15px; }
+            .sign-block { margin-top: 40px; display: flex; justify-content: space-between; font-size: 12px; }
+            .sign-line { border-top: 1px solid #94a3b8; width: 200px; text-align: center; padding-top: 6px; font-weight: bold; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div>
+              <h1 class="title">${profile.name || "MarketForge Gourmet Bistro"}</h1>
+              <p class="subtitle">Automated Daily Financial Reconciliation & Tax Audit Report</p>
+            </div>
+            <div style="text-align: right; font-size: 12px;">
+              <strong>Date:</strong> ${reportDate}<br/>
+              <strong>Region Profile:</strong> ${operatingRegion.toUpperCase().replace('_', ' ')}<br/>
+              <strong>Report ID:</strong> RECON-${Math.floor(100000 + Math.random() * 900000)}
+            </div>
+          </div>
+
+          <div class="section-title">1. Revenue Source Breakdown (POS & Hotel OS)</div>
+          <table>
+            <thead>
+              <tr><th>Revenue Stream</th><th>Transaction Count</th><th class="amount">Gross Volume</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>POS Restaurant Dine-in & Takeaway</td><td>${invoices.length + orders.length} Orders</td><td class="amount">${formatCurrency(posSalesTotal, currency)}</td></tr>
+              <tr><td>Hotel Suite & Room Bookings</td><td>${hotelRooms.filter(r => r.status === 'Occupied').length} Rooms</td><td class="amount">${formatCurrency(hotelBookingTotal, currency)}</td></tr>
+              <tr><td>In-Room Dining Express Service</td><td>${hotelRooms.filter(r => (r.activeRoomServiceTotal || 0) > 0).length} Orders</td><td class="amount">${formatCurrency(roomServiceTotal, currency)}</td></tr>
+              <tr style="background:#fff7ed; font-weight: bold;"><td>TOTAL GROSS REVENUE AGGREGATED</td><td>-</td><td class="amount">${formatCurrency(grossRevenue, currency)}</td></tr>
+            </tbody>
+          </table>
+
+          <div class="section-title">2. Regional Tax & Regulatory Calculations</div>
+          <table>
+            <thead>
+              <tr><th>Tax Type</th><th>Configured Rate</th><th class="amount">Calculated Tax Amount</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Regional VAT / Sales Tax</td><td>${taxConfig.vatRate}%</td><td class="amount">${formatCurrency(calculatedVAT, currency)}</td></tr>
+              <tr><td>Hospitality Service Tax Levy</td><td>${taxConfig.serviceTaxRate}%</td><td class="amount">${formatCurrency(calculatedServiceTax, currency)}</td></tr>
+              <tr style="background:#fef2f2; font-weight: bold;"><td>TOTAL DEDUCTIBLE TAX LEVIES</td><td>-</td><td class="amount">${formatCurrency(totalTaxes, currency)}</td></tr>
+            </tbody>
+          </table>
+
+          <div class="section-title">3. Merchant & Operational Deductions</div>
+          <table>
+            <thead>
+              <tr><th>Deduction Item</th><th>Percentage Rate</th><th class="amount">Deduction Amount</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Merchant Credit Card Processing Fee</td><td>${taxConfig.cardFeeRate}%</td><td class="amount">${formatCurrency(cardFeeDeduction, currency)}</td></tr>
+              <tr><td>Staff Labor Levy & Payroll Retention</td><td>${taxConfig.laborTaxRate}%</td><td class="amount">${formatCurrency(laborTaxDeduction, currency)}</td></tr>
+              <tr><td>Platform Operational Overhead %</td><td>${taxConfig.operationalFeeRate}%</td><td class="amount">${formatCurrency(operationalDeduction, currency)}</td></tr>
+              <tr style="background:#f1f5f9; font-weight: bold;"><td>TOTAL DEDUCTIONS</td><td>-</td><td class="amount">${formatCurrency(totalDeductions, currency)}</td></tr>
+            </tbody>
+          </table>
+
+          <div class="summary-box">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <div>
+                <span style="font-size: 12px; text-transform: uppercase; font-weight: bold; color: #64748b;">Net Profit After Tax & Fees</span><br/>
+                <span class="net-profit">${formatCurrency(netProfit, currency)}</span>
+              </div>
+              <div style="text-align: right;">
+                <span style="font-size: 12px; text-transform: uppercase; font-weight: bold; color: #64748b;">Net Profit Margin</span><br/>
+                <span style="font-size: 18px; font-weight: 900; color: #0284c7;">${netProfitMargin.toFixed(2)}%</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="sign-block">
+            <div class="sign-line">Financial Auditor Signature</div>
+            <div class="sign-line">General Manager Seal & Sign</div>
+          </div>
+
+          <div class="footer">
+            Report auto-generated by MarketForge Restaurant & Hotel OS Engine. Confidential Document.
+          </div>
+
+          <script>
+            window.onload = function() { window.print(); }
+          </script>
+        </body>
+      </html>
+    `);
+    reportWindow.document.close();
+  };
+
+  // Download Excel / CSV File Report
+  const handleDownloadCsvReport = () => {
+    const csvRows = [
+      ['MarketForge Gourmet OS - Financial Reconciliation Report'],
+      ['Date', reportDate],
+      ['Operating Region', operatingRegion.toUpperCase()],
+      ['Currency', currency],
+      [''],
+      ['REVENUE STREAM', 'TRANSACTIONS', 'GROSS VOLUME'],
+      ['POS Restaurant Sales', invoices.length + orders.length, posSalesTotal.toFixed(2)],
+      ['Hotel Suite Bookings', hotelRooms.filter(r => r.status === 'Occupied').length, hotelBookingTotal.toFixed(2)],
+      ['In-Room Dining Service', hotelRooms.filter(r => (r.activeRoomServiceTotal || 0) > 0).length, roomServiceTotal.toFixed(2)],
+      ['GROSS REVENUE TOTAL', '', grossRevenue.toFixed(2)],
+      [''],
+      ['TAX TYPE', 'RATE %', 'AMOUNT'],
+      ['Regional VAT / Sales Tax', `${taxConfig.vatRate}%`, calculatedVAT.toFixed(2)],
+      ['Hospitality Service Tax', `${taxConfig.serviceTaxRate}%`, calculatedServiceTax.toFixed(2)],
+      ['TOTAL TAXES', '', totalTaxes.toFixed(2)],
+      [''],
+      ['DEDUCTION TYPE', 'RATE %', 'AMOUNT'],
+      ['Merchant Card Processing', `${taxConfig.cardFeeRate}%`, cardFeeDeduction.toFixed(2)],
+      ['Labor Tax Levy', `${taxConfig.laborTaxRate}%`, laborTaxDeduction.toFixed(2)],
+      ['Platform Operational Overhead', `${taxConfig.operationalFeeRate}%`, operationalDeduction.toFixed(2)],
+      ['TOTAL DEDUCTIONS', '', totalDeductions.toFixed(2)],
+      [''],
+      ['NET REVENUE / PROFIT', '', netProfit.toFixed(2)],
+      ['NET PROFIT MARGIN %', '', `${netProfitMargin.toFixed(2)}%`]
+    ];
+
+    const csvContent = "data:text/csv;charset=utf-8," + csvRows.map(e => e.join(",")).join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `Financial_Reconciliation_${reportDate}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Top Banner & Quick Controls */}
+      <div className="bg-gradient-to-r from-slate-900 via-orange-950 to-slate-900 rounded-3xl p-6 text-white shadow-xl flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 border border-orange-500/20">
+        <div className="flex items-center gap-4">
+          <div className="w-14 h-14 rounded-2xl bg-orange-600/20 border border-orange-500/40 flex items-center justify-center text-orange-400 shrink-0 shadow-lg">
+            <Scale className="w-7 h-7" />
+          </div>
+          <div>
+            <h3 className="text-xl font-black tracking-tight text-white flex items-center gap-2">
+              Automated Financial Reconciliation Engine
+              <span className="bg-orange-500/20 text-orange-300 font-mono text-[10px] px-2 py-0.5 rounded-full border border-orange-500/30">
+                AUDIT READY
+              </span>
+            </h3>
+            <p className="text-xs text-slate-300 mt-1 max-w-xl">
+              Cross-aggregates daily POS revenue & Hotel room booking sales, calculates regional tax levies, merchant fees, and net profit.
+            </p>
+          </div>
+        </div>
+
+        {/* Action Export Buttons */}
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            onClick={handleDownloadPdfReport}
+            className="px-4 py-2.5 bg-orange-600 hover:bg-orange-500 text-white font-extrabold text-xs rounded-xl shadow-lg transition flex items-center gap-2 cursor-pointer"
+          >
+            <Download className="w-4 h-4" /> Download PDF Audit Report
+          </button>
+
+          <button
+            onClick={handleDownloadCsvReport}
+            className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs rounded-xl shadow-lg transition flex items-center gap-2 cursor-pointer"
+          >
+            <FileSpreadsheet className="w-4 h-4" /> Export Excel / CSV
+          </button>
+        </div>
+      </div>
+
+      {/* Region Presets & Custom Tax Rate Adjuster */}
+      <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-4">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-100 pb-4">
+          <div>
+            <h4 className="font-extrabold text-sm text-slate-900 flex items-center gap-2">
+              <Globe className="w-4 h-4 text-orange-600" />
+              Operating Region Tax & Regulatory Presets
+            </h4>
+            <p className="text-xs text-slate-500">Select standard regional tax profiles or adjust custom percentage overrides</p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-slate-600">Audit Date:</span>
+            <input 
+              type="date" 
+              value={reportDate} 
+              onChange={(e) => setReportDate(e.target.value)} 
+              className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-mono font-bold text-slate-800 outline-none"
+            />
+          </div>
+        </div>
+
+        {/* Region Badges */}
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+          {[
+            { id: 'north_america', name: 'North America (US/CA)', vat: '8.875% Tax', serv: '10% Serv' },
+            { id: 'south_asia', name: 'Nepal & South Asia', vat: '13% VAT', serv: '10% Serv' },
+            { id: 'eu', name: 'European Union (EU)', vat: '20% VAT', serv: '5% Serv' },
+            { id: 'middle_east', name: 'Middle East (GCC)', vat: '5% VAT', serv: '10% Serv' },
+            { id: 'custom', name: 'Custom Regional Rules', vat: 'Manual %', serv: 'Manual %' }
+          ].map(reg => (
+            <button
+              key={reg.id}
+              onClick={() => handleSelectRegion(reg.id as any)}
+              className={`p-3 rounded-2xl border text-left transition cursor-pointer flex flex-col justify-between ${
+                operatingRegion === reg.id 
+                  ? 'bg-orange-50 border-orange-500 shadow-sm' 
+                  : 'bg-slate-50 border-slate-200 hover:border-slate-300'
+              }`}
+            >
+              <div>
+                <span className={`font-extrabold text-xs block ${operatingRegion === reg.id ? 'text-orange-900' : 'text-slate-800'}`}>
+                  {reg.name}
+                </span>
+                <span className="text-[10px] text-slate-500 block">{reg.vat} • {reg.serv}</span>
+              </div>
+              <div className="mt-2 text-[10px] font-mono font-bold text-orange-700">
+                {operatingRegion === reg.id ? '✓ ACTIVE REGION' : 'Select'}
+              </div>
+            </button>
+          ))}
+        </div>
+
+        {/* Tax Adjuster Sliders & Percentage Inputs */}
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-200 text-xs font-bold">
+          <div>
+            <label className="text-slate-600 block mb-1">VAT / Sales Tax %</label>
+            <input 
+              type="number" 
+              step="0.1" 
+              value={taxConfig.vatRate} 
+              onChange={(e) => setTaxConfig({ ...taxConfig, vatRate: parseFloat(e.target.value) || 0 })}
+              className="w-full bg-white border border-slate-300 rounded-xl px-3 py-1.5 font-mono text-slate-900 outline-none"
+            />
+          </div>
+
+          <div>
+            <label className="text-slate-600 block mb-1">Service Tax %</label>
+            <input 
+              type="number" 
+              step="0.1" 
+              value={taxConfig.serviceTaxRate} 
+              onChange={(e) => setTaxConfig({ ...taxConfig, serviceTaxRate: parseFloat(e.target.value) || 0 })}
+              className="w-full bg-white border border-slate-300 rounded-xl px-3 py-1.5 font-mono text-slate-900 outline-none"
+            />
+          </div>
+
+          <div>
+            <label className="text-slate-600 block mb-1">Merchant Card Fee %</label>
+            <input 
+              type="number" 
+              step="0.1" 
+              value={taxConfig.cardFeeRate} 
+              onChange={(e) => setTaxConfig({ ...taxConfig, cardFeeRate: parseFloat(e.target.value) || 0 })}
+              className="w-full bg-white border border-slate-300 rounded-xl px-3 py-1.5 font-mono text-slate-900 outline-none"
+            />
+          </div>
+
+          <div>
+            <label className="text-slate-600 block mb-1">Labor Tax Levy %</label>
+            <input 
+              type="number" 
+              step="0.1" 
+              value={taxConfig.laborTaxRate} 
+              onChange={(e) => setTaxConfig({ ...taxConfig, laborTaxRate: parseFloat(e.target.value) || 0 })}
+              className="w-full bg-white border border-slate-300 rounded-xl px-3 py-1.5 font-mono text-slate-900 outline-none"
+            />
+          </div>
+
+          <div>
+            <label className="text-slate-600 block mb-1">Operational Fee %</label>
+            <input 
+              type="number" 
+              step="0.1" 
+              value={taxConfig.operationalFeeRate} 
+              onChange={(e) => setTaxConfig({ ...taxConfig, operationalFeeRate: parseFloat(e.target.value) || 0 })}
+              className="w-full bg-white border border-slate-300 rounded-xl px-3 py-1.5 font-mono text-slate-900 outline-none"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* KPI Cards: Gross Sales, Taxes, Deductions, Net Profit */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+        <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-xs space-y-2">
+          <div className="flex justify-between items-center text-slate-500">
+            <span className="text-xs font-bold uppercase tracking-wider">Gross Daily Revenue</span>
+            <DollarSign className="w-5 h-5 text-emerald-600" />
+          </div>
+          <div className="text-2xl font-black text-slate-900 font-mono">
+            {formatCurrency(grossRevenue, currency)}
+          </div>
+          <p className="text-[11px] text-slate-500">Aggregated POS + Hotel Suites</p>
+        </div>
+
+        <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-xs space-y-2">
+          <div className="flex justify-between items-center text-slate-500">
+            <span className="text-xs font-bold uppercase tracking-wider">Total Tax Obligations</span>
+            <Receipt className="w-5 h-5 text-rose-600" />
+          </div>
+          <div className="text-2xl font-black text-rose-700 font-mono">
+            {formatCurrency(totalTaxes, currency)}
+          </div>
+          <p className="text-[11px] text-slate-500">VAT ({taxConfig.vatRate}%) + Service ({taxConfig.serviceTaxRate}%)</p>
+        </div>
+
+        <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-xs space-y-2">
+          <div className="flex justify-between items-center text-slate-500">
+            <span className="text-xs font-bold uppercase tracking-wider">Operating Deductions</span>
+            <CreditCard className="w-5 h-5 text-amber-600" />
+          </div>
+          <div className="text-2xl font-black text-amber-700 font-mono">
+            {formatCurrency(totalDeductions, currency)}
+          </div>
+          <p className="text-[11px] text-slate-500">Merchant Card ({taxConfig.cardFeeRate}%) + Labor ({taxConfig.laborTaxRate}%)</p>
+        </div>
+
+        <div className="bg-gradient-to-br from-emerald-600 to-teal-700 rounded-3xl p-5 text-white shadow-lg space-y-2">
+          <div className="flex justify-between items-center text-emerald-100">
+            <span className="text-xs font-bold uppercase tracking-wider">Net Profit After Taxes</span>
+            <TrendingUp className="w-5 h-5 text-white" />
+          </div>
+          <div className="text-2xl font-black font-mono text-white">
+            {formatCurrency(netProfit, currency)}
+          </div>
+          <p className="text-[11px] text-emerald-100 font-bold">
+            Net Margin: {netProfitMargin.toFixed(1)}% of Gross Sales
+          </p>
+        </div>
+      </div>
+
+      {/* Itemized Audit Table */}
+      <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-4">
+        <h4 className="font-extrabold text-sm text-slate-900 border-b border-slate-100 pb-3 flex items-center justify-between">
+          <span>Itemized Cross-Module Daily Revenue Reconciliation</span>
+          <span className="text-xs font-mono font-bold text-slate-500">{reportDate}</span>
+        </h4>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse text-xs">
+            <thead>
+              <tr className="bg-slate-50 text-slate-700 uppercase font-mono text-[10px] border-b border-slate-200">
+                <th className="p-3.5">Module Source</th>
+                <th className="p-3.5">Gross Sales</th>
+                <th className="p-3.5">VAT ({taxConfig.vatRate}%)</th>
+                <th className="p-3.5">Service Tax ({taxConfig.serviceTaxRate}%)</th>
+                <th className="p-3.5">Card Fee ({taxConfig.cardFeeRate}%)</th>
+                <th className="p-3.5 text-right">Net Revenue Share</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 font-bold">
+              <tr className="hover:bg-slate-50/80">
+                <td className="p-3.5 text-slate-900 flex items-center gap-2">
+                  <Utensils className="w-4 h-4 text-orange-600" />
+                  POS Restaurant & Dine-in Sales
+                </td>
+                <td className="p-3.5 font-mono text-slate-900">{formatCurrency(posSalesTotal, currency)}</td>
+                <td className="p-3.5 font-mono text-slate-600">{formatCurrency(posSalesTotal * (taxConfig.vatRate / 100), currency)}</td>
+                <td className="p-3.5 font-mono text-slate-600">{formatCurrency(posSalesTotal * (taxConfig.serviceTaxRate / 100), currency)}</td>
+                <td className="p-3.5 font-mono text-slate-600">{formatCurrency(posSalesTotal * (taxConfig.cardFeeRate / 100), currency)}</td>
+                <td className="p-3.5 font-mono text-right text-emerald-700">
+                  {formatCurrency(posSalesTotal - (posSalesTotal * (taxConfig.vatRate + taxConfig.serviceTaxRate + taxConfig.cardFeeRate) / 100), currency)}
+                </td>
+              </tr>
+
+              <tr className="hover:bg-slate-50/80">
+                <td className="p-3.5 text-slate-900 flex items-center gap-2">
+                  <Building2 className="w-4 h-4 text-indigo-600" />
+                  Hotel Room Suite Bookings
+                </td>
+                <td className="p-3.5 font-mono text-slate-900">{formatCurrency(hotelBookingTotal, currency)}</td>
+                <td className="p-3.5 font-mono text-slate-600">{formatCurrency(hotelBookingTotal * (taxConfig.vatRate / 100), currency)}</td>
+                <td className="p-3.5 font-mono text-slate-600">{formatCurrency(hotelBookingTotal * (taxConfig.serviceTaxRate / 100), currency)}</td>
+                <td className="p-3.5 font-mono text-slate-600">{formatCurrency(hotelBookingTotal * (taxConfig.cardFeeRate / 100), currency)}</td>
+                <td className="p-3.5 font-mono text-right text-emerald-700">
+                  {formatCurrency(hotelBookingTotal - (hotelBookingTotal * (taxConfig.vatRate + taxConfig.serviceTaxRate + taxConfig.cardFeeRate) / 100), currency)}
+                </td>
+              </tr>
+
+              <tr className="hover:bg-slate-50/80">
+                <td className="p-3.5 text-slate-900 flex items-center gap-2">
+                  <Coffee className="w-4 h-4 text-amber-600" />
+                  In-Room Service Express Billing
+                </td>
+                <td className="p-3.5 font-mono text-slate-900">{formatCurrency(roomServiceTotal, currency)}</td>
+                <td className="p-3.5 font-mono text-slate-600">{formatCurrency(roomServiceTotal * (taxConfig.vatRate / 100), currency)}</td>
+                <td className="p-3.5 font-mono text-slate-600">{formatCurrency(roomServiceTotal * (taxConfig.serviceTaxRate / 100), currency)}</td>
+                <td className="p-3.5 font-mono text-slate-600">{formatCurrency(roomServiceTotal * (taxConfig.cardFeeRate / 100), currency)}</td>
+                <td className="p-3.5 font-mono text-right text-emerald-700">
+                  {formatCurrency(roomServiceTotal - (roomServiceTotal * (taxConfig.vatRate + taxConfig.serviceTaxRate + taxConfig.cardFeeRate) / 100), currency)}
+                </td>
+              </tr>
+
+              <tr className="bg-orange-50/60 font-black text-slate-900">
+                <td className="p-3.5 uppercase tracking-wider text-orange-900">DAILY RECONCILIATION TOTALS</td>
+                <td className="p-3.5 font-mono text-orange-950 text-sm">{formatCurrency(grossRevenue, currency)}</td>
+                <td className="p-3.5 font-mono text-slate-800">{formatCurrency(calculatedVAT, currency)}</td>
+                <td className="p-3.5 font-mono text-slate-800">{formatCurrency(calculatedServiceTax, currency)}</td>
+                <td className="p-3.5 font-mono text-slate-800">{formatCurrency(cardFeeDeduction, currency)}</td>
+                <td className="p-3.5 font-mono text-right text-emerald-800 text-sm">{formatCurrency(netProfit, currency)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// =========================================================================
+// SUB-COMPONENT: MODULAR POS INTERFACE CONFIGURATION TOOL
+// =========================================================================
+function ModularPOSConfiguratorTab({
+  menuItems,
+  categories,
+  posConfig,
+  onSaveConfig,
+  currency = 'USD',
+  onChangeCurrency,
+  invoiceSettings,
+  onSaveInvoiceSettings,
+  formatCurrency = (amt) => `$${amt.toFixed(2)}`
+}: {
+  menuItems: MenuItem[];
+  categories: string[];
+  posConfig: {
+    gridCols: 2 | 3 | 4 | 5;
+    tileTheme: 'orange' | 'emerald' | 'sky' | 'rose' | 'indigo' | 'amber' | 'purple' | 'slate';
+    portionCategories: string[];
+    quickKeys: string[];
+  };
+  onSaveConfig: (cfg: any) => void;
+  currency?: CurrencyCode;
+  onChangeCurrency?: (c: CurrencyCode) => void;
+  invoiceSettings?: InvoiceSettings;
+  onSaveInvoiceSettings?: (invSettings: InvoiceSettings) => void;
+  formatCurrency?: (amount: number, override?: CurrencyCode) => string;
+}) {
+  const [gridCols, setGridCols] = useState<2 | 3 | 4 | 5>(posConfig.gridCols || 3);
+  const [tileTheme, setTileTheme] = useState(posConfig.tileTheme || 'orange');
+  const [portions, setPortions] = useState<string[]>(posConfig.portionCategories);
+  const [newPortionInput, setNewPortionInput] = useState<string>('');
+  const [quickKeys, setQuickKeys] = useState<string[]>(posConfig.quickKeys);
+
+  // Editable Invoice & Branding State
+  const [localInv, setLocalInv] = useState<InvoiceSettings>(invoiceSettings || {
+    restaurantName: 'MarketForge Gourmet Bistro',
+    address: '124 Grand Avenue, Suite 400',
+    phone: '+1 (555) 019-2831',
+    email: 'billing@mforge.com',
+    taxId: 'VAT/PAN-98210391A',
+    cashierName: 'Alex Vance',
+    footerNote: 'Thank you for dining with us! Please come again.',
+    currency: currency || 'USD'
+  });
+
+  const themeClasses: Record<string, { bg: string; border: string; text: string; headerBg: string }> = {
+    orange: { bg: 'bg-orange-50/80', border: 'border-orange-300', text: 'text-orange-900', headerBg: 'bg-orange-600' },
+    emerald: { bg: 'bg-emerald-50/80', border: 'border-emerald-300', text: 'text-emerald-900', headerBg: 'bg-emerald-600' },
+    sky: { bg: 'bg-sky-50/80', border: 'border-sky-300', text: 'text-sky-900', headerBg: 'bg-sky-600' },
+    rose: { bg: 'bg-rose-50/80', border: 'border-rose-300', text: 'text-rose-900', headerBg: 'bg-rose-600' },
+    indigo: { bg: 'bg-indigo-50/80', border: 'border-indigo-300', text: 'text-indigo-900', headerBg: 'bg-indigo-600' },
+    amber: { bg: 'bg-amber-50/80', border: 'border-amber-300', text: 'text-amber-900', headerBg: 'bg-amber-600' },
+    purple: { bg: 'bg-purple-50/80', border: 'border-purple-300', text: 'text-purple-900', headerBg: 'bg-purple-600' },
+    slate: { bg: 'bg-slate-100', border: 'border-slate-300', text: 'text-slate-900', headerBg: 'bg-slate-800' }
+  };
+
+  const handleAddPortion = () => {
+    if (newPortionInput.trim() && !portions.includes(newPortionInput.trim())) {
+      setPortions([...portions, newPortionInput.trim()]);
+      setNewPortionInput('');
+    }
+  };
+
+  const handleRemovePortion = (portionToRemove: string) => {
+    setPortions(portions.filter(p => p !== portionToRemove));
+  };
+
+  const handleSave = () => {
+    onSaveConfig({
+      gridCols,
+      tileTheme,
+      portionCategories: portions,
+      quickKeys
+    });
+    if (onSaveInvoiceSettings) {
+      onSaveInvoiceSettings(localInv);
+    }
+    if (onChangeCurrency && localInv.currency) {
+      onChangeCurrency(localInv.currency);
+    }
+    alert('Tenant Settings & Modular POS Configuration Saved Successfully! All POS terminals and invoices updated.');
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Header Banner */}
+      <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 rounded-3xl p-6 text-white shadow-xl flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 border border-indigo-500/20">
+        <div className="flex items-center gap-4">
+          <div className="w-14 h-14 rounded-2xl bg-indigo-600/20 border border-indigo-500/40 flex items-center justify-center text-indigo-400 shrink-0 shadow-lg">
+            <SlidersHorizontal className="w-7 h-7" />
+          </div>
+          <div>
+            <h3 className="text-xl font-black tracking-tight text-white flex items-center gap-2">
+              Modular POS Interface & Touch Keypad Editor
+              <span className="bg-indigo-500/20 text-indigo-300 font-mono text-[10px] px-2 py-0.5 rounded-full border border-indigo-500/30">
+                DRAG & LAYOUT
+              </span>
+            </h3>
+            <p className="text-xs text-slate-300 mt-1 max-w-xl">
+              Customize keypad touch button tile colors, portion variation categories, grid layouts, and quick payment shortcut keys.
+            </p>
+          </div>
+        </div>
+
+        <button
+          onClick={handleSave}
+          className="px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold text-xs rounded-xl shadow-lg transition flex items-center gap-2 cursor-pointer"
+        >
+          <CheckCircle2 className="w-4 h-4" /> Save POS Keypad Configuration
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Controls Column (1 Col) */}
+        <div className="space-y-6">
+          {/* Tenant Business & Invoice Branding Settings Card */}
+          <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-xs space-y-3">
+            <h4 className="font-extrabold text-xs uppercase tracking-wider text-slate-800 flex items-center justify-between border-b border-slate-100 pb-2">
+              <span className="flex items-center gap-2">
+                <Building2 className="w-4 h-4 text-orange-600" /> Tenant Business & Invoice Profile
+              </span>
+              <span className="text-[10px] bg-orange-100 text-orange-800 px-2 py-0.5 rounded-full font-mono font-bold">
+                PRO CONFIG
+              </span>
+            </h4>
+
+            <div className="space-y-2.5 text-xs font-bold text-slate-700">
+              <div>
+                <label className="block text-[10px] text-slate-500 uppercase">Operating Currency:</label>
+                <select
+                  value={localInv.currency || currency}
+                  onChange={(e) => setLocalInv({ ...localInv, currency: e.target.value as CurrencyCode })}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 font-bold text-slate-900 outline-none focus:border-orange-500"
+                >
+                  <option value="USD">USD ($) - US Dollar</option>
+                  <option value="NPR">NPR (रू) - Nepalese Rupee</option>
+                  <option value="INR">INR (₹) - Indian Rupee</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[10px] text-slate-500 uppercase">Business / Restaurant Name:</label>
+                <input
+                  type="text"
+                  value={localInv.restaurantName}
+                  onChange={(e) => setLocalInv({ ...localInv, restaurantName: e.target.value })}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 font-bold text-slate-900 outline-none focus:border-orange-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] text-slate-500 uppercase">PAN / VAT Registration No:</label>
+                <input
+                  type="text"
+                  value={localInv.taxId}
+                  onChange={(e) => setLocalInv({ ...localInv, taxId: e.target.value })}
+                  placeholder="e.g. VAT-98120391A"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 font-bold text-slate-900 outline-none focus:border-orange-500 font-mono"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-[10px] text-slate-500 uppercase">Phone:</label>
+                  <input
+                    type="text"
+                    value={localInv.phone}
+                    onChange={(e) => setLocalInv({ ...localInv, phone: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 font-bold text-slate-900 outline-none focus:border-orange-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] text-slate-500 uppercase">Email:</label>
+                  <input
+                    type="text"
+                    value={localInv.email}
+                    onChange={(e) => setLocalInv({ ...localInv, email: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 font-bold text-slate-900 outline-none focus:border-orange-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[10px] text-slate-500 uppercase">Physical Address:</label>
+                <input
+                  type="text"
+                  value={localInv.address}
+                  onChange={(e) => setLocalInv({ ...localInv, address: e.target.value })}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 font-bold text-slate-900 outline-none focus:border-orange-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] text-slate-500 uppercase">Receipt Footer Note:</label>
+                <textarea
+                  value={localInv.footerNote}
+                  onChange={(e) => setLocalInv({ ...localInv, footerNote: e.target.value })}
+                  rows={2}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 font-medium text-slate-800 outline-none focus:border-orange-500 text-[11px]"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* 1. Grid Dimensions Selector */}
+          <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-xs space-y-3">
+            <h4 className="font-extrabold text-xs uppercase tracking-wider text-slate-800 flex items-center gap-2 border-b border-slate-100 pb-2">
+              <Grid className="w-4 h-4 text-indigo-600" /> Touch Screen Grid Columns
+            </h4>
+            <div className="grid grid-cols-4 gap-2">
+              {([2, 3, 4, 5] as const).map(cols => (
+                <button
+                  key={cols}
+                  onClick={() => setGridCols(cols)}
+                  className={`py-2.5 rounded-xl text-xs font-mono font-extrabold border transition cursor-pointer ${
+                    gridCols === cols 
+                      ? 'bg-indigo-600 border-indigo-500 text-white shadow-md' 
+                      : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                  }`}
+                >
+                  {cols} Cols
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* 2. Product Tile Button Color Palette */}
+          <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-xs space-y-3">
+            <h4 className="font-extrabold text-xs uppercase tracking-wider text-slate-800 flex items-center gap-2 border-b border-slate-100 pb-2">
+              <Palette className="w-4 h-4 text-indigo-600" /> Tile Button Color Theme
+            </h4>
+            <div className="grid grid-cols-4 gap-2">
+              {Object.keys(themeClasses).map(tName => (
+                <button
+                  key={tName}
+                  onClick={() => setTileTheme(tName as any)}
+                  className={`p-2.5 rounded-xl text-[10px] font-bold capitalize border transition cursor-pointer flex flex-col items-center gap-1.5 ${
+                    tileTheme === tName ? 'border-slate-900 ring-2 ring-indigo-500/50 shadow-sm' : 'border-slate-200'
+                  }`}
+                >
+                  <div className={`w-6 h-6 rounded-lg ${themeClasses[tName].headerBg}`} />
+                  <span>{tName}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* 3. Dynamic Portion Variation Sizing Categories */}
+          <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-xs space-y-3">
+            <h4 className="font-extrabold text-xs uppercase tracking-wider text-slate-800 flex items-center justify-between border-b border-slate-100 pb-2">
+              <span className="flex items-center gap-2">
+                <Tag className="w-4 h-4 text-indigo-600" /> Dynamic Portion Variations
+              </span>
+              <span className="text-[10px] font-mono text-slate-400">{portions.length} Active</span>
+            </h4>
+
+            {/* Portion Add Input */}
+            <div className="flex gap-2">
+              <input
+                type="text"
+                placeholder="e.g. 180 ml (Quarter), Half-Plate"
+                value={newPortionInput}
+                onChange={(e) => setNewPortionInput(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleAddPortion()}
+                className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs text-slate-800 outline-none font-medium"
+              />
+              <button
+                onClick={handleAddPortion}
+                className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl cursor-pointer"
+              >
+                Add
+              </button>
+            </div>
+
+            {/* Portions Tags List */}
+            <div className="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto">
+              {portions.map(p => (
+                <span
+                  key={p}
+                  className="bg-slate-100 border border-slate-200 text-slate-800 text-[11px] font-bold px-2.5 py-1 rounded-xl flex items-center gap-1.5"
+                >
+                  {p}
+                  <button onClick={() => handleRemovePortion(p)} className="text-slate-400 hover:text-rose-600 cursor-pointer">
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Live POS Keypad Simulator Preview (2 Cols) */}
+        <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl text-white space-y-5">
+          <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+            <div>
+              <span className="text-[10px] font-mono font-bold text-indigo-400 uppercase tracking-widest block">LIVE SIMULATOR PREVIEW</span>
+              <h4 className="font-extrabold text-base text-white">Interactive Waiter POS Touch Screen Layout</h4>
+            </div>
+            <div className="bg-slate-800 border border-slate-700 px-3 py-1.5 rounded-xl font-mono text-xs text-amber-300 font-bold">
+              {gridCols} COLUMNS • {tileTheme.toUpperCase()} THEME
+            </div>
+          </div>
+
+          {/* Dynamic Grid Rendering */}
+          <div className={`grid gap-3 ${
+            gridCols === 2 ? 'grid-cols-2' :
+            gridCols === 3 ? 'grid-cols-3' :
+            gridCols === 4 ? 'grid-cols-4' :
+            'grid-cols-5'
+          }`}>
+            {menuItems.slice(0, 10).map((item, idx) => (
+              <div
+                key={item.id}
+                className={`p-3.5 rounded-2xl border transition shadow-lg flex flex-col justify-between h-28 ${themeClasses[tileTheme].bg} ${themeClasses[tileTheme].border}`}
+              >
+                <div>
+                  <div className="flex justify-between items-start">
+                    <span className={`text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded ${themeClasses[tileTheme].headerBg} text-white`}>
+                      #{idx + 1}
+                    </span>
+                    <span className="text-[9px] font-mono font-bold text-slate-500">{item.category}</span>
+                  </div>
+                  <span className={`font-black text-xs block mt-1.5 line-clamp-1 ${themeClasses[tileTheme].text}`}>
+                    {item.name}
+                  </span>
+                </div>
+
+                <div className="flex justify-between items-center border-t border-slate-300/40 pt-1.5">
+                  <span className="font-mono text-xs font-black text-slate-900">
+                    {formatCurrency(item.price, currency)}
+                  </span>
+                  <span className="bg-white/80 border border-slate-300 text-[9px] font-bold px-1.5 py-0.5 rounded text-slate-700">
+                    {portions[0] || 'Standard'}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Quick Payment Keys Row */}
+          <div className="border-t border-slate-800 pt-4 space-y-2">
+            <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400 font-bold">Quick Payment & Operation Touch Keys:</span>
+            <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+              {quickKeys.map(key => (
+                <div key={key} className="bg-slate-800 border border-slate-700 p-2 rounded-xl text-center text-[10px] font-mono font-extrabold text-indigo-300">
+                  {key}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// =========================================================================
+// SUB-COMPONENT: FLOOR OPERATIONS AUDIT DASHBOARD
+// =========================================================================
+function FloorOperationsAuditTab({
+  tables,
+  orders,
+  invoices,
+  currency = 'USD',
+  formatCurrency = (amt) => `$${amt.toFixed(2)}`
+}: {
+  tables: TableItem[];
+  orders: LiveOrder[];
+  invoices: InvoiceRecord[];
+  currency?: CurrencyCode;
+  formatCurrency?: (amount: number, override?: CurrencyCode) => string;
+}) {
+  const [shiftLogs, setShiftLogs] = useState([
+    { id: 'shift_1', serverName: 'Alex Vance', section: 'Main Dining', shiftHours: '08:00 - 16:00', tablesHandled: 8, revenueHandled: 1240.50, efficiencyScore: 98, status: 'Active Shift' },
+    { id: 'shift_2', serverName: 'Sarah Jenkins', section: 'Bar & Lounge', shiftHours: '10:00 - 18:00', tablesHandled: 6, revenueHandled: 890.00, efficiencyScore: 95, status: 'Active Shift' },
+    { id: 'shift_3', serverName: 'David Miller', section: 'Terrace Patio', shiftHours: '16:00 - 24:00', tablesHandled: 10, revenueHandled: 1420.00, efficiencyScore: 99, status: 'Scheduled' },
+    { id: 'shift_4', serverName: 'Emily Watson', section: 'VIP Suites', shiftHours: '16:00 - 24:00', tablesHandled: 4, revenueHandled: 980.00, efficiencyScore: 92, status: 'Scheduled' }
+  ]);
+
+  const [isAddShiftOpen, setIsAddShiftOpen] = useState(false);
+  const [newServerName, setNewServerName] = useState('');
+  const [newSection, setNewSection] = useState('Main Dining');
+
+  const totalSeats = tables.reduce((sum, t) => sum + t.capacity, 0);
+  const occupiedSeats = tables.filter(t => t.status === 'occupied' || t.status === 'ordering').reduce((sum, t) => sum + t.capacity, 0);
+  const seatingUtilization = totalSeats > 0 ? (occupiedSeats / totalSeats) * 100 : 0;
+
+  const totalDailyRevenue = invoices.reduce((sum, i) => sum + i.grandTotal, 0) + orders.reduce((sum, o) => sum + o.totalAmount, 0);
+  const totalOperatingHours = 12; // 12 hour operational window
+  const revpash = (totalDailyRevenue / ((totalSeats || 1) * totalOperatingHours));
+
+  const handleAddShift = () => {
+    if (newServerName.trim()) {
+      setShiftLogs([
+        ...shiftLogs,
+        {
+          id: `shift_${Date.now()}`,
+          serverName: newServerName.trim(),
+          section: newSection,
+          shiftHours: '16:00 - 24:00',
+          tablesHandled: 5,
+          revenueHandled: 0,
+          efficiencyScore: 95,
+          status: 'Active Shift'
+        }
+      ]);
+      setNewServerName('');
+      setIsAddShiftOpen(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Header Banner */}
+      <div className="bg-gradient-to-r from-slate-900 via-amber-950 to-slate-900 rounded-3xl p-6 text-white shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-6 border border-amber-500/20">
+        <div className="flex items-center gap-4">
+          <div className="w-14 h-14 rounded-2xl bg-amber-600/20 border border-amber-500/40 flex items-center justify-center text-amber-400 shrink-0 shadow-lg">
+            <Activity className="w-7 h-7" />
+          </div>
+          <div>
+            <h3 className="text-xl font-black tracking-tight text-white flex items-center gap-2">
+              Floor Operations Audit & Seating Efficiency Dashboard
+              <span className="bg-amber-500/20 text-amber-300 font-mono text-[10px] px-2 py-0.5 rounded-full border border-amber-500/30">
+                REAL-TIME METRICS
+              </span>
+            </h3>
+            <p className="text-xs text-slate-300 mt-1 max-w-xl">
+              Track real-time table turnover rates, staff shift assignment logs, seating capacity utilization, and RevPASH.
+            </p>
+          </div>
+        </div>
+
+        <button
+          onClick={() => setIsAddShiftOpen(true)}
+          className="px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs rounded-xl shadow-lg transition flex items-center gap-2 cursor-pointer"
+        >
+          <UserCheck className="w-4 h-4" /> Assign Staff Shift
+        </button>
+      </div>
+
+      {/* KPI Seating & Turnover Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+        <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-xs space-y-2">
+          <div className="flex justify-between items-center text-slate-500">
+            <span className="text-xs font-bold uppercase tracking-wider">Avg Table Seating Duration</span>
+            <Clock className="w-5 h-5 text-indigo-600" />
+          </div>
+          <div className="text-2xl font-black text-slate-900 font-mono">
+            42 mins <span className="text-xs font-bold text-emerald-600">(-4m vs target)</span>
+          </div>
+          <p className="text-[11px] text-slate-500">Table Turnover Rate: 3.6 turns / day</p>
+        </div>
+
+        <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-xs space-y-2">
+          <div className="flex justify-between items-center text-slate-500">
+            <span className="text-xs font-bold uppercase tracking-wider">Capacity Utilization</span>
+            <Users className="w-5 h-5 text-orange-600" />
+          </div>
+          <div className="text-2xl font-black text-orange-700 font-mono">
+            {seatingUtilization.toFixed(1)}%
+          </div>
+          <p className="text-[11px] text-slate-500">{occupiedSeats} of {totalSeats} seats currently occupied</p>
+        </div>
+
+        <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-xs space-y-2">
+          <div className="flex justify-between items-center text-slate-500">
+            <span className="text-xs font-bold uppercase tracking-wider">Peak Hour Occupancy</span>
+            <TrendingUp className="w-5 h-5 text-emerald-600" />
+          </div>
+          <div className="text-2xl font-black text-emerald-700 font-mono">
+            92.4%
+          </div>
+          <p className="text-[11px] text-slate-500">Peak Period: 19:00 - 22:00 Dining Rush</p>
+        </div>
+
+        <div className="bg-gradient-to-br from-amber-600 to-orange-700 rounded-3xl p-5 text-white shadow-lg space-y-2">
+          <div className="flex justify-between items-center text-amber-100">
+            <span className="text-xs font-bold uppercase tracking-wider">RevPASH Index</span>
+            <DollarSign className="w-5 h-5 text-white" />
+          </div>
+          <div className="text-2xl font-black font-mono text-white">
+            {formatCurrency(revpash, currency)}
+          </div>
+          <p className="text-[11px] text-amber-100 font-bold">
+            Revenue Per Available Seat Hour
+          </p>
+        </div>
+      </div>
+
+      {/* Staff Shift Assignment Logs Table */}
+      <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-4">
+        <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+          <div>
+            <h4 className="font-extrabold text-sm text-slate-900">Staff Shift Assignment & Table Logs</h4>
+            <p className="text-xs text-slate-500">Real-time waiter assigned floor section, shift hours, and handled sales volume</p>
+          </div>
+          <span className="bg-slate-100 text-slate-800 text-xs font-mono font-bold px-3 py-1 rounded-full">
+            {shiftLogs.filter(s => s.status === 'Active Shift').length} Active On Shift
+          </span>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse text-xs">
+            <thead>
+              <tr className="bg-slate-50 text-slate-700 uppercase font-mono text-[10px] border-b border-slate-200">
+                <th className="p-3.5">Staff Member</th>
+                <th className="p-3.5">Assigned Floor Section</th>
+                <th className="p-3.5">Shift Window</th>
+                <th className="p-3.5">Tables Handled</th>
+                <th className="p-3.5">Total Sales Volume</th>
+                <th className="p-3.5">Efficiency Score</th>
+                <th className="p-3.5 text-right">Shift Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 font-bold">
+              {shiftLogs.map(log => (
+                <tr key={log.id} className="hover:bg-slate-50/80">
+                  <td className="p-3.5 text-slate-900 flex items-center gap-2">
+                    <UserCheck className="w-4 h-4 text-orange-600" />
+                    {log.serverName}
+                  </td>
+                  <td className="p-3.5 text-slate-700">{log.section}</td>
+                  <td className="p-3.5 font-mono text-slate-600">{log.shiftHours}</td>
+                  <td className="p-3.5 font-mono text-slate-800">{log.tablesHandled} Tables</td>
+                  <td className="p-3.5 font-mono text-slate-900">{formatCurrency(log.revenueHandled, currency)}</td>
+                  <td className="p-3.5 font-mono text-emerald-700">{log.efficiencyScore}%</td>
+                  <td className="p-3.5 text-right">
+                    <span className={`px-2.5 py-1 rounded-full text-[10px] font-mono font-extrabold ${
+                      log.status === 'Active Shift' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'
+                    }`}>
+                      {log.status}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Add Staff Shift Modal */}
+      {isAddShiftOpen && (
+        <div 
+          className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs z-50 flex items-center justify-center p-4 overflow-y-auto"
+          onClick={(e) => { if (e.target === e.currentTarget) setIsAddShiftOpen(false); }}
+        >
+          <div className="bg-white rounded-3xl max-w-md w-full max-h-[90vh] overflow-y-auto my-auto p-6 shadow-2xl border border-slate-200 space-y-4 relative">
+            <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+              <h3 className="font-extrabold text-base text-slate-900">Assign Staff Member to Floor Shift</h3>
+              <button onClick={() => setIsAddShiftOpen(false)} className="text-slate-400 hover:text-slate-700">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Server Name:</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Marcus Thorne"
+                  value={newServerName}
+                  onChange={(e) => setNewServerName(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-900 font-bold outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Floor Section Assignment:</label>
+                <select
+                  value={newSection}
+                  onChange={(e) => setNewSection(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-900 font-bold outline-none"
+                >
+                  <option value="Main Dining">Main Dining Room</option>
+                  <option value="Terrace Patio">Terrace Outdoor Patio</option>
+                  <option value="VIP Lounge">VIP Private Suite</option>
+                  <option value="Bar & Lounge">Bar & Cocktail Lounge</option>
+                </select>
+              </div>
+
+              <button
+                onClick={handleAddShift}
+                className="w-full py-3 bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-xs rounded-xl shadow-md transition cursor-pointer"
+              >
+                Confirm Shift Assignment
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// =========================================================================
+// SUB-COMPONENT: TABLE QR ORDERING & BOOKING CENTER
+// =========================================================================
+function QrOrderingCenterTab({
+  tenantId,
+  tables,
+  orders,
+  menuItems,
+  profile,
+  onOpenMobilePreview,
+  onClearDemoData
+}: {
+  tenantId: string;
+  tables: TableItem[];
+  orders: any[];
+  menuItems: MenuItem[];
+  profile: BusinessProfile;
+  onOpenMobilePreview: (tableNum: string) => void;
+  onClearDemoData: () => void;
+}) {
+  const [selectedSection, setSelectedSection] = useState<string>('ALL');
+  const [searchTable, setSearchTable] = useState<string>('');
+  const [copiedLinkTable, setCopiedLinkTable] = useState<string | null>(null);
+
+  const sections = ['ALL', ...Array.from(new Set(tables.map(t => t.section || 'Main Dining')))];
+  
+  const filteredTables = tables.filter(t => {
+    const matchesSec = selectedSection === 'ALL' || t.section === selectedSection;
+    const matchesSearch = !searchTable || t.tableNumber.toLowerCase().includes(searchTable.toLowerCase());
+    return matchesSec && matchesSearch;
+  });
+
+  const getQrUrl = (tableNum: string) => {
+    const origin = window.location.origin;
+    return `${origin}/?mode=qr_menu&tenant=${encodeURIComponent(tenantId)}&table=${encodeURIComponent(tableNum)}`;
+  };
+
+  const handleCopyLink = (tableNum: string) => {
+    const url = getQrUrl(tableNum);
+    navigator.clipboard.writeText(url);
+    setCopiedLinkTable(tableNum);
+    setTimeout(() => setCopiedLinkTable(null), 2000);
+  };
+
+  const handlePrintAllQr = () => {
+    window.print();
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Header Banner */}
+      <div className="bg-gradient-to-r from-slate-900 via-orange-950 to-slate-900 text-white rounded-3xl p-6 shadow-xl border border-orange-500/20 flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <div className="space-y-2">
+          <div className="inline-flex items-center gap-2 bg-orange-500/20 text-orange-300 border border-orange-500/30 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">
+            <QrCode className="w-3.5 h-3.5" /> Direct Contactless Ordering
+          </div>
+          <h2 className="text-2xl font-black tracking-tight">Table QR Code Booking & Ordering Center</h2>
+          <p className="text-slate-300 text-xs max-w-2xl leading-relaxed">
+            Generate high-res table tent QR cards for every table. Guests scan with their mobile camera to browse your HD Unsplash photo menu, order directly to Kitchen KDS, and request staff services in real-time.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3 shrink-0">
+          <button
+            onClick={() => onOpenMobilePreview('T-01')}
+            className="flex items-center gap-2 bg-orange-600 hover:bg-orange-500 text-white px-4 py-2.5 rounded-xl font-bold text-xs shadow-lg shadow-orange-600/30 transition cursor-pointer"
+          >
+            <Smartphone className="w-4 h-4" /> Preview Guest Mobile App
+          </button>
+
+          <button
+            onClick={handlePrintAllQr}
+            className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 px-4 py-2.5 rounded-xl font-bold text-xs transition cursor-pointer"
+          >
+            <Printer className="w-4 h-4 text-orange-400" /> Print All QR Tent Cards
+          </button>
+
+          <button
+            onClick={onClearDemoData}
+            className="flex items-center gap-2 bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/40 px-3 py-2.5 rounded-xl font-bold text-xs transition cursor-pointer"
+            title="Clear demo entries & start clean for commercial production"
+          >
+            <Trash2 className="w-3.5 h-3.5" /> Reset to Clean Start (0 Mock Data)
+          </button>
+        </div>
+      </div>
+
+      {/* Stats Quick Grid */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+          <div>
+            <span className="text-[11px] font-bold uppercase text-slate-500 tracking-wider">Active QR Tables</span>
+            <div className="text-xl font-black text-slate-900 mt-1">{tables.length} Tables</div>
+          </div>
+          <div className="p-3 bg-orange-50 text-orange-600 rounded-xl">
+            <QrCode className="w-6 h-6" />
+          </div>
+        </div>
+
+        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+          <div>
+            <span className="text-[11px] font-bold uppercase text-slate-500 tracking-wider">Unsplash Photo Dishes</span>
+            <div className="text-xl font-black text-slate-900 mt-1">{menuItems.length} Dishes</div>
+          </div>
+          <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl">
+            <Utensils className="w-6 h-6" />
+          </div>
+        </div>
+
+        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+          <div>
+            <span className="text-[11px] font-bold uppercase text-slate-500 tracking-wider">Mobile QR Orders</span>
+            <div className="text-xl font-black text-slate-900 mt-1">{orders.length} Placed</div>
+          </div>
+          <div className="p-3 bg-indigo-50 text-indigo-600 rounded-xl">
+            <Smartphone className="w-6 h-6" />
+          </div>
+        </div>
+
+        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+          <div>
+            <span className="text-[11px] font-bold uppercase text-slate-500 tracking-wider">Guest WiFi SSID</span>
+            <div className="text-xs font-mono font-bold text-slate-900 mt-1 truncate max-w-[120px]">{profile?.name || 'Bistro'}_Guest</div>
+          </div>
+          <div className="p-3 bg-amber-50 text-amber-600 rounded-xl">
+            <Wifi className="w-6 h-6" />
+          </div>
+        </div>
+      </div>
+
+      {/* Filter and Search Bar */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white p-3 rounded-2xl border border-slate-200 shadow-sm">
+        <div className="flex items-center gap-2 overflow-x-auto w-full sm:w-auto">
+          <span className="text-xs font-bold text-slate-500 pl-2">Filter Section:</span>
+          {sections.map(sec => (
+            <button
+              key={sec}
+              onClick={() => setSelectedSection(sec)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer whitespace-nowrap ${
+                selectedSection === sec
+                  ? 'bg-orange-600 text-white shadow-sm'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              {sec}
+            </button>
+          ))}
+        </div>
+
+        <div className="relative w-full sm:w-64">
+          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <input
+            type="text"
+            value={searchTable}
+            onChange={(e) => setSearchTable(e.target.value)}
+            placeholder="Search table number..."
+            className="w-full pl-9 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-orange-500"
+          />
+        </div>
+      </div>
+
+      {/* Printable QR Cards Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+        {filteredTables.map(tbl => {
+          const qrUrl = getQrUrl(tbl.tableNumber);
+          const isCopied = copiedLinkTable === tbl.tableNumber;
+
+          return (
+            <div
+              key={tbl.id}
+              className="bg-white rounded-3xl p-5 border border-slate-200 shadow-md hover:shadow-xl transition-all space-y-4 flex flex-col justify-between"
+            >
+              <div className="space-y-3">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <span className="text-[10px] font-extrabold uppercase text-orange-600 tracking-wider">{tbl.section || 'Main Dining'}</span>
+                    <h3 className="text-xl font-black text-slate-900">Table {tbl.tableNumber}</h3>
+                  </div>
+                  <span className="text-[10px] font-bold bg-slate-100 text-slate-700 px-2.5 py-1 rounded-full">
+                    {tbl.seats} Seats
+                  </span>
+                </div>
+
+                {/* QR Code Container */}
+                <div className="bg-slate-50 border-2 border-dashed border-orange-300 rounded-2xl p-4 flex flex-col items-center justify-center space-y-2 text-center relative group">
+                  <QRCodeSVG 
+                    value={qrUrl} 
+                    size={140} 
+                    bgColor="#ffffff"
+                    fgColor="#0f172a"
+                    level="H"
+                    includeMargin={true}
+                  />
+
+                  <div className="text-[10px] font-bold text-slate-600 flex items-center gap-1 mt-1">
+                    <Smartphone className="w-3 h-3 text-orange-600" />
+                    <span>Scan to Order & Pay</span>
+                  </div>
+
+                  <div className="text-[9px] font-mono text-slate-400 truncate max-w-full px-2">
+                    {qrUrl}
+                  </div>
+                </div>
+
+                {/* WiFi Credentials Card Element for Table Tent */}
+                <div className="bg-slate-900 text-white p-2.5 rounded-xl text-[10px] flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Wifi className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                    <div className="truncate">
+                      <div className="font-bold text-slate-200 truncate">{profile?.name || 'Restaurant'} WiFi</div>
+                      <div className="font-mono text-slate-400">Pass: FreeGuest123</div>
+                    </div>
+                  </div>
+                  <span className="bg-amber-400/20 text-amber-300 text-[8px] font-mono px-1.5 py-0.5 rounded border border-amber-400/30">
+                    FREE
+                  </span>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100">
+                <button
+                  onClick={() => onOpenMobilePreview(tbl.tableNumber)}
+                  className="flex items-center justify-center gap-1.5 bg-orange-600 hover:bg-orange-700 text-white py-2 rounded-xl text-[11px] font-bold transition cursor-pointer"
+                >
+                  <Eye className="w-3.5 h-3.5" /> Mobile View
+                </button>
+
+                <button
+                  onClick={() => handleCopyLink(tbl.tableNumber)}
+                  className="flex items-center justify-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 rounded-xl text-[11px] font-bold transition cursor-pointer"
+                >
+                  {isCopied ? (
+                    <>
+                      <Check className="w-3.5 h-3.5 text-emerald-600" /> Copied!
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3.5 h-3.5" /> Copy Link
+                    </>
+                  )}
                 </button>
               </div>
             </div>

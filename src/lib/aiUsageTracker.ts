@@ -29,8 +29,8 @@ export const AI_MODELS_REGISTRY: AiModelSpec[] = [
     isDefault: true
   },
   {
-    id: 'gemini-2.5-pro',
-    name: 'Google Gemini 2.5 Pro',
+    id: 'gemini-1.5-pro',
+    name: 'Google Gemini 1.5 Pro',
     provider: 'Google Gemini',
     inputRatePer1k: 0.001250, // $1.25 / 1M tokens
     outputRatePer1k: 0.005000, // $5.00 / 1M tokens
@@ -106,7 +106,7 @@ export interface TenantAiConfig {
   customKeyValid: boolean;
   monthlyTokenQuota: number; // Included free in plan e.g. 500,000 tokens
   overageRatePer1kTokens: number; // e.g. $0.002 per 1k tokens above quota
-  modelBudgetCaps?: Record<string, number>; // Hard monthly USD budget limit per model (e.g. { 'gemini-2.5-pro': 15.00 })
+  modelBudgetCaps?: Record<string, number>; // Hard monthly USD budget limit per model (e.g. { 'gemini-1.5-pro': 15.00 })
   updatedAt: string;
 }
 
@@ -384,12 +384,12 @@ function generateSeed30DayUsageLogs(tenantId: string): AiTaskUsageLog[] {
 
   const taskTemplates = [
     { taskId: 'social_studio_post', title: 'AI Social Media Post & Campaign Copy', model: 'gemini-2.5-flash', pTokens: 1250, cTokens: 620 },
-    { taskId: 'campaign_planner', title: 'Autonomous AI Campaign Strategy Architecture', model: 'gemini-2.5-pro', pTokens: 3800, cTokens: 1950 },
+    { taskId: 'campaign_planner', title: 'Autonomous AI Campaign Strategy Architecture', model: 'gemini-1.5-pro', pTokens: 3800, cTokens: 1950 },
     { taskId: 'ad_studio_gen', title: 'Multi-Channel Ad Creative Copy Generation', model: 'gemini-2.5-flash', pTokens: 1100, cTokens: 480 },
     { taskId: 'email_newsletter', title: 'AI Email Newsletter & Workflow Automation', model: 'gemini-1.5-flash', pTokens: 1450, cTokens: 820 },
     { taskId: 'website_builder_ai', title: 'AI Website Landing Page Section Generator', model: 'gemini-2.5-flash', pTokens: 2100, cTokens: 1150 },
-    { taskId: 'omnicore_lab_agent', title: 'OmniCore Intelligence Research Task Execution', model: 'gemini-2.5-pro', pTokens: 4200, cTokens: 2400 },
-    { taskId: 'revenue_intel_audit', title: 'AI Revenue Forecast & Financial Audit', model: 'gemini-2.5-pro', pTokens: 2900, cTokens: 1300 },
+    { taskId: 'omnicore_lab_agent', title: 'OmniCore Intelligence Research Task Execution', model: 'gemini-1.5-pro', pTokens: 4200, cTokens: 2400 },
+    { taskId: 'revenue_intel_audit', title: 'AI Revenue Forecast & Financial Audit', model: 'gemini-1.5-pro', pTokens: 2900, cTokens: 1300 },
     { taskId: 'restaurant_pos_ai', title: 'AI Restaurant Special Promo & Menu Generator', model: 'gemini-2.5-flash', pTokens: 980, cTokens: 410 }
   ];
 

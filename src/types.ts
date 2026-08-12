@@ -84,6 +84,26 @@ export interface ContentAsset {
   createdAt: string;
 }
 
+export interface KeyResult {
+  id: string;
+  title: string;
+  targetValue: number;
+  currentValue: number;
+  unit: string;
+  status: 'On Track' | 'At Risk' | 'Behind' | 'Completed';
+  lastUpdated?: string;
+}
+
+export interface MarketingObjective {
+  id: string;
+  tenantId?: string;
+  title: string;
+  category: 'Growth & Traffic' | 'Lead Generation' | 'Revenue & Sales' | 'Brand & Engagement';
+  targetQuarter: string;
+  keyResults: KeyResult[];
+  createdAt: string;
+}
+
 export interface BrandGuideline {
   primaryColor: string;
   secondaryColor: string;
@@ -110,6 +130,25 @@ export interface ModulePrice {
   isFree?: boolean;
 }
 
+export interface TenantInfrastructureSettings {
+  businessType?: 'restaurant' | 'hotel_resort' | 'tours_travel' | 'retail_commerce' | 'agency_enterprise';
+  numberOfRooms?: number;
+  numberOfCashiers?: number;
+  cashierTerminals?: string[];
+  floorsAndTerraces?: string[]; // e.g. ['Ground Dining', '1st Floor Terrace', 'Rooftop Bar', 'Garden Patio']
+  tablesPerFloor?: number;
+  currencyCode?: 'USD' | 'EUR' | 'GBP' | 'NPR' | 'INR' | 'AED' | 'CAD' | 'AUD' | 'JPY';
+  taxVatRate?: number;
+  serviceChargeRate?: number;
+  allowWaiterDiscounting?: boolean;
+  allowQuickPinLogin?: boolean;
+  customLogoUrl?: string;
+  address?: string;
+  phone?: string;
+  vatRegNumber?: string;
+  openingHours?: string;
+}
+
 export interface TenantConfig {
   id: string;
   name: string;
@@ -133,6 +172,8 @@ export interface TenantConfig {
   paymentGateway?: 'stripe' | 'esewa' | 'khalti' | 'fonepay' | 'manual';
   paymentStatus?: 'active' | 'pending' | 'failed';
   createdAt?: string;
+  notes?: string;
+  settings?: TenantInfrastructureSettings;
 }
 
 export type AgentType = 'strategist' | 'planner' | 'writer' | 'creative';
@@ -234,14 +275,17 @@ export interface TenantTeamMember {
   name: string;
   email: string;
   password?: string; // Credentials for logging in
-  designation: string; // e.g. 'Tenant Owner', 'General Manager', 'Restaurant POS Lead', 'Marketing Specialist', 'Investor / Board Member'
-  department: string; // e.g. 'Executive', 'Operations', 'Finance', 'Sales & Marketing', 'Engineering', 'Investor Relations'
+  pinCode?: string; // 4-digit quick touch POS PIN code for cashiers/waiters (e.g. '1234')
+  designation: string; // e.g. 'Tenant Owner', 'General Manager', 'Head Chef / Kitchen Lead', 'Cashier Specialist', 'Waiter / Server', 'Investor / Board Member'
+  department: string; // e.g. 'Executive', 'Operations', 'Kitchen & Food', 'Bar & Service', 'Finance', 'Sales & Marketing', 'Investor Relations'
   role: 'owner' | 'admin' | 'writer' | 'viewer' | 'investor';
   status: 'active' | 'pending_invite' | 'revoked';
   permittedModules: string[]; // Module IDs: ['social', 'email', 'revenue', 'restaurant', 'tours', 'website', 'business_ops', 'omnicore', 'admin']
   isInvestor?: boolean;
   investorDetails?: InvestorShareDetails;
   invitedAt: string;
+  invitedBy?: string;
+  inviteToken?: string;
   lastActive: string;
   avatarUrl?: string;
 }

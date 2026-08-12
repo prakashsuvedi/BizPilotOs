@@ -56,8 +56,11 @@ export default function AiUsageBadge({
 
       {/* Task AI API Usage Transparency Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className="bg-[#0f111d] border border-indigo-500/30 rounded-3xl max-w-md w-full p-6 shadow-2xl text-slate-200 space-y-5 relative animate-fade-in">
+        <div 
+          className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4 overflow-y-auto"
+          onClick={(e) => { if (e.target === e.currentTarget) setIsModalOpen(false); }}
+        >
+          <div className="bg-[#0f111d] border border-indigo-500/30 rounded-3xl max-w-md w-full max-h-[90vh] overflow-y-auto my-auto p-6 shadow-2xl text-slate-200 space-y-5 relative animate-fade-in">
             <button
               onClick={() => setIsModalOpen(false)}
               className="absolute right-4 top-4 p-1.5 text-slate-400 hover:text-white rounded-xl cursor-pointer hover:bg-white/10"

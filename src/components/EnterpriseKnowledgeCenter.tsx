@@ -417,7 +417,7 @@ export default function EnterpriseKnowledgeCenter({ currentTenantId, userRole }:
 
   const aiModelsList = [
     { name: 'gemini-2.5-flash', role: 'Primary inference model for fast, standard operations (copywriting, checklist generation, assistant responses)', cost: '1 Credit / request', fallback: 'gemini-1.5-flash' },
-    { name: 'gemini-2.5-pro', role: 'Deep reasoning, structural schema generation, comprehensive marketing package planning, code audits', cost: '5 Credits / request', fallback: 'gemini-1.5-pro' }
+    { name: 'gemini-1.5-pro', role: 'Deep reasoning, structural schema generation, comprehensive marketing package planning, code audits', cost: '5 Credits / request', fallback: 'gemini-1.5-flash' }
   ];
 
   const featureRegistry = [

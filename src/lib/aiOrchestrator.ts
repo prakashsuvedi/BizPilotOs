@@ -211,7 +211,7 @@ ${request.prompt}
     try {
       const ai = new GoogleGenAI({ apiKey });
       const response = await ai.models.generateContent({
-        model: model === 'gemini-1.5-pro' ? 'gemini-1.5-pro' : 'gemini-2.0-flash',
+        model: model === 'gemini-1.5-pro' ? 'gemini-2.5-flash' : 'gemini-2.0-flash',
         contents: prompt,
         config: {
           temperature

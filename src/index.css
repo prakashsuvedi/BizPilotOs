@@ -26,6 +26,25 @@ body.high-contrast {
   --text-color: #FFFFFF;
 }
 
+/* Light Theme Mode Overrides */
+body.light-mode-bg {
+  --bg-color: #F8FAFC;
+  --text-color: #0F172A;
+  background-color: #F8FAFC !important;
+  color: #0F172A !important;
+}
+
+body.light-mode-bg .bg-\[\#0B0C10\],
+body.light-mode-bg .bg-\[\#07080E\],
+body.light-mode-bg .bg-\[\#0C0D14\],
+body.light-mode-bg .bg-\[\#0e101a\],
+body.light-mode-bg .bg-\[\#090a10\],
+body.light-mode-bg .bg-\[\#0d0f18\] {
+  background-color: #FFFFFF !important;
+  color: #0F172A !important;
+  border-color: #E2E8F0 !important;
+}
+
 body.high-contrast * {
   /* Only apply to classes that need high contrast forced */
 }
@@ -82,6 +101,34 @@ body.high-contrast .border-white\/10 {
 }
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.2);
+}
+
+/* Infinite Marquee Sliders */
+@keyframes marquee-left {
+  0% { transform: translateX(0%); }
+  100% { transform: translateX(-50%); }
+}
+
+@keyframes marquee-right {
+  0% { transform: translateX(-50%); }
+  100% { transform: translateX(0%); }
+}
+
+.animate-marquee-left {
+  display: flex;
+  width: max-content;
+  animation: marquee-left 120s linear infinite;
+}
+
+.animate-marquee-right {
+  display: flex;
+  width: max-content;
+  animation: marquee-right 120s linear infinite;
+}
+
+.animate-marquee-left:hover,
+.animate-marquee-right:hover {
+  animation-play-state: paused;
 }
 
 /* Print Styles for Receipts and Invoices */

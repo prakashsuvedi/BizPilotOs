@@ -26,6 +26,8 @@ export interface CustomLandingData {
   aboutText?: string;
 }
 
+import { clearStaleLocalStorageCache } from './imageUtils';
+
 export interface TenantBranding {
   tenantId: string;
   companyName: string;
@@ -122,11 +124,19 @@ export function getTenantBranding(tenantId: string): TenantBranding {
 
   const defaultPreset = DEFAULT_BRANDINGS[tenantId] || {};
 
+  const cleanFormattedName = tenantFromMaster?.name || defaultPreset.companyName || 
+    tenantId.replace(/[-_]/g, ' ')
+      .replace(/\btenant\b/gi, 'Workspace')
+      .split(' ')
+      .filter(Boolean)
+      .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+      .join(' ');
+
   const fallback: TenantBranding = {
     tenantId,
-    companyName: tenantFromMaster?.name || defaultPreset.companyName || `${tenantId.replace(/[-_]/g, ' ').toUpperCase()} Co.`,
-    tagline: defaultPreset.tagline || 'Leading Next-Gen Operations & Customer Experience.',
-    logoUrl: defaultPreset.logoUrl || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=200&q=80',
+    companyName: cleanFormattedName || 'Enterprise Workspace',
+    tagline: defaultPreset.tagline || 'Leading Next-Gen Operations & Integrated Commerce.',
+    logoUrl: defaultPreset.logoUrl || '',
     address: defaultPreset.address || '100 Business Avenue, Suite 100, Innovation District',
     phone: defaultPreset.phone || '+1 (800) 555-0199',
     supportEmail: tenantFromMaster?.ownerEmail || defaultPreset.supportEmail || `contact@${tenantId}.com`,
@@ -151,7 +161,13 @@ export async function saveTenantBranding(branding: TenantBranding): Promise<void
   try {
     localStorage.setItem(`marketforge_tenant_branding_${branding.tenantId}`, JSON.stringify(branding));
   } catch (e) {
-    console.error('Failed to write tenant branding to localStorage:', e);
+    console.warn('Failed to write tenant branding to localStorage, clearing stale cache:', e);
+    clearStaleLocalStorageCache();
+    try {
+      localStorage.setItem(`marketforge_tenant_branding_${branding.tenantId}`, JSON.stringify(branding));
+    } catch (retryErr) {
+      console.warn('LocalStorage quota exceeded for tenant branding.');
+    }
   }
 
   // 2. Sync to master tenant list

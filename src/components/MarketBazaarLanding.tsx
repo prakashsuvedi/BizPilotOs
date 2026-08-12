@@ -32,7 +32,7 @@ import {
   Briefcase
 } from 'lucide-react';
 
-export interface MarketBazaarLandingProps {
+export interface MarketForgeLandingProps {
   onSelectFeature?: (featureId: string) => void;
   onEnterOS?: () => void;
 }
@@ -276,12 +276,12 @@ const OS_FEATURES: OSFeature[] = [
     title: 'Success Center & AI Coach',
     category: 'Enterprise Operations',
     tagline: 'Guided Onboarding & Academy Courses',
-    description: 'Interactive adoption desk featuring guided setup wizards, MarketBazaar Academy courses, and personal AI marketing coach.',
+    description: 'Interactive adoption desk featuring guided setup wizards, MarketForge Academy courses, and personal AI marketing coach.',
     icon: GraduationCap,
     color: 'from-amber-500 to-orange-600',
     badge: 'Adoption Engine',
     keyCapabilities: [
-      'Step-by-step MarketBazaar Success Score™ wizard',
+      'Step-by-step MarketForge Success Score™ wizard',
       'Structured Academy courses & certification quizzes',
       'Personal AI Marketing Coach chat interface',
       'Multi-channel setup progress tracking'
@@ -313,7 +313,7 @@ const OS_FEATURES: OSFeature[] = [
   }
 ];
 
-export function MarketBazaarLanding({ onSelectFeature, onEnterOS }: MarketBazaarLandingProps) {
+export function MarketForgeLanding({ onSelectFeature, onEnterOS }: MarketForgeLandingProps) {
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [previewFeature, setPreviewFeature] = useState<OSFeature | null>(OS_FEATURES[0]);
@@ -350,7 +350,7 @@ export function MarketBazaarLanding({ onSelectFeature, onEnterOS }: MarketBazaar
             <div className="space-y-3 max-w-3xl">
               <div className="inline-flex items-center gap-2 bg-gradient-to-r from-indigo-500/15 to-violet-500/15 border border-indigo-500/30 px-3 py-1 rounded-full text-xs font-mono font-bold text-indigo-300 uppercase tracking-widest">
                 <Sparkles className="w-3.5 h-3.5 text-indigo-400 animate-pulse" />
-                MarketBazaar OS • Next-Gen Enterprise Platform
+                MarketForge OS • Next-Gen Enterprise Platform
               </div>
               
               <h1 className="font-display font-black text-3xl sm:text-4xl lg:text-5xl text-white tracking-tight leading-tight">
@@ -358,7 +358,7 @@ export function MarketBazaarLanding({ onSelectFeature, onEnterOS }: MarketBazaar
               </h1>
               
               <p className="text-slate-300 text-sm sm:text-base leading-relaxed font-sans max-w-2xl">
-                MarketBazaar OS unifies daily executive command, autonomous AI worker pipelines, industry verticals, multi-channel marketing, and financial forecasting into a single, sleek, multi-tenant workspace.
+                MarketForge OS unifies daily executive command, autonomous AI worker pipelines, industry verticals, multi-channel marketing, and financial forecasting into a single, sleek, multi-tenant workspace.
               </p>
             </div>
 
@@ -567,3 +567,5 @@ export function MarketBazaarLanding({ onSelectFeature, onEnterOS }: MarketBazaar
     </div>
   );
 }
+
+export default MarketForgeLanding;

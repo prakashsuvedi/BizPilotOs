@@ -14,9 +14,12 @@ import {
   Trash2,
   Sliders,
   Radio,
-  Server
+  Server,
+  Building2,
+  Layers
 } from 'lucide-react';
 import { clientDb } from '../lib/firebase';
+import TenantCustomDomainPanel from './TenantCustomDomainPanel';
 
 interface DomainRecord {
   id: string;
@@ -35,6 +38,7 @@ interface DomainRecord {
 }
 
 export default function CustomDomainCenter() {
+  const [domainTab, setDomainTab] = useState<'tenant_setup' | 'routing_grid'>('tenant_setup');
   const [domains, setDomains] = useState<DomainRecord[]>([]);
   const [tenantsList, setTenantsList] = useState<any[]>([]);
   const [selectedTenant, setSelectedTenant] = useState('');
@@ -344,25 +348,55 @@ export default function CustomDomainCenter() {
   };
 
   return (
-    <div className="space-y-6" id="domain-management-center">
+    <div className="space-y-6 font-sans" id="domain-management-center">
       {/* Upper header */}
-      <div className="bg-[#18191A] border border-slate-800 rounded-3xl p-6 text-white relative overflow-hidden shadow-xl">
-        <div className="absolute right-0 top-0 opacity-10 pointer-events-none translate-x-12 -translate-y-12">
-          <Globe className="w-80 h-80 text-teal-400" />
-        </div>
-        
-        <div className="max-w-3xl relative z-10 space-y-3">
-          <span className="bg-teal-500/15 text-teal-300 border border-teal-500/25 text-[10px] font-mono font-bold tracking-widest uppercase px-3 py-1 rounded-full">
-            Enterprise Traffic & CDN Layer
-          </span>
-          <h2 className="text-2xl font-bold font-sans tracking-tight">Enterprise Multi-Tenant Domain Manager</h2>
-          <p className="text-slate-400 text-sm leading-relaxed">
-            Provision and configure high-performance edge routing across Mode A (Subfolder), Mode B (Subdomain), and Mode C (Dedicated Custom Domain). Change tenant routing modes in real time with automated SSL certificates, custom DNS challenges, and Cloudflare CDN proxy detection.
+      <div className="bg-[#18191A] border border-slate-800 rounded-3xl p-6 text-white relative overflow-hidden shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+        <div className="max-w-3xl relative z-10 space-y-2">
+          <div className="flex items-center gap-2">
+            <span className="bg-teal-500/15 text-teal-300 border border-teal-500/25 text-[10px] font-mono font-bold tracking-widest uppercase px-3 py-1 rounded-full">
+              Enterprise Traffic & CDN Layer
+            </span>
+          </div>
+          <h2 className="text-2xl font-bold tracking-tight">SaaS Custom Domain Configuration Interface</h2>
+          <p className="text-slate-300 text-xs leading-relaxed">
+            Configure custom domain names, track Pending DNS Verification, and manage edge CDN routing partitions.
           </p>
+        </div>
+
+        {/* Tab Controls */}
+        <div className="flex items-center gap-2 bg-slate-900 border border-slate-700/80 p-1.5 rounded-2xl relative z-10 shrink-0">
+          <button
+            onClick={() => setDomainTab('tenant_setup')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+              domainTab === 'tenant_setup'
+                ? 'bg-teal-500 text-slate-950 shadow-md font-extrabold'
+                : 'text-slate-400 hover:text-white hover:bg-white/5'
+            }`}
+          >
+            <Globe className="w-4 h-4" /> Custom Domain Configuration
+          </button>
+          <button
+            onClick={() => setDomainTab('routing_grid')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+              domainTab === 'routing_grid'
+                ? 'bg-indigo-600 text-white shadow-md font-extrabold'
+                : 'text-slate-400 hover:text-white hover:bg-white/5'
+            }`}
+          >
+            <Layers className="w-4 h-4" /> Global Routing Grid
+          </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+      {/* TAB 1: TENANT CUSTOM DOMAIN CONFIGURATION */}
+      {domainTab === 'tenant_setup' ? (
+        <TenantCustomDomainPanel
+          tenantId={selectedTenant || 'demo-tenant'}
+          tenantName="Enterprise Workspace"
+        />
+      ) : (
+        /* TAB 2: GLOBAL ROUTING GRID */
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         {/* Main routing mapping table */}
         <div className="xl:col-span-2 bg-white border border-slate-200 rounded-2xl shadow-sm p-6 space-y-6 text-slate-900">
           <div className="flex items-center justify-between">
@@ -757,6 +791,7 @@ export default function CustomDomainCenter() {
           )}
         </div>
       </div>
+      )}
     </div>
   );
 }

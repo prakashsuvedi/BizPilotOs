@@ -3,8 +3,11 @@ import {
   Database, RefreshCw, Plus, Trash2, ShieldCheck, Play, 
   CheckCircle2, AlertTriangle, FileSpreadsheet, Upload, 
   HelpCircle, Check, Code, MapPin, Layers, Settings, Calendar,
-  TrendingUp, Info
+  TrendingUp, Info, GitBranch, Key, Webhook, Zap
 } from "lucide-react";
+import WorkflowAutomationStudio from "./WorkflowAutomationStudio";
+import ApiGatewayDeveloperPortal from "./ApiGatewayDeveloperPortal";
+import AdvancedWebhookEngine from "./AdvancedWebhookEngine";
 
 interface IntegrationManagerProps {
   tenantId: string;
@@ -62,6 +65,9 @@ export default function IntegrationManager({
   onReloadOutcomes,
   onCreateAuditLog
 }: IntegrationManagerProps) {
+  // Main Enterprise Tab Navigation
+  const [activeMainTab, setActiveMainTab] = useState<'workflows' | 'apigateway' | 'webhooks' | 'analytics'>('workflows');
+
   // Lists & UI State
   const [connections, setConnections] = useState<DataIntegration[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -372,22 +378,71 @@ export default function IntegrationManager({
     <div id="autonomous-intake-control" className="space-y-6">
       
       {/* Visual Ribbon Title Banner */}
-      <div className="bg-gradient-to-r from-indigo-900 to-slate-900 text-white p-6 rounded-3xl border border-indigo-950/40 shadow-md relative overflow-hidden">
-        <div className="absolute right-0 top-0 bottom-0 p-8 opacity-10 flex items-center">
-          <Database className="w-24 h-24 text-slate-100 animate-pulse" />
-        </div>
-        <div className="relative z-10 space-y-1">
+      <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-6 rounded-3xl border border-indigo-900/50 shadow-xl relative overflow-hidden flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
+        <div className="relative z-10 space-y-1 max-w-2xl">
           <div className="flex items-center gap-2">
-            <Layers className="w-5 h-5 text-indigo-400 shrink-0" />
-            <h4 className="font-extrabold text-sm uppercase tracking-wider font-mono">Module 10.5 — Autonomous Ingestion Layer</h4>
+            <span className="bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 text-[10px] font-mono font-bold tracking-widest uppercase px-3 py-1 rounded-full flex items-center gap-1.5">
+              <Zap className="w-3 h-3 text-amber-400" />
+              Phase 4 Enterprise Orchestration Core
+            </span>
           </div>
-          <h3 className="text-xl font-bold font-sans tracking-tight">Active Analytics Integration Registry</h3>
-          <p className="text-slate-300 text-xs max-w-3xl pt-2">
-            Eliminate manual tracking. Sync GA4, Meta pixels, or paste CSV reports directly. MarketForge hooks up to your channels, auto-pulls weekly outcomes, and continuously optimizes strategic confidence indexes with zero daily friction.
+          <h3 className="text-2xl font-black font-sans tracking-tight">Enterprise Automation & Integration Gateway</h3>
+          <p className="text-slate-300 text-xs leading-relaxed pt-1">
+            Visual workflow automation engine (n8n/Make.com paradigm), scoped bearer API key gateway, real-time incoming/outgoing webhooks, and GA4/CSV analytics ingestion pipelines.
           </p>
+        </div>
+
+        {/* Phase 4 Enterprise Navigation Tabs */}
+        <div className="flex flex-wrap items-center gap-2 bg-slate-900/90 p-1.5 border border-slate-800 rounded-2xl relative z-10 shrink-0">
+          <button
+            onClick={() => setActiveMainTab('workflows')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-extrabold transition flex items-center gap-1.5 cursor-pointer ${
+              activeMainTab === 'workflows' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <GitBranch className="w-4 h-4 text-amber-300" /> Workflow Studio (n8n)
+          </button>
+          <button
+            onClick={() => setActiveMainTab('apigateway')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-extrabold transition flex items-center gap-1.5 cursor-pointer ${
+              activeMainTab === 'apigateway' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <Key className="w-4 h-4 text-emerald-300" /> API Gateway
+          </button>
+          <button
+            onClick={() => setActiveMainTab('webhooks')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-extrabold transition flex items-center gap-1.5 cursor-pointer ${
+              activeMainTab === 'webhooks' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <Webhook className="w-4 h-4 text-teal-300" /> Webhook Engine
+          </button>
+          <button
+            onClick={() => setActiveMainTab('analytics')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-extrabold transition flex items-center gap-1.5 cursor-pointer ${
+              activeMainTab === 'analytics' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <Database className="w-4 h-4 text-indigo-300" /> Data Ingestion
+          </button>
         </div>
       </div>
 
+      {/* CONDITIONAL TAB RENDERING */}
+      {activeMainTab === 'workflows' && (
+        <WorkflowAutomationStudio tenantId={tenantId} onCreateAuditLog={onCreateAuditLog} />
+      )}
+
+      {activeMainTab === 'apigateway' && (
+        <ApiGatewayDeveloperPortal tenantId={tenantId} onCreateAuditLog={onCreateAuditLog} />
+      )}
+
+      {activeMainTab === 'webhooks' && (
+        <AdvancedWebhookEngine tenantId={tenantId} onCreateAuditLog={onCreateAuditLog} />
+      )}
+
+      {activeMainTab === 'analytics' && (
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         
         {/* Left Column: Registered registries & New forms (Grid size 5) */}
@@ -918,6 +973,7 @@ export default function IntegrationManager({
         </div>
 
       </div>
+      )}
 
     </div>
   );

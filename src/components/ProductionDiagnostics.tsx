@@ -682,8 +682,11 @@ export default function ProductionDiagnostics() {
 
           {/* Stage Details Modal Dialog */}
           {selectedStage && (
-            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-55">
-              <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-lg w-full overflow-hidden text-left">
+            <div 
+              className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4 z-55 overflow-y-auto"
+              onClick={(e) => { if (e.target === e.currentTarget) setSelectedStage(null); }}
+            >
+              <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto my-auto text-left relative">
                 <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-900 text-white">
                   <div>
                     <h4 className="text-base font-black tracking-tight">{selectedStage.stage} Diagnostics</h4>
@@ -691,9 +694,11 @@ export default function ProductionDiagnostics() {
                   </div>
                   <button
                     onClick={() => setSelectedStage(null)}
-                    className="p-1.5 hover:bg-white/10 rounded-xl transition cursor-pointer text-slate-900"
+                    className="p-2 hover:bg-white/10 rounded-xl transition cursor-pointer text-slate-300 hover:text-white flex items-center gap-1"
+                    title="Close modal"
                   >
-                    Close
+                    <X className="w-4 h-4" />
+                    <span className="text-xs font-bold">Close</span>
                   </button>
                 </div>
                 <div className="p-6 space-y-4">

@@ -30,6 +30,8 @@ import {
   saveTenantBranding,
   verifyTenantCustomDomain
 } from '../lib/tenantBranding';
+import WhiteLabelBrandingEditor from './WhiteLabelBrandingEditor';
+import TenantCustomDomainPanel from './TenantCustomDomainPanel';
 
 interface TenantWhiteLabelCenterProps {
   tenantId: string;
@@ -187,127 +189,12 @@ export default function TenantWhiteLabelCenter({ tenantId, onNavigateToWebsiteBu
         <div className="lg:col-span-7 space-y-6">
           {/* TAB 1: Logo & Visual Identity */}
           {activeTab === 'branding' && (
-            <div className="bg-[#0D0E17] border border-white/10 rounded-2xl p-6 space-y-6 shadow-xl">
-              <div>
-                <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                  <Palette className="w-5 h-5 text-indigo-400" /> Company Logo & Visual Identity
-                </h3>
-                <p className="text-xs text-slate-400">Configure tenant brand name, tagline, logo image, and primary theme colors.</p>
-              </div>
-
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-300 mb-1">Company / Brand Name</label>
-                  <input
-                    type="text"
-                    value={branding.companyName}
-                    onChange={(e) => setBranding({ ...branding, companyName: e.target.value })}
-                    className="w-full bg-slate-900 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-indigo-500 font-semibold"
-                    placeholder="e.g. Acme Corporation or Apex Bistro"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-300 mb-1">Tagline / Slogan</label>
-                  <input
-                    type="text"
-                    value={branding.tagline}
-                    onChange={(e) => setBranding({ ...branding, tagline: e.target.value })}
-                    className="w-full bg-slate-900 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-indigo-500"
-                    placeholder="e.g. Direct factory prices & high volume B2B bulk supply."
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-300 mb-1">Logo URL (Direct Image Link)</label>
-                  <input
-                    type="text"
-                    value={branding.logoUrl}
-                    onChange={(e) => setBranding({ ...branding, logoUrl: e.target.value })}
-                    className="w-full bg-slate-900 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-indigo-500 font-mono"
-                    placeholder="https://domain.com/logo.png"
-                  />
-                </div>
-
-                {/* Preset Logo Selection */}
-                <div>
-                  <label className="block text-xs font-bold text-slate-400 mb-2">Or Choose From High-Res Preset Logos:</label>
-                  <div className="grid grid-cols-6 gap-2">
-                    {PRESET_LOGOS.map((url, idx) => (
-                      <button
-                        key={idx}
-                        onClick={() => setBranding({ ...branding, logoUrl: url })}
-                        className={`p-1.5 rounded-xl border transition cursor-pointer overflow-hidden ${
-                          branding.logoUrl === url ? 'border-indigo-500 bg-indigo-500/20 ring-2 ring-indigo-500' : 'border-white/10 bg-slate-900 hover:border-white/30'
-                        }`}
-                      >
-                        <img src={url} alt={`Preset ${idx + 1}`} className="w-full h-10 object-cover rounded-lg" />
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Theme Color Schemes */}
-                <div>
-                  <label className="block text-xs font-bold text-slate-300 mb-2">Theme Color Palette</label>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                    {PRESET_COLORS.map((c, i) => (
-                      <button
-                        key={i}
-                        onClick={() => setBranding({ ...branding, primaryColor: c.primary, accentColor: c.accent })}
-                        className={`p-3 rounded-xl border text-left transition cursor-pointer ${
-                          branding.primaryColor === c.primary ? 'border-indigo-500 bg-indigo-500/10' : 'border-white/10 bg-slate-900 hover:border-white/20'
-                        }`}
-                      >
-                        <div className="flex items-center gap-2 mb-1">
-                          <div className="w-4 h-4 rounded-full shadow" style={{ backgroundColor: c.primary }} />
-                          <div className="w-4 h-4 rounded-full shadow" style={{ backgroundColor: c.accent }} />
-                          <span className="text-xs font-bold text-white ml-auto">{branding.primaryColor === c.primary && <Check className="w-3.5 h-3.5 text-indigo-400" />}</span>
-                        </div>
-                        <p className="text-[11px] font-semibold text-slate-300">{c.name}</p>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-400 mb-1">Primary Color Hex</label>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="color"
-                        value={branding.primaryColor || '#6366f1'}
-                        onChange={(e) => setBranding({ ...branding, primaryColor: e.target.value })}
-                        className="w-9 h-9 rounded-lg bg-transparent cursor-pointer border-0"
-                      />
-                      <input
-                        type="text"
-                        value={branding.primaryColor}
-                        onChange={(e) => setBranding({ ...branding, primaryColor: e.target.value })}
-                        className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-white font-mono"
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-400 mb-1">Accent Color Hex</label>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="color"
-                        value={branding.accentColor || '#06b6d4'}
-                        onChange={(e) => setBranding({ ...branding, accentColor: e.target.value })}
-                        className="w-9 h-9 rounded-lg bg-transparent cursor-pointer border-0"
-                      />
-                      <input
-                        type="text"
-                        value={branding.accentColor}
-                        onChange={(e) => setBranding({ ...branding, accentColor: e.target.value })}
-                        className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-white font-mono"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
+            <WhiteLabelBrandingEditor
+              branding={branding}
+              onChange={setBranding}
+              onSave={handleSaveAll}
+              isSaving={isSaving}
+            />
           )}
 
           {/* TAB 2: Company & Location Contacts */}
@@ -376,81 +263,11 @@ export default function TenantWhiteLabelCenter({ tenantId, onNavigateToWebsiteBu
 
           {/* TAB 3: Custom Domain & CNAME Provisioning */}
           {activeTab === 'domain' && (
-            <div className="bg-[#0D0E17] border border-white/10 rounded-2xl p-6 space-y-6 shadow-xl">
-              <div>
-                <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                  <Globe className="w-5 h-5 text-indigo-400" /> Custom Domain & CNAME Provisioning
-                </h3>
-                <p className="text-xs text-slate-400">Map your own brand domain (e.g., www.mycompany.com) directly to this workspace.</p>
-              </div>
-
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-300 mb-1">Enter Tenant Custom Domain</label>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={customDomainInput}
-                      onChange={(e) => setCustomDomainInput(e.target.value)}
-                      className="flex-1 bg-slate-900 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-indigo-500 font-mono"
-                      placeholder="e.g. www.apexbistro.com or shop.acme.com"
-                    />
-                    <button
-                      onClick={handleVerifyDomain}
-                      disabled={isVerifyingDomain}
-                      className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl shadow-lg flex items-center gap-2 transition cursor-pointer"
-                    >
-                      {isVerifyingDomain ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Globe className="w-4 h-4" />}
-                      {isVerifyingDomain ? 'Verifying DNS...' : 'Verify & Provision'}
-                    </button>
-                  </div>
-                </div>
-
-                {domainVerifyResult && (
-                  <div className={`p-4 rounded-xl border text-xs ${
-                    domainVerifyResult.success ? 'bg-emerald-950/70 border-emerald-500/40 text-emerald-200' : 'bg-red-950/70 border-red-500/40 text-red-200'
-                  }`}>
-                    <p className="font-bold flex items-center gap-2">
-                      {domainVerifyResult.success ? <CheckCircle2 className="w-4 h-4 text-emerald-400" /> : <AlertCircle className="w-4 h-4 text-red-400" />}
-                      {domainVerifyResult.message}
-                    </p>
-                  </div>
-                )}
-
-                {/* DNS Instructions Box */}
-                <div className="bg-slate-900/80 border border-white/10 rounded-xl p-4 space-y-3 font-mono text-xs">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-indigo-300 uppercase font-sans">Required DNS Configuration Records</span>
-                    <button
-                      onClick={() => copyDnsRecord('cname.marketforge.com')}
-                      className="text-[11px] text-slate-400 hover:text-white flex items-center gap-1 transition cursor-pointer"
-                    >
-                      <Copy className="w-3.5 h-3.5 text-indigo-400" /> {copiedTxt ? 'Copied!' : 'Copy CNAME Target'}
-                    </button>
-                  </div>
-
-                  <div className="space-y-2 text-[11px]">
-                    <div className="bg-black/60 p-2.5 rounded-lg border border-white/5 flex items-center justify-between">
-                      <div>
-                        <span className="text-slate-400">Type:</span> <strong className="text-emerald-400">CNAME</strong> | <span className="text-slate-400">Host:</span> <strong className="text-white">www</strong>
-                      </div>
-                      <div>
-                        <span className="text-slate-400">Points To:</span> <strong className="text-indigo-300">cname.marketforge.com</strong>
-                      </div>
-                    </div>
-
-                    <div className="bg-black/60 p-2.5 rounded-lg border border-white/5 flex items-center justify-between">
-                      <div>
-                        <span className="text-slate-400">Type:</span> <strong className="text-emerald-400">A Record</strong> | <span className="text-slate-400">Host:</span> <strong className="text-white">@</strong>
-                      </div>
-                      <div>
-                        <span className="text-slate-400">Points To:</span> <strong className="text-indigo-300">199.195.143.10</strong>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
+            <TenantCustomDomainPanel
+              tenantId={tenantId}
+              tenantName={branding.companyName}
+              onDomainUpdated={(dom) => setBranding({ ...branding, customDomain: dom })}
+            />
           )}
 
           {/* TAB 4: Custom Homepage & Website Builder Sync */}

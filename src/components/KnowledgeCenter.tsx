@@ -1259,8 +1259,11 @@ export default function KnowledgeCenter({ profile, tenantId }: Props) {
 
       {/* MODAL EDITING REGISTER */}
       {editingItem && (
-        <div className="fixed inset-0 bg-[#010816]/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl border border-slate-200 shadow-xl max-w-lg w-full p-6 space-y-4 animate-scale-up flex flex-col max-h-[90vh] text-slate-900">
+        <div 
+          className="fixed inset-0 bg-[#010816]/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto"
+          onClick={(e) => { if (e.target === e.currentTarget) setEditingItem(null); }}
+        >
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-xl max-w-lg w-full p-6 space-y-4 animate-scale-up flex flex-col max-h-[90vh] my-auto text-slate-900 relative">
             <div className="flex items-center justify-between border-b pb-3">
               <h4 className="font-bold text-slate-900 text-sm">Edit Ingested Category Field values</h4>
               <button 

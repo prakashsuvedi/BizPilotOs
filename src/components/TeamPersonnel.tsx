@@ -253,8 +253,11 @@ export default function TeamPersonnel({ tenantId, userRole, onCreateAuditLog }: 
 
       {/* Add personnel drawer modal */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <form onSubmit={handleAddMemberSubmit} className="bg-white border border-slate-200 w-full max-w-md rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh] text-slate-900">
+        <div 
+          className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto"
+          onClick={(e) => { if (e.target === e.currentTarget) setShowAddModal(false); }}
+        >
+          <form onSubmit={handleAddMemberSubmit} className="bg-white border border-slate-200 w-full max-w-md rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh] my-auto text-slate-900 relative">
             
             <div className="bg-slate-900 text-white p-5 flex items-center justify-between border-b border-slate-800">
               <div className="flex items-center gap-2">

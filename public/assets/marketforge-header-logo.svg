@@ -1,0 +1,111 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 90" width="100%" height="100%">
+  <defs>
+    <!-- Metallic M Face Gradient -->
+    <linearGradient id="hdrMGrad1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8" />
+      <stop offset="50%" stop-color="#0284c7" />
+      <stop offset="100%" stop-color="#1e3a8a" />
+    </linearGradient>
+
+    <linearGradient id="hdrMGrad2" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#0f172a" />
+      <stop offset="60%" stop-color="#1e293b" />
+      <stop offset="100%" stop-color="#2563eb" />
+    </linearGradient>
+
+    <!-- Arrow Gradient -->
+    <linearGradient id="hdrArrowGrad" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#1d4ed8" />
+      <stop offset="50%" stop-color="#38bdf8" />
+      <stop offset="100%" stop-color="#e0f2fe" />
+    </linearGradient>
+
+    <!-- Spark Glow -->
+    <radialGradient id="hdrSparkGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#fef08a" />
+      <stop offset="40%" stop-color="#ea580c" />
+      <stop offset="100%" stop-color="#000000" stop-opacity="0" />
+    </radialGradient>
+
+    <!-- OS Pill Metallic -->
+    <linearGradient id="hdrOsPillGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0284c7" />
+      <stop offset="50%" stop-color="#0369a1" />
+      <stop offset="100%" stop-color="#0f172a" />
+    </linearGradient>
+
+    <linearGradient id="textGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#ffffff" />
+      <stop offset="60%" stop-color="#f0f9ff" />
+      <stop offset="100%" stop-color="#bae6fd" />
+    </linearGradient>
+
+    <filter id="hdrGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#0284c7" flood-opacity="0.35" />
+    </filter>
+  </defs>
+
+  <!-- LEFT 3D EMBLEM MARK -->
+  <g transform="translate(45, 45) scale(0.38)">
+    <!-- Globe Constellation Backing -->
+    <g opacity="0.4" stroke="#38bdf8" stroke-width="2" fill="none">
+      <circle cx="0" cy="-20" r="100" stroke-dasharray="6 6" />
+      <ellipse cx="0" cy="-20" rx="100" ry="40" />
+      <ellipse cx="0" cy="-20" rx="45" ry="100" />
+    </g>
+
+    <!-- Metallic 3D Letter 'M' -->
+    <g transform="translate(0, -10)">
+      <path d="M -110 90 L -110 -60 L -65 -95 L -25 10 L -60 90 Z" fill="url(#hdrMGrad2)" />
+      <path d="M -95 80 L -95 -50 L -65 -80 L -35 0 L -60 80 Z" fill="url(#hdrMGrad1)" />
+
+      <path d="M -25 10 L 0 80 L 25 10 L 0 90 Z" fill="url(#hdrMGrad2)" />
+
+      <path d="M 25 10 L 65 -95 L 110 -60 L 110 90 L 60 90 Z" fill="url(#hdrMGrad2)" />
+      <path d="M 35 0 L 65 -80 L 95 -50 L 95 80 L 60 80 Z" fill="url(#hdrMGrad1)" />
+    </g>
+
+    <!-- Growth Arrow Swoosh -->
+    <path d="M -90 70 C -50 50, 30 0, 130 -90 L 100 -90 L 150 -110 L 140 -50 L 120 -75 C 30 0, -50 50, -90 70 Z" fill="url(#hdrArrowGrad)" filter="url(#hdrGlow)" />
+
+    <!-- Anvil & Hammer Impact -->
+    <g transform="translate(0, 45)">
+      <path d="M -40 30 L 40 30 L 30 8 L 45 0 L 45 -8 L -45 -8 L -45 0 L -30 8 Z" fill="#1e293b" stroke="#94a3b8" stroke-width="1.5" />
+      <path d="M -42 -6 L 42 -6 L 38 0 L -38 0 Z" fill="#e2e8f0" />
+
+      <!-- Hammer -->
+      <g transform="translate(0, -22) rotate(-28)">
+        <rect x="-5" y="-22" width="10" height="30" rx="2" fill="#78350f" />
+        <rect x="-14" y="-32" width="28" height="15" rx="3" fill="#64748b" stroke="#ffffff" stroke-width="1.5" />
+      </g>
+
+      <!-- Impact Sparks -->
+      <circle cx="0" cy="-8" r="22" fill="url(#hdrSparkGlow)" />
+      <line x1="0" y1="-8" x2="-28" y2="-32" stroke="#fbbf24" stroke-width="2.5" stroke-linecap="round" />
+      <line x1="0" y1="-8" x2="28" y2="-32" stroke="#fbbf24" stroke-width="2.5" stroke-linecap="round" />
+    </g>
+  </g>
+
+  <!-- TYPOGRAPHY: MarketForge OS -->
+  <g transform="translate(100, 48)">
+    <text font-family="system-ui, -apple-system, sans-serif" font-weight="900" font-size="34" letter-spacing="-0.5">
+      <tspan fill="url(#textGrad)">Market</tspan><tspan fill="#38bdf8">Forge</tspan>
+    </text>
+
+    <!-- OS Pill Box -->
+    <g transform="translate(210, -28)">
+      <rect x="0" y="0" width="58" height="32" rx="10" fill="url(#hdrOsPillGrad)" stroke="#38bdf8" stroke-width="1.8" filter="url(#hdrGlow)" />
+      <text x="29" y="22" font-family="system-ui, -apple-system, sans-serif" font-weight="900" font-size="18" fill="#ffffff" text-anchor="middle" letter-spacing="1">OS</text>
+      <text x="52" y="10" font-family="sans-serif" font-weight="bold" font-size="8" fill="#93c5fd">TM</text>
+    </g>
+
+    <!-- TAGLINE UNDERNEATH -->
+    <g transform="translate(0, 20)">
+      <line x1="0" y1="-4" x2="45" y2="-4" stroke="#38bdf8" stroke-width="1.2" opacity="0.6" />
+      <text x="52" y="0" font-family="system-ui, -apple-system, sans-serif" font-weight="800" font-size="10" fill="#94a3b8" letter-spacing="2.8">
+        A TRUE BUSINESS TRANSFORMATION
+      </text>
+      <line x1="315" y1="-4" x2="360" y2="-4" stroke="#38bdf8" stroke-width="1.2" opacity="0.6" />
+    </g>
+  </g>
+</svg>

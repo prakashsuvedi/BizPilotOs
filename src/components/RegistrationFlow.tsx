@@ -151,11 +151,13 @@ export default function RegistrationFlow({ onActivateTenant, onLogin }: { onActi
         ownerEmail: email,
         isCustom: true,
         status: 'active',
-        plan: 'Custom',
-        subscriptionPriceNpr: totalNpr,
+        plan: 'Pro (1 Month Free Trial)',
+        subscriptionPriceNpr: 0,
+        mrr: 0,
+        trialDaysLeft: 30,
         activatedModules: allSelectedModules,
         paymentGateway: paymentGateway,
-        paymentStatus: 'active'
+        paymentStatus: 'free_trial'
       };
 
       setTimeout(() => {
