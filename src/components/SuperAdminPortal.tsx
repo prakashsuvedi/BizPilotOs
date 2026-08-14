@@ -1149,13 +1149,20 @@ export default function SuperAdminPortal({
   const fetchDiagnostics = async () => {
     setIsLoadingDiagnostics(true);
     try {
-      const res = await fetch('/api/admin/diagnose');
-      const data = await res.json();
-      if (data.success && data.report) {
-        setDiagnosticsReport(data.report);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 6000);
+      const res = await fetch('/api/admin/diagnose', { signal: controller.signal });
+      clearTimeout(timeoutId);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.report) {
+          setDiagnosticsReport(data.report);
+        }
       }
-    } catch (err) {
-      console.error("Failed to query systems diagnostics endpoint:", err);
+    } catch (err: any) {
+      if (err.name !== 'AbortError') {
+        console.warn("Diagnostics telemetry report notice:", err.message || err);
+      }
     } finally {
       setIsLoadingDiagnostics(false);
     }

@@ -465,7 +465,7 @@ export default function App() {
     const probe = async (): Promise<boolean> => {
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 3500);
+        const timeoutId = setTimeout(() => controller.abort(), 7500);
         const res = await fetch('/api/health', {
           headers: { 'Cache-Control': 'no-cache, no-store' },
           signal: controller.signal
@@ -493,8 +493,8 @@ export default function App() {
         await new Promise(r => setTimeout(r, backoffDelay));
         return probe();
       } else {
-        // Retries exhausted for automatic probe, transition smoothly to connected so cached views or retry can function
-        setBackendStatus('connected');
+        // Retries exhausted for automatic probe; set to recoverable error state for backend-dependent views
+        setBackendStatus('error');
         fetchTenants();
         return false;
       }
@@ -744,21 +744,6 @@ export default function App() {
     );
   }
 
-  // 0. Cold-Start / Backend Warming Up State
-  if (backendStatus === 'waking') {
-    const currentSlug = routeState.slug || urlParams.get('tenant') || urlParams.get('slug') || (routeState.tenant ? routeState.tenant.name : '');
-    return (
-      <ConnectingState 
-        statusText="Connecting to MarketForge..."
-        subText="Establishing secure cloud connection. If the service is warming up from inactivity, this takes just a few moments."
-        tenantSlug={currentSlug || undefined}
-        isRetrying={true}
-        retryAttempt={retryAttempt}
-        onManualRetry={() => checkBackendAvailability(true)}
-      />
-    );
-  }
-
   // 1. Tenant 404 Resolution (Invalid Tenant URL)
   if (routeState.type === 'tenant_not_found') {
     return (
@@ -792,7 +777,7 @@ export default function App() {
       window.location.hash === '#workspace' ||
       dashboardTab !== 'landing';
 
-    // If NOT logged in -> Render Specific Tenant Landing Page
+    // If NOT logged in -> Render Specific Tenant Landing Page immediately (unblocked by cold-start)
     if (!user) {
       return (
         <MarketForgeLanding 
@@ -872,13 +857,42 @@ export default function App() {
     }
   }
 
-  // 4. Platform Root or Unauthenticated User -> Render Main MarketForge Platform Landing Page
+  // 4. Platform Root or Unauthenticated User -> Render Main MarketForge Platform Landing Page (unblocked)
   if (!user) {
     return (
       <LoginPortal 
         onLogin={handleLogin}
         tenantsList={tenantsList}
         onActivateTenant={handleActivateTenant}
+      />
+    );
+  }
+
+  // 5. Authenticated Workspace Access -> Guard against waking/offline backend for live operations
+  if (backendStatus === 'waking') {
+    const currentSlug = routeState.slug || urlParams.get('tenant') || urlParams.get('slug') || (user?.tenantId || (routeState.tenant ? routeState.tenant.name : ''));
+    return (
+      <ConnectingState 
+        statusText="Connecting to MarketForge Workspace..."
+        subText="Establishing secure cloud connection for your workspace. If the service is warming up from inactivity, this takes just a few moments."
+        tenantSlug={currentSlug || undefined}
+        isRetrying={true}
+        retryAttempt={retryAttempt}
+        onManualRetry={() => checkBackendAvailability(true)}
+      />
+    );
+  }
+
+  if (backendStatus === 'error') {
+    const currentSlug = routeState.slug || urlParams.get('tenant') || urlParams.get('slug') || (user?.tenantId || (routeState.tenant ? routeState.tenant.name : ''));
+    return (
+      <ConnectingState 
+        statusText="Cloud Backend Reconnecting..."
+        subText="The cloud backend service took longer than expected to respond. Your workspace data is protected. You can retry the connection or verify connectivity below."
+        tenantSlug={currentSlug || undefined}
+        isRetrying={false}
+        retryAttempt={retryAttempt}
+        onManualRetry={() => checkBackendAvailability(true)}
       />
     );
   }
