@@ -3,7 +3,9 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Helmet } from 'react-helmet-async';
 import { MarketForgeLogo, MarketForgeEmblem } from './MarketForgeLogo';
 import { getTenantBranding, saveTenantBranding, TenantBranding } from '../lib/tenantBranding';
-import CompanyPagesModal, { CompanyPageType } from './CompanyPagesModal';
+import type { CompanyPageType } from './CompanyPagesModal';
+
+const CompanyPagesModal = React.lazy(() => import('./CompanyPagesModal'));
 import {
   Sparkles,
   Building2,
@@ -1311,11 +1313,15 @@ export function MarketForgeLanding({ tenantId = 'demo-tenant', onSelectFeature, 
       )}
 
       {/* Company Pages Modal */}
-      <CompanyPagesModal
-        isOpen={companyPagesModalOpen}
-        onClose={() => setCompanyPagesModalOpen(false)}
-        defaultTab={companyPageTab}
-      />
+      {companyPagesModalOpen && (
+        <React.Suspense fallback={null}>
+          <CompanyPagesModal
+            isOpen={companyPagesModalOpen}
+            onClose={() => setCompanyPagesModalOpen(false)}
+            defaultTab={companyPageTab}
+          />
+        </React.Suspense>
+      )}
 
     </div>
   );

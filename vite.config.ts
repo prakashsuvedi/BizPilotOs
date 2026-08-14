@@ -16,6 +16,13 @@ export default defineConfig({
     cssCodeSplit: true,
     chunkSizeWarningLimit: 1500,
     minify: 'esbuild',
+    modulePreload: {
+      polyfill: false,
+      resolveDependencies: (filename, deps, { hostId, hostType }) => {
+        // Only preload CSS, do not eagerly preload heavy lazy chunks
+        return deps.filter(dep => dep.endsWith('.css'));
+      }
+    },
     rollupOptions: {
       output: {
         manualChunks(id) {

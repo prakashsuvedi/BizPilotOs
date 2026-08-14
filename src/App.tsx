@@ -55,46 +55,57 @@ import { clientAuth, clientDb } from './lib/firebase';
 import { BusinessProfile, CampaignPlan, CustomerPersona, BrandGuideline, TenantTeamMember } from './types';
 import { getTenantBranding } from './lib/tenantBranding';
 
-// Components
-import LoginPortal from './components/LoginPortal';
-import SuperAdminPortal from './components/SuperAdminPortal';
-import DailyCommandCenter from './components/DailyCommandCenter';
-import LaunchCenter from './components/LaunchCenter';
-import AIBusinessDepartment from './components/AIBusinessDepartment';
-import AdStudio from './components/AdStudio';
-import EmailStudio from './components/EmailStudio';
-import CampaignPlanner from './components/CampaignPlanner';
-import SocialStudio from './components/SocialStudio';
-import RevenueIntelligenceOS from './components/RevenueIntelligenceOS';
-import SuccessCenter from './components/SuccessCenter';
-import TenantWhiteLabelCenter from './components/TenantWhiteLabelCenter';
-import CustomDomainCenter from './components/CustomDomainCenter';
-import SubscriptionManagement from './components/SubscriptionManagement';
-import TenantHealthMonitor from './components/TenantHealthMonitor';
-
-import RestaurantManagement from './components/RestaurantManagement';
-import MobileTableQrOrderingApp from './components/MobileTableQrOrderingApp';
-import HotelManagement from './components/HotelManagement';
-import ToursAndTravelsManagement from './components/ToursAndTravelsManagement';
-import WebsiteBuilderOS from './components/WebsiteBuilderOS';
-
-import BusinessOperations from './components/BusinessOperations';
-import WorkflowAutomationStudio from './components/WorkflowAutomationStudio';
-import ApiGatewayDeveloperPortal from './components/ApiGatewayDeveloperPortal';
-import AdvancedWebhookEngine from './components/AdvancedWebhookEngine';
-import IntegrationManager from './components/IntegrationManager';
-import MemberAuthModal from './components/MemberAuthModal';
-import TelemetrySparkline from './components/TelemetrySparkline';
-import AiTelemetryModal from './components/AiTelemetryModal';
+// Eager Lightweight Shell & Landing Components
 import MarketForgeLanding from './components/MarketForgeLanding';
 import { MarketForgeEmblem, MarketForgeLogo } from './components/MarketForgeLogo';
-
-import PaymentSuccessModal from './components/PaymentSuccessModal';
+import MemberAuthModal from './components/MemberAuthModal';
 import TrialBanner from './components/TrialBanner';
 import { TenantNotFoundPage, InactiveTenantPage } from './components/TenantStatusPages';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { FeedbackWidget } from './components/FeedbackWidget';
 import { ConnectingState } from './components/ConnectingState';
+import TelemetrySparkline from './components/TelemetrySparkline';
+
+// Lazy-Loaded Authenticated Workspace & Heavy Sub-Systems
+const LoginPortal = React.lazy(() => import('./components/LoginPortal'));
+const SuperAdminPortal = React.lazy(() => import('./components/SuperAdminPortal'));
+const DailyCommandCenter = React.lazy(() => import('./components/DailyCommandCenter'));
+const LaunchCenter = React.lazy(() => import('./components/LaunchCenter'));
+const AIBusinessDepartment = React.lazy(() => import('./components/AIBusinessDepartment'));
+const AdStudio = React.lazy(() => import('./components/AdStudio'));
+const EmailStudio = React.lazy(() => import('./components/EmailStudio'));
+const CampaignPlanner = React.lazy(() => import('./components/CampaignPlanner'));
+const SocialStudio = React.lazy(() => import('./components/SocialStudio'));
+const RevenueIntelligenceOS = React.lazy(() => import('./components/RevenueIntelligenceOS'));
+const SuccessCenter = React.lazy(() => import('./components/SuccessCenter'));
+const TenantWhiteLabelCenter = React.lazy(() => import('./components/TenantWhiteLabelCenter'));
+const CustomDomainCenter = React.lazy(() => import('./components/CustomDomainCenter'));
+const SubscriptionManagement = React.lazy(() => import('./components/SubscriptionManagement'));
+const TenantHealthMonitor = React.lazy(() => import('./components/TenantHealthMonitor'));
+const RestaurantManagement = React.lazy(() => import('./components/RestaurantManagement'));
+const MobileTableQrOrderingApp = React.lazy(() => import('./components/MobileTableQrOrderingApp'));
+const HotelManagement = React.lazy(() => import('./components/HotelManagement'));
+const ToursAndTravelsManagement = React.lazy(() => import('./components/ToursAndTravelsManagement'));
+const WebsiteBuilderOS = React.lazy(() => import('./components/WebsiteBuilderOS'));
+const BusinessOperations = React.lazy(() => import('./components/BusinessOperations'));
+const WorkflowAutomationStudio = React.lazy(() => import('./components/WorkflowAutomationStudio'));
+const ApiGatewayDeveloperPortal = React.lazy(() => import('./components/ApiGatewayDeveloperPortal'));
+const AdvancedWebhookEngine = React.lazy(() => import('./components/AdvancedWebhookEngine'));
+const IntegrationManager = React.lazy(() => import('./components/IntegrationManager'));
+const AiTelemetryModal = React.lazy(() => import('./components/AiTelemetryModal'));
+const PaymentSuccessModal = React.lazy(() => import('./components/PaymentSuccessModal'));
+
+// Sleek lightweight loading fallback for dynamic workspace modules
+const WorkspaceModuleLoader = () => (
+  <div className="flex flex-col items-center justify-center min-h-[360px] w-full p-8 text-center animate-fade-in">
+    <div className="relative w-10 h-10 mb-3 flex items-center justify-center">
+      <div className="absolute inset-0 rounded-full border-2 border-indigo-500/20 border-t-indigo-500 animate-spin" />
+      <div className="w-3.5 h-3.5 rounded-full bg-indigo-500/30 backdrop-blur-sm animate-pulse" />
+    </div>
+    <p className="text-xs font-semibold text-slate-300 tracking-wide">Loading Module...</p>
+    <p className="text-[11px] text-slate-500 mt-0.5">Initializing workspace component</p>
+  </div>
+);
 
 // Default Fallbacks
 const defaultProfile: BusinessProfile = {
@@ -860,11 +871,13 @@ export default function App() {
   // 4. Platform Root or Unauthenticated User -> Render Main MarketForge Platform Landing Page (unblocked)
   if (!user) {
     return (
-      <LoginPortal 
-        onLogin={handleLogin}
-        tenantsList={tenantsList}
-        onActivateTenant={handleActivateTenant}
-      />
+      <React.Suspense fallback={<WorkspaceModuleLoader />}>
+        <LoginPortal 
+          onLogin={handleLogin}
+          tenantsList={tenantsList}
+          onActivateTenant={handleActivateTenant}
+        />
+      </React.Suspense>
     );
   }
 
@@ -1289,15 +1302,17 @@ export default function App() {
 
         {/* Portal component */}
         <div className="flex-1 overflow-y-auto">
-          <SuperAdminPortal 
-            currentTenantId={selectedTenantId}
-            onTenantChange={(id) => {
-              setSelectedTenantId(id);
-              setSuperAdminView('dashboard');
-            }}
-            userRole="super_admin"
-            onTenantsUpdated={(newList) => setTenantsList(newList)}
-          />
+          <React.Suspense fallback={<WorkspaceModuleLoader />}>
+            <SuperAdminPortal 
+              currentTenantId={selectedTenantId}
+              onTenantChange={(id) => {
+                setSelectedTenantId(id);
+                setSuperAdminView('dashboard');
+              }}
+              userRole="super_admin"
+              onTenantsUpdated={(newList) => setTenantsList(newList)}
+            />
+          </React.Suspense>
         </div>
       </div>
     );
@@ -2222,10 +2237,12 @@ export default function App() {
               {/* Workspace Telemetry Panel with AI Sparkline & Tenant Health Monitor */}
               {!isSidebarCollapsed && (
                 <div className="mx-1 pt-2 space-y-2">
-                  <TenantHealthMonitor
-                    tenantId={user.role === 'super_admin' ? selectedTenantId : user.tenantId}
-                    compact={true}
-                  />
+                  <React.Suspense fallback={<div className="h-10 bg-white/5 rounded-xl animate-pulse" />}>
+                    <TenantHealthMonitor
+                      tenantId={user.role === 'super_admin' ? selectedTenantId : user.tenantId}
+                      compact={true}
+                    />
+                  </React.Suspense>
                   <TelemetrySparkline
                     tenantId={user.role === 'super_admin' ? selectedTenantId : user.tenantId}
                     tenantPlan={activeTenantObj?.plan || "Growth"}
@@ -2310,26 +2327,36 @@ export default function App() {
               className="w-full"
             >
               <ErrorBoundary sectionName={`Workspace Module: ${dashboardTab}`}>
-                {renderDashboardContent()}
+                <React.Suspense fallback={<WorkspaceModuleLoader />}>
+                  {renderDashboardContent()}
+                </React.Suspense>
               </ErrorBoundary>
             </motion.div>
           </AnimatePresence>
         </main>
       </div>
 
-      <SubscriptionManagement 
-        isOpen={isSubscriptionModalOpen} 
-        onClose={() => setIsSubscriptionModalOpen(false)} 
-        activeTenant={activeTenantObj} 
-      />
-      <PaymentSuccessModal 
-        isOpen={isPaymentSuccessOpen}
-        onClose={() => {
-           setIsPaymentSuccessOpen(false);
-           setIsSubscriptionModalOpen(false);
-           fetchTenants();
-        }}
-      />
+      {isSubscriptionModalOpen && (
+        <React.Suspense fallback={null}>
+          <SubscriptionManagement 
+            isOpen={isSubscriptionModalOpen} 
+            onClose={() => setIsSubscriptionModalOpen(false)} 
+            activeTenant={activeTenantObj} 
+          />
+        </React.Suspense>
+      )}
+      {isPaymentSuccessOpen && (
+        <React.Suspense fallback={null}>
+          <PaymentSuccessModal 
+            isOpen={isPaymentSuccessOpen}
+            onClose={() => {
+               setIsPaymentSuccessOpen(false);
+               setIsSubscriptionModalOpen(false);
+               fetchTenants();
+            }}
+          />
+        </React.Suspense>
+      )}
 
       {/* Global Settings Modal */}
       <AnimatePresence>
@@ -2466,14 +2493,18 @@ export default function App() {
       />
 
       {/* AI Telemetry, BYOK & Token Billing Modal */}
-      <AiTelemetryModal
-        isOpen={isAiTelemetryOpen}
-        onClose={() => setIsAiTelemetryOpen(false)}
-        tenantId={user?.role === 'super_admin' ? selectedTenantId : (user?.tenantId || 'demo-tenant')}
-        tenantName={activeTenantName}
-        tenantPlan={activeTenantObj?.plan || "Growth"}
-        isSuperAdmin={user?.role === 'super_admin'}
-      />
+      {isAiTelemetryOpen && (
+        <React.Suspense fallback={null}>
+          <AiTelemetryModal
+            isOpen={isAiTelemetryOpen}
+            onClose={() => setIsAiTelemetryOpen(false)}
+            tenantId={user?.role === 'super_admin' ? selectedTenantId : (user?.tenantId || 'demo-tenant')}
+            tenantName={activeTenantName}
+            tenantPlan={activeTenantObj?.plan || "Growth"}
+            isSuperAdmin={user?.role === 'super_admin'}
+          />
+        </React.Suspense>
+      )}
 
       {/* In-App Feedback & Telemetry Diagnostics Drawer */}
       <FeedbackWidget

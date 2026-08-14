@@ -45,7 +45,7 @@ import { generateCorrelationId, logProductionExecution, analyzeSmtpError, analyz
 import { runSaaSConsistencyCheck, executeSaaSAutoRepair } from "./src/lib/consistencyEngine.ts";
 import { getGlobalizationSettings } from "./src/lib/globalizationEngine.ts";
 import { getTranslation, simulateAiTranslation } from "./src/lib/multiLanguageEngine.ts";
-import zlib from "zlib";
+import compression from "compression";
 import sgMail from "@sendgrid/mail";
 import nodemailer from "nodemailer";
 import { PaymentWebhookService } from "./src/lib/webhookService.ts";
@@ -56,46 +56,17 @@ setupProcessExceptionHandler();
 
 const app = express();
 
-// Zero-dependency native Node zlib compression middleware
-app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
-  try {
-    const acceptEncoding = (req.headers["accept-encoding"] as string) || "";
-    if (acceptEncoding.includes("gzip") && req.method === "GET") {
-      const rawWrite = res.write;
-      const rawEnd = res.end;
-      let gzipStream: zlib.Gzip | null = null;
-
-      const initGzip = () => {
-        if (gzipStream) return;
-        gzipStream = zlib.createGzip({ level: 6 });
-        res.setHeader("Content-Encoding", "gzip");
-        res.removeHeader("Content-Length");
-        gzipStream.on("data", (chunk) => rawWrite.call(res, chunk));
-        gzipStream.on("end", () => rawEnd.call(res));
-      };
-
-      res.write = function (chunk: any, encoding?: any, callback?: any): boolean {
-        const contentType = String(res.getHeader("Content-Type") || "");
-        if (contentType.includes("image") || contentType.includes("video") || contentType.includes("zip")) {
-          return rawWrite.call(res, chunk, encoding, callback);
-        }
-        if (!gzipStream) initGzip();
-        return gzipStream!.write(chunk, encoding, callback);
-      } as any;
-
-      res.end = function (chunk?: any, encoding?: any, callback?: any): any {
-        if (!gzipStream) {
-          return rawEnd.call(res, chunk, encoding, callback);
-        }
-        if (chunk) {
-          gzipStream.write(chunk, encoding);
-        }
-        gzipStream.end(callback);
-      } as any;
+// Production-grade HTTP response compression for static assets and API payloads
+app.use(compression({
+  threshold: 1024,
+  level: 6,
+  filter: (req, res) => {
+    if (req.headers['x-no-compression']) {
+      return false;
     }
-  } catch (e) {}
-  next();
-});
+    return compression.filter(req, res);
+  }
+}));
 
 app.use(express.json());
 
