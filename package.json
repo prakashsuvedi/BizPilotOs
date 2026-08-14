@@ -14,7 +14,7 @@
     "start": "node dist/server.cjs"
   },
   "dependencies": {
-    "@google/genai": "^2.10.0",
+    "@google/genai": "^2.16.0",
     "@sendgrid/mail": "^8.1.6",
     "@types/compression": "^1.8.1",
     "clsx": "^2.1.1",
