@@ -12,6 +12,7 @@ import {
   TimeoutError,
   BaseEnterpriseError,
   DatabaseError,
+  ServiceUnavailableError,
 } from './errors/index.ts';
 
 export interface RequestOptions extends RequestInit {
@@ -19,12 +20,14 @@ export interface RequestOptions extends RequestInit {
   maxRetries?: number;
   correlationId?: string;
   skipErrorNormalization?: boolean;
+  idempotent?: boolean;
+  retryWrite?: boolean;
 }
 
 class EnterpriseAPIClient {
   private static instance: EnterpriseAPIClient;
   private readonly defaultTimeout = 30000; // 30 seconds
-  private readonly defaultRetries = 2;
+  private readonly defaultRetries = 3;
 
   private constructor() {}
 
@@ -36,11 +39,37 @@ class EnterpriseAPIClient {
   }
 
   /**
-   * Universal fetch with timeout, correlation headers, and automated retries
+   * Health probe helper with fast timeout for cold start detection
+   */
+  public async checkHealth(timeoutMs: number = 4000): Promise<{ healthy: boolean; data?: any }> {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+      const res = await fetch('/api/health', {
+        method: 'GET',
+        headers: { 'Cache-Control': 'no-cache, no-store' },
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+      if (res.ok) {
+        const data = await res.json().catch(() => ({ status: 'healthy' }));
+        return { healthy: true, data };
+      }
+      return { healthy: false };
+    } catch {
+      return { healthy: false };
+    }
+  }
+
+  /**
+   * Universal fetch with timeout, correlation headers, and safe automated retries
    */
   public async request<T>(path: string, options: RequestOptions = {}): Promise<T> {
     const correlationId = options.correlationId || `corr_${Math.random().toString(36).substr(2, 9)}`;
-    const maxRetries = options.maxRetries ?? this.defaultRetries;
+    const method = (options.method || 'GET').toUpperCase();
+    const isSafeMethod = method === 'GET' || method === 'HEAD' || method === 'OPTIONS';
+    const canRetry = isSafeMethod || options.idempotent === true || options.retryWrite === true;
+    const maxRetries = canRetry ? (options.maxRetries ?? this.defaultRetries) : 0;
     const timeout = options.timeout ?? this.defaultTimeout;
 
     // Standard headers for all corporate enterprise calls
@@ -88,6 +117,7 @@ class EnterpriseAPIClient {
           }
 
           const errMsg = parsedError.message || parsedError.error || `HTTP ${response.status} Error`;
+          const retryAfterSec = response.headers.get('retry-after') ? parseInt(response.headers.get('retry-after') || '3', 10) : undefined;
           
           if (response.status === 401) {
             throw new AuthenticationError(errMsg, correlationId);
@@ -97,8 +127,11 @@ class EnterpriseAPIClient {
             throw new RateLimitError(errMsg, correlationId);
           } else if (response.status === 400) {
             throw new ValidationError(errMsg, correlationId);
+          } else if (response.status === 503 || response.status === 502 || response.status === 504) {
+            // Cold start or temporary downstream service warmup
+            throw new ServiceUnavailableError(errMsg, retryAfterSec, correlationId);
           } else {
-            throw new BaseEnterpriseError(errMsg, `HTTP_${response.status}_FAULT`, 'medium', response.status >= 500, correlationId);
+            throw new BaseEnterpriseError(errMsg, `HTTP_${response.status}_FAULT`, 'medium', isSafeMethod && response.status >= 500, correlationId);
           }
         }
 
@@ -111,18 +144,24 @@ class EnterpriseAPIClient {
         if (err.name === 'AbortError') {
           throw new TimeoutError(`Request to ${path} exceeded timeout limit of ${timeout}ms`, correlationId);
         }
+        if (err instanceof TypeError && (err.message.includes('fetch') || err.message.includes('network') || err.message.includes('Failed to fetch'))) {
+          // Network interruption or backend offline during cold start
+          throw new ServiceUnavailableError(`Network connection to ${path} failed or backend is warming up`, 2, correlationId);
+        }
         throw err;
       }
     };
 
     const runRetryLoop = async (): Promise<T> => {
       try {
-        return await telemetry.instrument('api', `HTTP_${options.method || 'GET'}_${path}`, () => executeAttempt(), `Correlation: ${correlationId}`);
+        return await telemetry.instrument('api', `HTTP_${method}_${path}`, () => executeAttempt(), `Correlation: ${correlationId}`);
       } catch (err: any) {
-        if (err instanceof BaseEnterpriseError && err.retryable && attempt < maxRetries) {
+        const isRetryable = (err instanceof BaseEnterpriseError && err.retryable) || (err instanceof ServiceUnavailableError);
+        if (isRetryable && canRetry && attempt < maxRetries) {
           attempt++;
-          const backoffDelay = Math.pow(2, attempt) * 1000;
-          console.warn(`[EnterpriseAPIClient] Retrying ${path} (Attempt ${attempt}/${maxRetries}) in ${backoffDelay}ms due to: ${err.message}`);
+          // Exponential backoff: 1s, 2s, 4s, etc. (capped at 8s)
+          const backoffDelay = Math.min(Math.pow(2, attempt - 1) * 1000, 8000);
+          console.warn(`[EnterpriseAPIClient] Retrying ${method} ${path} (Attempt ${attempt}/${maxRetries}) in ${backoffDelay}ms due to: ${err.message}`);
           await new Promise((res) => setTimeout(res, backoffDelay));
           return runRetryLoop();
         }

@@ -10,10 +10,12 @@ import {
   createUserWithEmailAndPassword as firebaseCreateUserWithEmailAndPassword
 } from 'firebase/auth';
 import { 
-  getFirestore, 
+  getFirestore,
+  initializeFirestore,
   collection, 
   doc, 
   getDoc, 
+  getDocFromServer,
   getDocs, 
   setDoc, 
   addDoc, 
@@ -54,14 +56,88 @@ if (configToUse.projectId && !configToUse.projectId.startsWith("gen-lang-client-
 }
 
 const app = getApps().length === 0 ? initializeApp(configToUse) : getApps()[0];
-const liveDb = dbIdToUse && dbIdToUse !== "(default)" 
-  ? getFirestore(app, dbIdToUse) 
-  : getFirestore(app);
+
+// Configure Firestore with auto long-polling detection to prevent 10s streaming timeout in sandboxed and web environments
+let liveDb: any;
+try {
+  const firestoreSettings = {
+    experimentalAutoDetectLongPolling: true,
+    ignoreUndefinedProperties: true
+  };
+  liveDb = dbIdToUse && dbIdToUse !== "(default)" 
+    ? initializeFirestore(app, firestoreSettings, dbIdToUse) 
+    : initializeFirestore(app, firestoreSettings);
+} catch (e) {
+  // If already initialized (e.g. during fast reload), retrieve existing instance
+  liveDb = dbIdToUse && dbIdToUse !== "(default)" 
+    ? getFirestore(app, dbIdToUse) 
+    : getFirestore(app);
+}
+
 const liveAuth = getAuth(app);
 const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ client_id: '115411877340-hnhk9sokv9oo1v6037okhoegea8qqkc3.apps.googleusercontent.com' });
 
 export const isRealFirebase = true;
+
+export enum OperationType {
+  CREATE = 'create',
+  UPDATE = 'update',
+  DELETE = 'delete',
+  LIST = 'list',
+  GET = 'get',
+  WRITE = 'write',
+}
+
+export interface FirestoreErrorInfo {
+  error: string;
+  operationType: OperationType;
+  path: string | null;
+  authInfo: {
+    userId?: string | null;
+    email?: string | null;
+    emailVerified?: boolean | null;
+    isAnonymous?: boolean | null;
+    tenantId?: string | null;
+    providerInfo?: {
+      providerId?: string | null;
+      email?: string | null;
+    }[];
+  };
+}
+
+export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  const errInfo: FirestoreErrorInfo = {
+    error: error instanceof Error ? error.message : String(error),
+    authInfo: {
+      userId: liveAuth.currentUser?.uid,
+      email: liveAuth.currentUser?.email,
+      emailVerified: liveAuth.currentUser?.emailVerified,
+      isAnonymous: liveAuth.currentUser?.isAnonymous,
+      tenantId: (liveAuth.currentUser as any)?.tenantId,
+      providerInfo: liveAuth.currentUser?.providerData?.map(provider => ({
+        providerId: provider.providerId,
+        email: provider.email,
+      })) || []
+    },
+    operationType,
+    path
+  };
+  console.warn('Firestore Error Handled:', JSON.stringify(errInfo));
+  return errInfo;
+}
+
+// Lightweight connection check
+export async function testConnection() {
+  try {
+    await getDocFromServer(doc(liveDb, 'test', 'connection'));
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('the client is offline')) {
+      console.warn("Firestore Notice: Client running in resilient local cache/offline mode.");
+    }
+  }
+}
+testConnection();
 
 export const clientAuth = {
   currentUser: null as any,

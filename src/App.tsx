@@ -91,6 +91,10 @@ import { MarketForgeEmblem, MarketForgeLogo } from './components/MarketForgeLogo
 
 import PaymentSuccessModal from './components/PaymentSuccessModal';
 import TrialBanner from './components/TrialBanner';
+import { TenantNotFoundPage, InactiveTenantPage } from './components/TenantStatusPages';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import { FeedbackWidget } from './components/FeedbackWidget';
+import { ConnectingState } from './components/ConnectingState';
 
 // Default Fallbacks
 const defaultProfile: BusinessProfile = {
@@ -158,9 +162,34 @@ export default function App() {
   };
 
 
-  // Master Tenants list
-  const [tenantsList, setTenantsList] = useState<any[]>([]);
+  // Master Tenants list with local fallback for instant cold-start resolution
+  const [tenantsList, setTenantsList] = useState<any[]>(() => {
+    try {
+      const cached = localStorage.getItem('marketforge_sa_tenants');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {
+      // ignore
+    }
+    return [
+      { id: 'demo-tenant', name: 'Enterprise DemoCorp (Template Showcase)', domain: 'demo-tenant.marketforge.ai', status: 'active', isTemplate: true },
+      { id: 'sienna-tenant', name: 'Sienna Clay Studio (Template Showcase)', domain: 'sienna-tenant.marketforge.ai', status: 'active', isTemplate: true }
+    ];
+  });
   const [selectedTenantId, setSelectedTenantId] = useState<string>('demo-tenant');
+
+  // Backend cold-start and connection resilience states
+  const [backendStatus, setBackendStatus] = useState<'checking' | 'waking' | 'connected' | 'error'>('checking');
+  const [retryAttempt, setRetryAttempt] = useState<number>(0);
+
+  // Dedicated Multi-Tenant Ingress & Route State
+  const [routeState, setRouteState] = useState<{
+    type: 'platform_root' | 'tenant_view' | 'super_admin' | 'tenant_not_found' | 'tenant_suspended';
+    slug?: string;
+    tenant?: any;
+  }>({ type: 'platform_root' });
 
   // Super Admin view state: 'portal' | 'selection' | 'dashboard'
   const [superAdminView, setSuperAdminView] = useState<'portal' | 'selection' | 'dashboard'>('portal');
@@ -243,47 +272,245 @@ export default function App() {
     return () => clearInterval(timer);
   }, []);
 
-  // Fetch tenants
+  // Multi-Tenant Ingress and Route Matching Engine
+  const matchAndSetTenant = (rawSlug: string, currentTenants: any[]) => {
+    if (!rawSlug) {
+      setRouteState({ type: 'platform_root' });
+      return;
+    }
+
+    const cleanSlug = rawSlug.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+
+    // 1. Direct ID match
+    let matched = currentTenants.find(t => t.id && t.id.toLowerCase() === rawSlug.toLowerCase());
+
+    // 2. Custom domain match
+    if (!matched) {
+      matched = currentTenants.find(t => t.domain && t.domain.toLowerCase() === rawSlug.toLowerCase());
+    }
+
+    // 3. Clean slug ID match
+    if (!matched) {
+      matched = currentTenants.find(t => t.id && t.id.toLowerCase().replace(/[^a-z0-9]/g, '') === cleanSlug);
+    }
+
+    // 4. Prefix match (e.g. "malaysianrest" -> "malaysianrest-tenant")
+    if (!matched) {
+      matched = currentTenants.find(t => t.id && t.id.toLowerCase().startsWith(cleanSlug));
+    }
+
+    // 5. Tenant Name match
+    if (!matched) {
+      matched = currentTenants.find(t => t.name && t.name.toLowerCase().replace(/[^a-z0-9]/g, '') === cleanSlug);
+    }
+
+    // 6. Hardcoded Template Fallbacks
+    if (!matched && (rawSlug === 'demo-tenant' || cleanSlug === 'democorp' || cleanSlug === 'demo')) {
+      matched = { id: 'demo-tenant', name: 'Enterprise DemoCorp (Template Showcase)', domain: 'demo-tenant.marketforge.ai', status: 'active', isTemplate: true };
+    } else if (!matched && (rawSlug === 'sienna-tenant' || cleanSlug === 'sienna' || cleanSlug === 'siennaclay')) {
+      matched = { id: 'sienna-tenant', name: 'Sienna Clay Studio (Template Showcase)', domain: 'sienna-tenant.marketforge.ai', status: 'active', isTemplate: true };
+    }
+
+    if (matched) {
+      setSelectedTenantId(matched.id);
+      if (matched.status === 'suspended' || matched.status === 'inactive') {
+        setRouteState({ type: 'tenant_suspended', slug: rawSlug, tenant: matched });
+      } else {
+        setRouteState({ type: 'tenant_view', slug: rawSlug, tenant: matched });
+      }
+    } else {
+      // Fallback async API check before declaring 404
+      fetch(`/api/tenant/details?slug=${encodeURIComponent(rawSlug)}`)
+        .then(res => {
+          if (!res.ok && (res.status === 502 || res.status === 503 || res.status === 504)) {
+            // Cold start fallback: synthesize provisional tenant so the page doesn't flash 404
+            const dynamicName = rawSlug
+              .replace(/[-_]/g, ' ')
+              .replace(/\btenant\b/gi, 'Studio')
+              .split(' ')
+              .filter(Boolean)
+              .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+              .join(' ') || 'Workspace Showcase';
+            const provisional = { id: rawSlug, name: dynamicName, domain: `${rawSlug}.marketforge.ai`, status: 'active', isProvisional: true };
+            setSelectedTenantId(rawSlug);
+            setRouteState({ type: 'tenant_view', slug: rawSlug, tenant: provisional });
+            return null;
+          }
+          return res.json();
+        })
+        .then(data => {
+          if (!data) return;
+          if (data && data.success && data.tenant) {
+            setSelectedTenantId(data.tenant.id);
+            if (data.tenant.status === 'suspended' || data.tenant.status === 'inactive') {
+              setRouteState({ type: 'tenant_suspended', slug: rawSlug, tenant: data.tenant });
+            } else {
+              setRouteState({ type: 'tenant_view', slug: rawSlug, tenant: data.tenant });
+            }
+          } else {
+            setRouteState({ type: 'tenant_not_found', slug: rawSlug });
+          }
+        })
+        .catch(() => {
+          // If backend offline or cold starting, assume provisional tenant instead of 404
+          const dynamicName = rawSlug
+            .replace(/[-_]/g, ' ')
+            .replace(/\btenant\b/gi, 'Studio')
+            .split(' ')
+            .filter(Boolean)
+            .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+            .join(' ') || 'Workspace Showcase';
+          const provisional = { id: rawSlug, name: dynamicName, domain: `${rawSlug}.marketforge.ai`, status: 'active', isProvisional: true };
+          setSelectedTenantId(rawSlug);
+          setRouteState({ type: 'tenant_view', slug: rawSlug, tenant: provisional });
+        });
+    }
+  };
+
+  const resolveCurrentRoute = (currentTenants: any[] = tenantsList) => {
+    if (typeof window === 'undefined') return;
+
+    const pathname = window.location.pathname;
+    const pathSegments = pathname.split('/').filter(Boolean);
+    const urlParams = new URLSearchParams(window.location.search);
+    const queryTenant = urlParams.get('tenant') || urlParams.get('slug') || urlParams.get('t') || urlParams.get('id');
+
+    // Case 1: Root URL -> Platform Homepage
+    if (pathSegments.length === 0) {
+      if (queryTenant) {
+        matchAndSetTenant(queryTenant, currentTenants);
+      } else {
+        setRouteState({ type: 'platform_root' });
+      }
+      return;
+    }
+
+    const firstSeg = pathSegments[0].toLowerCase();
+
+    // Case 2: Super Admin route
+    if (['admin', 'superadmin', 'super-admin'].includes(firstSeg)) {
+      setRouteState({ type: 'super_admin' });
+      return;
+    }
+
+    // Case 3: Reserved Platform routes (Login, Register, Pricing, About, etc.)
+    if (['login', 'auth', 'register', 'signup', 'pricing', 'about', 'contact'].includes(firstSeg)) {
+      setRouteState({ type: 'platform_root' });
+      return;
+    }
+
+    // Case 4: Static assets/api
+    if (['dist', 'static', 'assets', 'api', 'favicon.ico', 'robots.txt'].includes(firstSeg)) {
+      return;
+    }
+
+    // Case 5: Tenant path e.g. /t/sienna-tenant or /tenant/demo-tenant or directly /sienna-tenant
+    let targetSlug = pathSegments[0];
+    if (pathSegments.length >= 2 && ['t', 'tenant', 'slug', 'b', 'company', 'workspace', 'store', 'view'].includes(firstSeg)) {
+      targetSlug = pathSegments[1];
+    }
+    if (queryTenant) {
+      targetSlug = queryTenant;
+    }
+
+    matchAndSetTenant(targetSlug, currentTenants);
+  };
+
+  // Browser Navigation Helpers
+  const navigateToTenant = (tenantId: string, action?: 'landing' | 'workspace') => {
+    const url = action === 'workspace' ? `/${tenantId}?action=workspace` : `/${tenantId}`;
+    window.history.pushState({}, '', url);
+    resolveCurrentRoute(tenantsList);
+  };
+
+  const navigateToPlatform = () => {
+    window.history.pushState({}, '', '/');
+    resolveCurrentRoute(tenantsList);
+  };
+
+  const navigateToAdmin = () => {
+    window.history.pushState({}, '', '/admin');
+    resolveCurrentRoute(tenantsList);
+  };
+
+  // Fetch tenants & resolve route
   const fetchTenants = async () => {
     try {
       const res = await fetch('/api/tenants-list');
       if (res.ok) {
         const list = await res.json();
-        setTenantsList(list || []);
-      } else {
-        setTenantsList([]);
+        if (Array.isArray(list) && list.length > 0) {
+          localStorage.setItem('marketforge_sa_tenants', JSON.stringify(list));
+          setTenantsList(list);
+          resolveCurrentRoute(list);
+          return list;
+        }
       }
+      resolveCurrentRoute(tenantsList);
     } catch (err) {
-      setTenantsList([]);
+      resolveCurrentRoute(tenantsList);
     }
+  };
+
+  // Cold-start probe & backend availability check with controlled exponential backoff
+  const checkBackendAvailability = async (isManual: boolean = false) => {
+    if (isManual) {
+      setBackendStatus('checking');
+      setRetryAttempt(0);
+    }
+
+    let attempt = 0;
+    const maxAttempts = 6;
+
+    const probe = async (): Promise<boolean> => {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3500);
+        const res = await fetch('/api/health', {
+          headers: { 'Cache-Control': 'no-cache, no-store' },
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+
+        if (res.ok) {
+          setBackendStatus('connected');
+          fetchTenants();
+          return true;
+        } else if (res.status === 502 || res.status === 503 || res.status === 504) {
+          // Backend is cold-starting / waking up
+          setBackendStatus('waking');
+        }
+      } catch (err) {
+        // Cold start network timeout or connection refused
+        setBackendStatus('waking');
+      }
+
+      attempt++;
+      setRetryAttempt(attempt);
+
+      if (attempt < maxAttempts) {
+        const backoffDelay = Math.min(Math.pow(2, attempt - 1) * 1200, 6000);
+        await new Promise(r => setTimeout(r, backoffDelay));
+        return probe();
+      } else {
+        // Retries exhausted for automatic probe, transition smoothly to connected so cached views or retry can function
+        setBackendStatus('connected');
+        fetchTenants();
+        return false;
+      }
+    };
+
+    probe();
   };
 
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
-    const queryTenant = urlParams.get('tenant') || urlParams.get('slug') || urlParams.get('t') || urlParams.get('id');
 
-    // Parse path segments for clean slug URLs e.g. /t/sienna-tenant or /tenant/demo-tenant
-    const pathSegments = window.location.pathname.split('/').filter(Boolean);
-    let pathTenant = '';
-    if (pathSegments.length >= 2 && ['t', 'tenant', 'slug', 'b', 'company', 'workspace'].includes(pathSegments[0])) {
-      pathTenant = pathSegments[1];
-    } else if (pathSegments.length === 1 && !['api', 'login', 'admin', 'dist', 'static', 'assets'].includes(pathSegments[0])) {
-      pathTenant = pathSegments[0];
-    }
-
-    const detectedTenant = queryTenant || pathTenant;
-    if (detectedTenant) {
-      setSelectedTenantId(detectedTenant);
-    }
-
-    // Auto-launch workspace trigger check
     const isLaunchRequested = 
       urlParams.get('action') === 'workspace' || 
       urlParams.get('launch') === 'true' || 
       urlParams.get('autolaunch') === 'true' ||
-      window.location.hash === '#workspace' ||
-      pathSegments.includes('workspace') ||
-      pathSegments.includes('launch');
+      window.location.hash === '#workspace';
 
     if (isLaunchRequested) {
       if (user) {
@@ -294,15 +521,19 @@ export default function App() {
       }
     }
 
+    // Run backend availability verification & tenant initialization
+    resolveCurrentRoute(tenantsList);
+    checkBackendAvailability();
+
     if (urlParams.get('payment_success')) {
        setIsPaymentSuccessOpen(true);
        window.history.replaceState({}, document.title, window.location.pathname);
-       // Poll a few times to ensure the backend update has propagated
        let attempts = 0;
        const pollInterval = setInterval(() => {
           fetch('/api/tenants-list').then(res => res.json()).then(list => {
              localStorage.setItem('marketforge_sa_tenants', JSON.stringify(list));
              setTenantsList(list);
+             resolveCurrentRoute(list);
              if (user?.tenantId) {
                 loadTenantDetails(user.tenantId);
              }
@@ -310,13 +541,16 @@ export default function App() {
              if (attempts > 3) {
                  clearInterval(pollInterval);
              }
-          });
+          }).catch(() => {});
        }, 1000);
-    } else {
-       fetchTenants();
     }
 
-    }, []);
+    const handlePopState = () => {
+      resolveCurrentRoute(tenantsList);
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   // Load state whenever selectedTenantId or user session changes
   const loadTenantDetails = async (tenantId: string) => {
@@ -400,8 +634,12 @@ export default function App() {
     if (role === 'super_admin') {
       setSelectedTenantId('demo-tenant');
       setSuperAdminView('portal');
+      navigateToAdmin();
     } else {
       setSelectedTenantId(tenantId);
+      setDashboardTab('command');
+      setIsHeaderFolded(true);
+      navigateToTenant(tenantId, 'workspace');
     }
   };
 
@@ -411,6 +649,7 @@ export default function App() {
     setUser(null);
     setSuperAdminView('portal');
     setDashboardTab('command');
+    navigateToPlatform();
   };
 
   const handleActivateTenant = (newTenant: any) => {
@@ -420,6 +659,9 @@ export default function App() {
       return [...prev, newTenant];
     });
     fetchTenants();
+    if (newTenant?.id) {
+      navigateToTenant(newTenant.id);
+    }
   };
 
   const handleUpdateCampaign = async (newCampaign: CampaignPlan) => {
@@ -502,7 +744,135 @@ export default function App() {
     );
   }
 
-  // Render Login Portal
+  // 0. Cold-Start / Backend Warming Up State
+  if (backendStatus === 'waking') {
+    const currentSlug = routeState.slug || urlParams.get('tenant') || urlParams.get('slug') || (routeState.tenant ? routeState.tenant.name : '');
+    return (
+      <ConnectingState 
+        statusText="Connecting to MarketForge..."
+        subText="Establishing secure cloud connection. If the service is warming up from inactivity, this takes just a few moments."
+        tenantSlug={currentSlug || undefined}
+        isRetrying={true}
+        retryAttempt={retryAttempt}
+        onManualRetry={() => checkBackendAvailability(true)}
+      />
+    );
+  }
+
+  // 1. Tenant 404 Resolution (Invalid Tenant URL)
+  if (routeState.type === 'tenant_not_found') {
+    return (
+      <TenantNotFoundPage 
+        slug={routeState.slug || ''} 
+        onNavigateHome={navigateToPlatform} 
+        onOpenRegister={() => {
+          navigateToPlatform();
+        }}
+      />
+    );
+  }
+
+  // 2. Tenant Suspended / Inactive Page
+  if (routeState.type === 'tenant_suspended') {
+    return (
+      <InactiveTenantPage 
+        tenant={routeState.tenant} 
+        onNavigateHome={navigateToPlatform} 
+      />
+    );
+  }
+
+  // 3. Specific Tenant View (https://marketforge.scamspike.com/{tenantname})
+  if (routeState.type === 'tenant_view' && routeState.tenant) {
+    const currentTenant = routeState.tenant;
+    const isLaunchRequested = 
+      urlParams.get('action') === 'workspace' || 
+      urlParams.get('launch') === 'true' || 
+      urlParams.get('autolaunch') === 'true' ||
+      window.location.hash === '#workspace' ||
+      dashboardTab !== 'landing';
+
+    // If NOT logged in -> Render Specific Tenant Landing Page
+    if (!user) {
+      return (
+        <MarketForgeLanding 
+          tenantId={currentTenant.id}
+          onSelectFeature={() => {
+            setIsMemberAuthModalOpen(true);
+          }}
+          onEnterOS={() => {
+            setIsMemberAuthModalOpen(true);
+          }}
+        />
+      );
+    }
+
+    // If logged in: check authorization
+    const isAuthorizedForTenant = user.role === 'super_admin' || user.tenantId === currentTenant.id;
+
+    if (!isAuthorizedForTenant) {
+      // Viewing another tenant's public landing page
+      return (
+        <div className="relative">
+          <div className="bg-slate-900 border-b border-indigo-500/30 px-4 py-2 flex flex-wrap items-center justify-between text-xs text-slate-300 gap-2 sticky top-0 z-50">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+              <span>Signed in as <strong className="text-white">{user.email}</strong> ({user.tenantId}) &bull; Viewing public showcase for <strong className="text-indigo-300">{currentTenant.name}</strong></span>
+            </div>
+            <button 
+              onClick={() => navigateToTenant(user.tenantId, 'workspace')}
+              className="px-3 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg font-bold text-xs transition cursor-pointer flex items-center gap-1.5"
+            >
+              <span>Return to My Workspace ({user.tenantId})</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+          <MarketForgeLanding 
+            tenantId={currentTenant.id}
+            onSelectFeature={() => {}}
+            onEnterOS={() => navigateToTenant(user.tenantId, 'workspace')}
+          />
+        </div>
+      );
+    }
+
+    // If authorized and viewing public landing page preview
+    if (dashboardTab === 'landing' && !isLaunchRequested) {
+      return (
+        <div className="relative">
+          <div className="bg-indigo-950/90 border-b border-indigo-500/30 px-4 py-2.5 flex flex-wrap items-center justify-between text-xs text-indigo-200 gap-2 sticky top-0 z-50 backdrop-blur-md">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-indigo-400 animate-pulse"></span>
+              <span>Public Storefront Preview for <strong className="text-white">{currentTenant.name}</strong></span>
+            </div>
+            <button 
+              onClick={() => {
+                setDashboardTab('command');
+                setIsHeaderFolded(true);
+              }}
+              className="px-3.5 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg font-bold text-xs transition cursor-pointer flex items-center gap-1.5 shadow"
+            >
+              <span>Open Workspace Command Center</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+          <MarketForgeLanding 
+            tenantId={currentTenant.id}
+            onSelectFeature={(featureId) => {
+              setDashboardTab(featureId as any);
+              setIsHeaderFolded(true);
+            }}
+            onEnterOS={() => {
+              setDashboardTab('command');
+              setIsHeaderFolded(true);
+            }}
+          />
+        </div>
+      );
+    }
+  }
+
+  // 4. Platform Root or Unauthenticated User -> Render Main MarketForge Platform Landing Page
   if (!user) {
     return (
       <LoginPortal 
@@ -1317,11 +1687,19 @@ export default function App() {
 
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => {
-                      const updated = tenantsList.map(t => gridSelectedTenantIds.includes(t.id) ? { ...t, status: 'suspended' } : t);
+                    onClick={async () => {
+                      const idsToSuspend = [...gridSelectedTenantIds];
+                      const updated = tenantsList.map(t => idsToSuspend.includes(t.id) ? { ...t, status: 'suspended' } : t);
                       setTenantsList(updated);
                       localStorage.setItem('marketforge_sa_tenants', JSON.stringify(updated));
                       setGridSelectedTenantIds([]);
+                      try {
+                        await fetch('/api/admin/tenants/update-status', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ tenantIds: idsToSuspend, status: 'suspended' })
+                        });
+                      } catch (e) {}
                     }}
                     className="px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/30 text-amber-300 text-xs font-bold rounded-xl transition cursor-pointer flex items-center gap-1.5"
                     title="Suspend selected workspaces"
@@ -1329,11 +1707,19 @@ export default function App() {
                     <Ban className="w-3.5 h-3.5" /> Suspend
                   </button>
                   <button
-                    onClick={() => {
-                      const updated = tenantsList.map(t => gridSelectedTenantIds.includes(t.id) ? { ...t, status: 'active' } : t);
+                    onClick={async () => {
+                      const idsToActivate = [...gridSelectedTenantIds];
+                      const updated = tenantsList.map(t => idsToActivate.includes(t.id) ? { ...t, status: 'active' } : t);
                       setTenantsList(updated);
                       localStorage.setItem('marketforge_sa_tenants', JSON.stringify(updated));
                       setGridSelectedTenantIds([]);
+                      try {
+                        await fetch('/api/admin/tenants/update-status', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ tenantIds: idsToActivate, status: 'active' })
+                        });
+                      } catch (e) {}
                     }}
                     className="px-3 py-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/30 text-emerald-300 text-xs font-bold rounded-xl transition cursor-pointer flex items-center gap-1.5"
                     title="Activate selected workspaces"
@@ -1909,7 +2295,9 @@ export default function App() {
               transition={{ duration: 0.2 }}
               className="w-full"
             >
-              {renderDashboardContent()}
+              <ErrorBoundary sectionName={`Workspace Module: ${dashboardTab}`}>
+                {renderDashboardContent()}
+              </ErrorBoundary>
             </motion.div>
           </AnimatePresence>
         </main>
@@ -2071,6 +2459,13 @@ export default function App() {
         tenantName={activeTenantName}
         tenantPlan={activeTenantObj?.plan || "Growth"}
         isSuperAdmin={user?.role === 'super_admin'}
+      />
+
+      {/* In-App Feedback & Telemetry Diagnostics Drawer */}
+      <FeedbackWidget
+        currentTenantId={selectedTenantId}
+        userEmail={user?.email || (activeTeamMember ? `${activeTeamMember.name.toLowerCase().replace(/\s+/g, '')}@${activeTenantObj?.domain || 'marketforge.ai'}` : 'guest@marketforge.ai')}
+        userRole={user?.role || activeTeamMember?.designation || 'Visitor'}
       />
     </div>
   );

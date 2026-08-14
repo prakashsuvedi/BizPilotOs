@@ -829,7 +829,7 @@ export default function SuperAdminPortal({
     }
   };
 
-  const handleBulkSuspendTenants = () => {
+  const handleBulkSuspendTenants = async () => {
     if (selectedTenantIds.length === 0) return;
     const count = selectedTenantIds.length;
     const updated = tenants.map(t => selectedTenantIds.includes(t.id) ? { ...t, status: 'suspended' as const } : t);
@@ -837,10 +837,20 @@ export default function SuperAdminPortal({
     localStorage.setItem('marketforge_sa_tenants', JSON.stringify(updated));
     if (onTenantsUpdated) onTenantsUpdated(updated);
     addAuditEntry('tenant_mutation', 'high', `Bulk suspended ${count} selected workspace partitions.`);
+    
+    try {
+      await fetch('/api/admin/tenants/update-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tenantIds: selectedTenantIds, status: 'suspended' })
+      });
+    } catch (e) {
+      console.warn('Backend update-status sync notice:', e);
+    }
     setSelectedTenantIds([]);
   };
 
-  const handleBulkActivateTenants = () => {
+  const handleBulkActivateTenants = async () => {
     if (selectedTenantIds.length === 0) return;
     const count = selectedTenantIds.length;
     const updated = tenants.map(t => selectedTenantIds.includes(t.id) ? { ...t, status: 'active' as const } : t);
@@ -848,10 +858,20 @@ export default function SuperAdminPortal({
     localStorage.setItem('marketforge_sa_tenants', JSON.stringify(updated));
     if (onTenantsUpdated) onTenantsUpdated(updated);
     addAuditEntry('tenant_mutation', 'medium', `Bulk activated ${count} selected workspace partitions.`);
+    
+    try {
+      await fetch('/api/admin/tenants/update-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tenantIds: selectedTenantIds, status: 'active' })
+      });
+    } catch (e) {
+      console.warn('Backend update-status sync notice:', e);
+    }
     setSelectedTenantIds([]);
   };
 
-  const handleBulkArchiveTenants = () => {
+  const handleBulkArchiveTenants = async () => {
     if (selectedTenantIds.length === 0) return;
     const nonDemoSelected = selectedTenantIds.filter(id => id !== 'demo-tenant');
     if (nonDemoSelected.length === 0) {
@@ -864,6 +884,16 @@ export default function SuperAdminPortal({
       localStorage.setItem('marketforge_sa_tenants', JSON.stringify(updated));
       if (onTenantsUpdated) onTenantsUpdated(updated);
       addAuditEntry('tenant_mutation', 'high', `Bulk archived / purged ${nonDemoSelected.length} workspace partitions.`);
+      
+      try {
+        await fetch('/api/admin/tenants/delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tenantIds: nonDemoSelected })
+        });
+      } catch (e) {
+        console.warn('Backend delete sync notice:', e);
+      }
       setSelectedTenantIds([]);
     }
   };

@@ -111,3 +111,11 @@ export class DatabaseError extends BaseEnterpriseError {
     super(message, 'DATABASE_ERROR', 'critical', true, correlationId);
   }
 }
+
+export class ServiceUnavailableError extends BaseEnterpriseError {
+  public readonly retryAfter?: number;
+  constructor(message: string = 'Service temporarily unavailable. Backend may be waking up.', retryAfter?: number, correlationId?: string) {
+    super(message, 'SERVICE_UNAVAILABLE_ERROR', 'medium', true, correlationId);
+    this.retryAfter = retryAfter;
+  }
+}

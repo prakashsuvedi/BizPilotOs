@@ -17,11 +17,13 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { 
   requireAuth, 
   requireRole, 
+  requireTenantScope,
   validateBody, 
   rateLimiter, 
   logAuditEvent, 
   businessProfileSchema, 
   requestContentSchema, 
+  feedbackTelemetrySchema,
   AuthRequest 
 } from "./src/middleware/auth.ts";
 import { getAdminDb, reinitializeFirebaseAdmin, getIsRealAdminReady, getAdminAuth } from "./src/lib/firebase-admin.ts";
@@ -193,12 +195,23 @@ app.use(async (req: any, res: any, next: any) => {
   req.tenantId = tenantId || "demo-tenant";
   next();
 });
-const PORT = (process.env.PORT && (process.env.PORT.includes('/') || process.env.PORT.includes('.sock'))) ? process.env.PORT : 3000;
+const PORT = process.env.PORT 
+  ? ((process.env.PORT.includes('/') || process.env.PORT.includes('.sock')) 
+      ? process.env.PORT 
+      : (!isNaN(Number(process.env.PORT)) ? Number(process.env.PORT) : 3000))
+  : 3000;
 
-// Simple connectivity health check route
-app.get("/api/health", (req, res) => {
-  res.json({
+// Unauthenticated lightweight connectivity health check route for cold-start detection & hosting load balancers
+app.all(["/api/health", "/api/ping"], (req, res) => {
+  res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+  res.setHeader("Pragma", "no-cache");
+  res.setHeader("Expires", "0");
+  if (req.method === "HEAD") {
+    return res.status(200).end();
+  }
+  return res.status(200).json({
     status: "healthy",
+    ready: true,
     timestamp: new Date().toISOString(),
     env: process.env.NODE_ENV || "production",
     message: "MarketForge AI Core System is fully online and connected!"
@@ -2732,7 +2745,7 @@ app.get("/api/profile", requireAuth, async (req: AuthRequest, res) => {
   }
 });
 
-app.post("/api/profile", requireAuth, requireRole(["owner", "admin", "writer"]), validateBody(businessProfileSchema), async (req: AuthRequest, res) => {
+app.post("/api/profile", requireAuth, requireTenantScope, requireRole(["owner", "admin", "writer"]), validateBody(businessProfileSchema), async (req: AuthRequest, res) => {
   try {
     const tenantId = req.tenantId || "demo-tenant";
     const profileId = `prof_${tenantId}`;
@@ -6628,8 +6641,324 @@ app.get("/api/tenants-list", async (req, res) => {
   }
 });
 
-// Endpoint to fetch members belonging to an isolated tenant scope
-app.get("/api/tenant/team", async (req, res) => {
+// Endpoint to retrieve a single tenant's full details and resolution
+app.get("/api/tenant/details", async (req, res) => {
+  const queryId = (req.query.tenantId || req.query.id || req.query.slug || "") as string;
+  if (!queryId) return res.status(400).json({ error: "Missing tenant identifier parameter." });
+
+  try {
+    let matchedTenant: any = null;
+    const cleanQuery = queryId.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+    const checkMatch = (t: any) => {
+      if (!t) return false;
+      const tId = (t.id || '').toLowerCase();
+      const tName = (t.name || '').toLowerCase();
+      const tDomain = (t.domain || '').toLowerCase();
+      const tIdClean = tId.replace(/[^a-z0-9]/g, '');
+      const tNameClean = tName.replace(/[^a-z0-9]/g, '');
+      const tDomainClean = tDomain.replace(/[^a-z0-9]/g, '');
+
+      return (
+        tId === queryId.toLowerCase() ||
+        tDomain === queryId.toLowerCase() ||
+        tIdClean === cleanQuery ||
+        tNameClean === cleanQuery ||
+        tDomainClean === cleanQuery ||
+        tId.startsWith(cleanQuery) ||
+        tIdClean.startsWith(cleanQuery) ||
+        tName.includes(queryId.toLowerCase()) ||
+        tNameClean.includes(cleanQuery) ||
+        (cleanQuery === 'democorp' && tId.includes('demo')) ||
+        (cleanQuery === 'demo' && tId.includes('demo')) ||
+        (cleanQuery === 'sienna' && tId.includes('sienna')) ||
+        (cleanQuery === 'siennaclay' && tId.includes('sienna'))
+      );
+    };
+
+    // 1. Check in-memory store
+    const memList = Object.values(serverMemoryStore.tenants || {}) as any[];
+    matchedTenant = memList.find(checkMatch);
+
+    // 2. If not found, check Firestore
+    if (!matchedTenant && getIsRealAdminReady()) {
+      try {
+        const db = getAdminDb();
+        const directDoc = await db.collection("tenants").doc(queryId).get();
+        if (directDoc.exists) {
+          matchedTenant = { id: directDoc.id, ...directDoc.data() };
+        }
+        if (!matchedTenant) {
+          const snap = await db.collection("tenants").get();
+          snap.forEach(docSnap => {
+            if (matchedTenant) return;
+            const data = docSnap.data();
+            const candidate = { id: docSnap.id, ...data };
+            if (checkMatch(candidate)) {
+              matchedTenant = candidate;
+            }
+          });
+        }
+      } catch (dbErr: any) {
+        console.warn("[Tenant Details] Firestore lookup notice:", dbErr.message);
+      }
+    }
+
+    // 3. Hardcoded template fallbacks
+    if (!matchedTenant) {
+      if (queryId === 'demo-tenant' || cleanQuery === 'democorp' || cleanQuery === 'demo') {
+        matchedTenant = {
+          id: 'demo-tenant',
+          name: 'Enterprise DemoCorp (Template Showcase)',
+          domain: 'demo-tenant.marketforge.ai',
+          ownerEmail: 'owner@democorp.com',
+          isCustom: false,
+          isTemplate: true,
+          status: 'active',
+          plan: 'Enterprise',
+          mrr: 499,
+          trialDaysLeft: 365,
+          activeUsers: 5,
+          storageMb: 120,
+          health: 'Healthy',
+          disabledModules: [],
+          activatedModules: ['restaurant', 'tours', 'marketing', 'hr', 'website', 'customercare', 'email', 'adstudio'],
+          createdAt: '2026-01-01T00:00:00.000Z'
+        };
+      } else if (queryId === 'sienna-tenant' || cleanQuery === 'sienna' || cleanQuery === 'siennaclay') {
+        matchedTenant = {
+          id: 'sienna-tenant',
+          name: 'Sienna Clay Studio (Template Showcase)',
+          domain: 'sienna-tenant.marketforge.ai',
+          ownerEmail: 'evelyn@siennaclay.com',
+          isCustom: false,
+          isTemplate: true,
+          status: 'active',
+          plan: 'Growth',
+          mrr: 249,
+          trialDaysLeft: 365,
+          activeUsers: 3,
+          storageMb: 45,
+          health: 'Healthy',
+          disabledModules: [],
+          activatedModules: ['restaurant', 'tours', 'marketing', 'website'],
+          createdAt: '2026-01-01T00:00:00.000Z'
+        };
+      }
+    }
+
+    if (!matchedTenant) {
+      return res.status(404).json({ error: `Tenant '${queryId}' not found.`, notFound: true });
+    }
+
+    return res.json({ success: true, tenant: matchedTenant });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// Admin endpoint to create a new tenant with Firestore + memory store persistence
+app.post("/api/admin/tenants/create", async (req, res) => {
+  try {
+    const { name, domain, ownerEmail, plan = "Growth", status = "active", mrr = 249, isTemplate = false } = req.body;
+    if (!name) return res.status(400).json({ error: "Tenant name is required." });
+
+    const cleanSlug = (domain || name).split('.')[0].toLowerCase().replace(/[^a-z0-9]/g, '');
+    const tenantId = `${cleanSlug}-tenant`;
+
+    const tenantPayload = {
+      id: tenantId,
+      name,
+      domain: domain || `${cleanSlug}.marketforge.ai`,
+      ownerEmail: ownerEmail || `admin@${cleanSlug}.com`,
+      isCustom: true,
+      status: status || 'active',
+      plan: plan || 'Growth',
+      mrr: Number(mrr) || 249,
+      trialDaysLeft: 30,
+      activeUsers: 1,
+      storageMb: 5.0,
+      health: 'Healthy',
+      apiRequests: 0,
+      pdfExports: 0,
+      imageGenerations: 0,
+      knowledgeAssets: 0,
+      disabledModules: [],
+      activatedModules: ['restaurant', 'website', 'marketing_planner'],
+      paymentStatus: 'active',
+      isTemplate: !!isTemplate,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    // Save to memory store
+    if (!serverMemoryStore.tenants) serverMemoryStore.tenants = {};
+    serverMemoryStore.tenants[tenantId] = tenantPayload;
+
+    // Save to Firestore
+    if (getIsRealAdminReady()) {
+      try {
+        const db = getAdminDb();
+        await db.collection("tenants").doc(tenantId).set(tenantPayload);
+      } catch (dbErr: any) {
+        console.warn("[Admin Create Tenant] Firestore persist notice:", dbErr.message);
+      }
+    }
+
+    return res.json({ success: true, tenant: tenantPayload });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// Admin endpoint to update tenant details
+app.post("/api/admin/tenants/update", async (req, res) => {
+  try {
+    const { tenantId, updates } = req.body;
+    if (!tenantId || !updates) return res.status(400).json({ error: "tenantId and updates are required." });
+
+    if (!serverMemoryStore.tenants) serverMemoryStore.tenants = {};
+    const existing = serverMemoryStore.tenants[tenantId] || {};
+    const merged = {
+      ...existing,
+      ...updates,
+      id: tenantId,
+      updatedAt: new Date().toISOString()
+    };
+    serverMemoryStore.tenants[tenantId] = merged;
+
+    if (getIsRealAdminReady()) {
+      try {
+        const db = getAdminDb();
+        await db.collection("tenants").doc(tenantId).set(merged, { merge: true });
+      } catch (dbErr: any) {
+        console.warn("[Admin Update Tenant] Firestore persist notice:", dbErr.message);
+      }
+    }
+
+    return res.json({ success: true, tenant: merged });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// Admin endpoint to update tenant status (active, suspended, archived)
+app.post("/api/admin/tenants/update-status", async (req, res) => {
+  try {
+    const { tenantIds, status } = req.body;
+    if (!Array.isArray(tenantIds) || !status) {
+      return res.status(400).json({ error: "tenantIds array and status required." });
+    }
+
+    const updatedList = [];
+    if (!serverMemoryStore.tenants) serverMemoryStore.tenants = {};
+
+    for (const tId of tenantIds) {
+      if (serverMemoryStore.tenants[tId]) {
+        serverMemoryStore.tenants[tId].status = status;
+        serverMemoryStore.tenants[tId].updatedAt = new Date().toISOString();
+        updatedList.push(serverMemoryStore.tenants[tId]);
+      }
+      if (getIsRealAdminReady()) {
+        try {
+          const db = getAdminDb();
+          await db.collection("tenants").doc(tId).set({ status, updatedAt: new Date().toISOString() }, { merge: true });
+        } catch (dbErr: any) {
+          console.warn(`[Update Status] Firestore notice for ${tId}:`, dbErr.message);
+        }
+      }
+    }
+
+    return res.json({ success: true, updatedCount: tenantIds.length, status });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// Admin endpoint to delete / archive tenant
+app.post("/api/admin/tenants/delete", async (req, res) => {
+  try {
+    const { tenantIds } = req.body;
+    if (!Array.isArray(tenantIds)) return res.status(400).json({ error: "tenantIds array required." });
+
+    const protectedIds = ['demo-tenant', 'sienna-tenant'];
+    const toDelete = tenantIds.filter(id => !protectedIds.includes(id));
+
+    if (!serverMemoryStore.tenants) serverMemoryStore.tenants = {};
+    for (const tId of toDelete) {
+      delete serverMemoryStore.tenants[tId];
+      if (getIsRealAdminReady()) {
+        try {
+          const db = getAdminDb();
+          await db.collection("tenants").doc(tId).delete();
+        } catch (dbErr: any) {
+          console.warn(`[Delete Tenant] Firestore notice for ${tId}:`, dbErr.message);
+        }
+      }
+    }
+
+    return res.json({ success: true, deletedCount: toDelete.length });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// Endpoint to save tenant custom branding
+app.post("/api/tenant/branding/save", async (req, res) => {
+  try {
+    const { tenantId, branding } = req.body;
+    if (!tenantId || !branding) return res.status(400).json({ error: "tenantId and branding required." });
+
+    const payload = {
+      ...branding,
+      tenantId,
+      lastUpdated: new Date().toISOString()
+    };
+
+    if (!serverMemoryStore.tenant_brandings) serverMemoryStore.tenant_brandings = {};
+    serverMemoryStore.tenant_brandings[tenantId] = payload;
+
+    if (getIsRealAdminReady()) {
+      try {
+        const db = getAdminDb();
+        await db.collection("tenant_brandings").doc(tenantId).set(payload);
+      } catch (dbErr: any) {
+        console.warn("[Save Branding] Firestore notice:", dbErr.message);
+      }
+    }
+
+    return res.json({ success: true, branding: payload });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// Endpoint to get tenant custom branding
+app.get("/api/tenant/branding", async (req, res) => {
+  try {
+    const tenantId = (req.query.tenantId as string) || "demo-tenant";
+    let branding = serverMemoryStore.tenant_brandings?.[tenantId] || null;
+
+    if (!branding && getIsRealAdminReady()) {
+      try {
+        const db = getAdminDb();
+        const docSnap = await db.collection("tenant_brandings").doc(tenantId).get();
+        if (docSnap.exists) {
+          branding = docSnap.data();
+        }
+      } catch (dbErr: any) {
+        console.warn("[Get Branding] Firestore notice:", dbErr.message);
+      }
+    }
+
+    return res.json({ success: true, branding });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// Endpoint to list tenant team members
+app.get("/api/tenant/team-members", async (req, res) => {
   const tenantId = req.query.tenantId as string || "demo-tenant";
   try {
     const allUsers = Object.values(serverMemoryStore.users || {});
@@ -6639,6 +6968,73 @@ app.get("/api/tenant/team", async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+// =========================================================================
+// PILLAR 3 & 4: IN-APP FEEDBACK, TELEMETRY & DIAGNOSTIC REPOSITORY
+// =========================================================================
+app.post("/api/telemetry/feedback", async (req, res) => {
+  try {
+    const parseResult = feedbackTelemetrySchema.safeParse(req.body);
+    const feedbackPayload = parseResult.success ? parseResult.data : req.body;
+
+    const feedbackId = `fb_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const record = {
+      id: feedbackId,
+      ...feedbackPayload,
+      receivedAt: new Date().toISOString(),
+      status: "received"
+    };
+
+    if (!serverMemoryStore.system_feedback) {
+      serverMemoryStore.system_feedback = {};
+    }
+    serverMemoryStore.system_feedback[feedbackId] = record;
+
+    if (getIsRealAdminReady()) {
+      try {
+        const db = getAdminDb();
+        await db.collection("system_feedback").doc(feedbackId).set(record);
+      } catch (dbErr: any) {
+        console.warn("[Telemetry] Firestore write warning (cached in memory):", dbErr.message);
+      }
+    }
+
+    console.log(`[TELEMETRY] ${record.category.toUpperCase()} logged: ${record.title || record.errorMessage || 'Feedback submitted'}`);
+    return res.json({ success: true, feedbackId, message: "Telemetry entry safely recorded." });
+  } catch (err: any) {
+    console.error("[Telemetry] Failed to record feedback:", err);
+    return res.status(500).json({ error: "Failed to process telemetry", message: err.message });
+  }
+});
+
+app.get("/api/telemetry/feedback", async (req, res) => {
+  try {
+    const memoryFeedback = Object.values(serverMemoryStore.system_feedback || {});
+    let firestoreFeedback: any[] = [];
+
+    if (getIsRealAdminReady()) {
+      try {
+        const db = getAdminDb();
+        const snap = await db.collection("system_feedback").limit(50).get();
+        firestoreFeedback = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      } catch (e) {}
+    }
+
+    // Merge and deduplicate
+    const combined = [...firestoreFeedback, ...memoryFeedback];
+    const uniqueMap = new Map();
+    combined.forEach(item => uniqueMap.set(item.id, item));
+
+    return res.json({
+      success: true,
+      count: uniqueMap.size,
+      items: Array.from(uniqueMap.values()).reverse()
+    });
+  } catch (err: any) {
+    return res.status(500).json({ error: "Failed to retrieve feedback list" });
+  }
+});
+
 
 // Endpoint to register key internal team personnel
 app.post("/api/tenant/add-team-member", async (req, res) => {
@@ -13053,6 +13449,80 @@ async function bootstrap() {
     next();
   };
 
+  // Explicit API 404 handler to prevent API routes from falling through to HTML index
+  app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
+    if (req.originalUrl.startsWith("/api")) {
+      return res.status(404).json({
+        error: "API Endpoint Not Found",
+        message: `No API route matches ${req.method} ${req.originalUrl}`,
+        status: 404,
+        timestamp: new Date().toISOString()
+      });
+    }
+    next();
+  });
+
+  // =========================================================================
+  // PILLAR 3: GRACEFUL GLOBAL API ERROR HANDLING & LOGGING MIDDLEWARE
+  // =========================================================================
+  app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+    if (res.headersSent) {
+      return next(err);
+    }
+    
+    // Check if error is a temporary downstream service or rate limit error
+    const isTemporaryUnavailable = 
+      err.status === 503 ||
+      err.status === 502 ||
+      err.status === 504 ||
+      err.code === 'ECONNREFUSED' ||
+      err.code === 'ETIMEDOUT' ||
+      err.code === 'ECONNRESET' ||
+      (err.message && (
+        err.message.includes('ResourceExhausted') ||
+        err.message.includes('429') ||
+        err.message.includes('temporarily unavailable') ||
+        err.message.includes('waking up') ||
+        err.message.includes('cold start')
+      ));
+
+    const status = isTemporaryUnavailable 
+      ? 503 
+      : (typeof err.status === "number" && err.status >= 400 && err.status < 600 ? err.status : 500);
+      
+    const isProd = process.env.NODE_ENV === "production";
+    
+    // Server-side audit capture without leaking sensitive credentials to browser
+    console.error(`[API ERROR ${status}] ${req.method} ${req.originalUrl}:`, {
+      message: err.message || "Unknown server fault",
+      stack: err.stack,
+      tenantId: (req as any).tenantId || req.headers["x-simulated-tenant"] || "unknown",
+      timestamp: new Date().toISOString()
+    });
+
+    if (req.originalUrl.startsWith("/api") || req.xhr || req.headers.accept?.includes("json")) {
+      if (status === 503) {
+        res.setHeader("Retry-After", "3");
+        return res.status(503).json({
+          error: "Service Temporarily Unavailable",
+          message: "A backend service or dependency is warming up or temporarily busy. Please retry in a few seconds.",
+          status: 503,
+          retryAfter: 3,
+          timestamp: new Date().toISOString()
+        });
+      }
+
+      return res.status(status).json({
+        error: status === 500 ? "Internal Server Error" : "Request Processing Error",
+        message: isProd && status === 500 ? "An unexpected server fault occurred. Please try again later." : (err.message || "Internal server error"),
+        status,
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    return next(err);
+  });
+
   // 2. Serve Vite middleware in development or static assets in production
   if (process.env.NODE_ENV !== "production") {
     console.log("[Bootstrap] Starting in development mode with active Vite middleware...");
@@ -13079,12 +13549,12 @@ async function bootstrap() {
     app.use(serveSpaFallback);
   }
 
-  const rawPort = (process.env.PORT && (process.env.PORT.includes('/') || process.env.PORT.includes('.sock'))) 
-    ? process.env.PORT 
+  const rawPort = process.env.PORT 
+    ? ((process.env.PORT.includes('/') || process.env.PORT.includes('.sock'))
+        ? process.env.PORT 
+        : (!isNaN(Number(process.env.PORT)) ? Number(process.env.PORT) : 3000))
     : 3000;
-  const finalPort = (typeof rawPort === 'number' || (!isNaN(Number(rawPort)) && !String(rawPort).includes('/') && !String(rawPort).includes('.sock'))) 
-    ? Number(rawPort) 
-    : rawPort;
+  const finalPort = rawPort;
 
   const startWorker = () => {
     // Background Worker to Auto-Publish Scheduled Social Posts
