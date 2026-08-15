@@ -7037,6 +7037,31 @@ app.get("/api/tenant/branding", async (req, res) => {
       }
     }
 
+    if (!branding) {
+      const tenantDoc = serverMemoryStore.tenants?.[tenantId];
+      const companyName = tenantDoc?.name || (tenantId === 'demo-tenant' ? 'DemoCorp International' : 'Tenant Workspace');
+      branding = {
+        tenantId,
+        companyName,
+        tagline: `${companyName} - Enterprise Portal`,
+        logoUrl: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=200&q=80",
+        address: "Corporate Headquarters",
+        phone: "+1 (800) 555-0199",
+        supportEmail: tenantDoc?.ownerEmail || `support@${tenantId}.com`,
+        primaryColor: "#6366f1",
+        accentColor: "#06b6d4",
+        customDomain: tenantDoc?.domain || `${tenantId}.marketforge.ai`,
+        domainRoutingMode: "path",
+        dnsStatus: "verified",
+        sslStatus: "active",
+        homepageSource: "default",
+        createdAt: new Date().toISOString(),
+        lastUpdated: new Date().toISOString()
+      };
+      if (!serverMemoryStore.tenant_brandings) serverMemoryStore.tenant_brandings = {};
+      serverMemoryStore.tenant_brandings[tenantId] = branding;
+    }
+
     return res.json({ success: true, branding });
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
