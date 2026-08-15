@@ -21,6 +21,8 @@ import {
   BookOpen,
   Settings as SettingsIcon,
   ArrowLeft,
+  ArrowRight,
+  ShieldCheck,
   Building2,
   Bed,
   ChevronRight,
