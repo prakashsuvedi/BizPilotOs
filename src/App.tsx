@@ -659,8 +659,12 @@ export default function App() {
     localStorage.removeItem("marketforge_user_session");
     setUser(null);
     setSuperAdminView('portal');
-    setDashboardTab('command');
-    navigateToPlatform();
+    setDashboardTab('landing');
+    if (routeState.type === 'tenant_view' && routeState.tenant?.id) {
+      navigateToTenant(routeState.tenant.id, 'landing');
+    } else {
+      navigateToPlatform();
+    }
   };
 
   const handleActivateTenant = (newTenant: any) => {
@@ -793,6 +797,8 @@ export default function App() {
       return (
         <MarketForgeLanding 
           tenantId={currentTenant.id}
+          initialAuthModalOpen={isLaunchRequested}
+          onLogin={handleLogin}
           onSelectFeature={() => {
             setIsMemberAuthModalOpen(true);
           }}
@@ -1031,6 +1037,7 @@ export default function App() {
         return (
           <MarketForgeLanding 
             tenantId={activeTenantForLanding}
+            onLogin={handleLogin}
             onSelectFeature={(featureId) => {
               if (!user) {
                 setSuperAdminView('portal');

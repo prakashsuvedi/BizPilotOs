@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { clientAuth, clientDb } from '../lib/firebase';
-import { Building2, Mail, Lock, CheckCircle2, AlertTriangle, ArrowRight, RefreshCw, Terminal, UtensilsCrossed, Compass, Share2, Users, MessageSquare, Globe, Bot, Send, Megaphone, Check, CreditCard, ShieldCheck } from 'lucide-react';
+import { Building2, Mail, Lock, CheckCircle2, AlertTriangle, ArrowRight, RefreshCw, Terminal, UtensilsCrossed, Compass, Share2, Users, User, MessageSquare, Globe, Bot, Send, Megaphone, Check, CreditCard, ShieldCheck } from 'lucide-react';
 import { OrchestrationEngine } from '../lib/orchestration';
 
 const MODULE_CATALOG = [
@@ -21,6 +21,7 @@ export default function RegistrationFlow({ onActivateTenant, onLogin }: { onActi
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [companyName, setCompanyName] = useState('');
+  const [ownerName, setOwnerName] = useState('');
   const [companyDomain, setCompanyDomain] = useState('');
   const [otp, setOtp] = useState('');
   const [otpSent, setOtpSent] = useState(false);
@@ -106,6 +107,7 @@ export default function RegistrationFlow({ onActivateTenant, onLogin }: { onActi
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: companyName,
+          ownerName: ownerName || companyName,
           domain: companyDomain,
           ownerEmail: email,
           password: password,
@@ -122,6 +124,7 @@ export default function RegistrationFlow({ onActivateTenant, onLogin }: { onActi
       }
 
       const resData = await resp.json();
+      const finalTenantSlug = resData.tenantSlug || resData.tenant?.id || generatedTenantId;
       setLogs(prev => [...prev, `[PAYMENT] Initiating gateway session for ${paymentGateway.toUpperCase()}...`]);
 
       // Call payment API
@@ -130,7 +133,7 @@ export default function RegistrationFlow({ onActivateTenant, onLogin }: { onActi
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           gateway: paymentGateway,
-          tenantId: generatedTenantId,
+          tenantId: finalTenantSlug,
           amountNpr: totalNpr,
           moduleIds: allSelectedModules,
           customerEmail: email,
@@ -142,27 +145,29 @@ export default function RegistrationFlow({ onActivateTenant, onLogin }: { onActi
       setLogs(prev => [...prev, `[PAYMENT] ${payData.message || 'Payment verified.'}`]);
 
       setSuccess(true);
-      setLogs(prev => [...prev, `[SUCCESS] Account created! Activated modules: ${allSelectedModules.join(', ')}.`]);
+      setLogs(prev => [...prev, `[SUCCESS] Account created! Workspace assigned: /${finalTenantSlug}.`]);
 
       const newTenant = resData.tenant || {
-        id: generatedTenantId,
+        id: finalTenantSlug,
         name: companyName,
         domain: companyDomain,
         ownerEmail: email,
         isCustom: true,
         status: 'active',
-        plan: 'Pro (1 Month Free Trial)',
-        subscriptionPriceNpr: 0,
-        mrr: 0,
+        plan: 'Growth (Self-Service)',
+        subscriptionPriceNpr: totalNpr,
+        mrr: totalUsd,
         trialDaysLeft: 30,
         activatedModules: allSelectedModules,
         paymentGateway: paymentGateway,
-        paymentStatus: 'free_trial'
+        paymentStatus: 'active'
       };
 
       setTimeout(() => {
         onActivateTenant(newTenant);
-        onLogin('owner', generatedTenantId, email);
+        // Automatically route to the newly created tenant landing page or workspace
+        window.history.pushState({}, '', `/${finalTenantSlug}`);
+        onLogin('owner', finalTenantSlug, email);
       }, 1500);
 
     } catch (err: any) {
@@ -193,23 +198,39 @@ export default function RegistrationFlow({ onActivateTenant, onLogin }: { onActi
 
       {step === 1 && (
         <form onSubmit={handleNextStep1} className="space-y-4 text-left">
-          <div className="space-y-1.5">
-            <label className="text-[10px] uppercase font-mono font-bold text-slate-400 block">Organization Name</label>
-            <div className="relative">
-              <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-              <input
-                type="text"
-                value={companyName}
-                onChange={(e) => setCompanyName(e.target.value)}
-                placeholder="e.g. Kathmandu Bistro & Travel"
-                className="w-full bg-slate-900 border border-slate-700 text-white text-xs rounded-xl pl-9 pr-3 py-2.5 focus:outline-none"
-                required
-              />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <label className="text-[10px] uppercase font-mono font-bold text-slate-400 block">Business / Org Name</label>
+              <div className="relative">
+                <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                <input
+                  type="text"
+                  value={companyName}
+                  onChange={(e) => setCompanyName(e.target.value)}
+                  placeholder="e.g. Kathmandu Bistro & Travel"
+                  className="w-full bg-slate-900 border border-slate-700 text-white text-xs rounded-xl pl-9 pr-3 py-2.5 focus:outline-none"
+                  required
+                />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-[10px] uppercase font-mono font-bold text-slate-400 block">Owner Full Name</label>
+              <div className="relative">
+                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                <input
+                  type="text"
+                  value={ownerName}
+                  onChange={(e) => setOwnerName(e.target.value)}
+                  placeholder="e.g. Maya Shrestha"
+                  className="w-full bg-slate-900 border border-slate-700 text-white text-xs rounded-xl pl-9 pr-3 py-2.5 focus:outline-none"
+                  required
+                />
+              </div>
             </div>
           </div>
           
           <div className="space-y-1.5">
-            <label className="text-[10px] uppercase font-mono font-bold text-slate-400 block">Web Domain</label>
+            <label className="text-[10px] uppercase font-mono font-bold text-slate-400 block">Web Domain / Unique Slug</label>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 font-bold text-xs">www.</span>
               <input

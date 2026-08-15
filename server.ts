@@ -1581,6 +1581,9 @@ app.post("/api/tenant/login", async (req: express.Request, res: express.Response
     if (!email) {
       return res.status(400).json({ error: "Email or username is required for login." });
     }
+    if (!password) {
+      return res.status(400).json({ error: "Password is required for login." });
+    }
 
     await syncFirebaseAccountsToMemoryAndFirestore();
 
@@ -1607,102 +1610,62 @@ app.post("/api/tenant/login", async (req: express.Request, res: express.Response
       } catch (e) {}
     }
 
-    // Handle tenant workspace association gracefully
-    if (foundUser) {
-      if (targetTenant && targetTenant !== "auto") {
-        // If workspace requested matches or if user owns/created this tenant, set tenantId to targetTenant
+    // If user does not exist, check if it is a template demo account fallback
+    if (!foundUser) {
+      if (cleanEmail === 'owner@democorp.com') {
+        foundUser = {
+          id: 'usr_democorp_owner',
+          email: 'owner@democorp.com',
+          name: 'DemoCorp Owner',
+          role: 'owner',
+          tenantId: 'demo-tenant',
+          password: 'password123'
+        };
+        if (!serverMemoryStore.users) serverMemoryStore.users = {};
+        serverMemoryStore.users[foundUser.id] = foundUser;
+      } else if (cleanEmail === 'admin@siennaclay.com' || cleanEmail === 'owner@siennaclay.com') {
+        foundUser = {
+          id: 'usr_sienna_owner',
+          email: cleanEmail,
+          name: 'Sienna Clay Owner',
+          role: 'owner',
+          tenantId: 'sienna-tenant',
+          password: 'password123'
+        };
+        if (!serverMemoryStore.users) serverMemoryStore.users = {};
+        serverMemoryStore.users[foundUser.id] = foundUser;
+      } else {
+        return res.status(401).json({ error: "Account not found for this workspace. Please register or contact your administrator." });
+      }
+    }
+
+    // Enforce Tenant Boundary & Context Lock Isolation
+    if (targetTenant && targetTenant !== "auto") {
+      if (foundUser.role !== 'super_admin') {
         const requestedTenantDoc = serverMemoryStore.tenants?.[targetTenant];
         const isOwnerOfTarget = requestedTenantDoc?.ownerEmail?.toLowerCase() === cleanEmail;
-        
-        if (foundUser.tenantId && foundUser.tenantId !== targetTenant && !isOwnerOfTarget) {
-          // If user owns or belongs to a tenant with similar slug prefix (e.g., 'dinesh' vs 'dinesh-tenant'), adjust
-          if (targetTenant.startsWith(foundUser.tenantId) || foundUser.tenantId.startsWith(targetTenant.replace(/-tenant$/, ''))) {
-            foundUser.tenantId = targetTenant;
-          }
-        } else if (isOwnerOfTarget) {
-          foundUser.tenantId = targetTenant;
+        const tenantMatches = 
+          foundUser.tenantId === targetTenant || 
+          (foundUser.tenantId && targetTenant.startsWith(foundUser.tenantId)) || 
+          (foundUser.tenantId && foundUser.tenantId.startsWith(targetTenant.replace(/-tenant$/, ''))) || 
+          isOwnerOfTarget;
+
+        if (!tenantMatches) {
+          return res.status(403).json({ error: "Access denied. Your account is not registered under this tenant workspace." });
         }
-      } else {
-        targetTenant = foundUser.tenantId || "demo-tenant";
-      }
-    }
-
-    // Password verification check if stored password exists
-    if (foundUser && foundUser.password && password) {
-      const allowedDemoPasses = [
-        "password123", "demopass123", "siennapass123", "solaspass123", "alphapass123",
-        "superadmin123", "admin_override", "google_oauth_pass"
-      ];
-      const isDemoDomain = cleanEmail.endsWith('@democorp.com') || 
-                           cleanEmail.endsWith('@siennaclay.com') || 
-                           cleanEmail.endsWith('@solas.io') || 
-                           cleanEmail.endsWith('@alpha.io');
-
-      if (
-        password !== foundUser.password &&
-        !allowedDemoPasses.includes(password) &&
-        !isDemoDomain
-      ) {
-        // Update password if logging in with new valid password or sync
-        foundUser.password = password;
-      }
-    }
-
-    if (foundUser) {
-      if (!targetTenant || targetTenant === "auto") {
-        targetTenant = foundUser.tenantId || "demo-tenant";
       }
     } else {
-      if (!targetTenant || targetTenant === "auto") {
-        const cleanSlug = cleanEmail.split('@')[0].toLowerCase().replace(/[^a-z0-9]/g, '');
-        targetTenant = `${cleanSlug}-tenant`;
-      }
-      const userId = `usr_${Math.random().toString(36).substr(2, 8)}`;
-      foundUser = {
-        id: userId,
-        tenantId: targetTenant,
-        email: cleanEmail,
-        name: cleanEmail.split('@')[0],
-        role: "owner",
-        status: "active",
-        password: password || "password123",
-        lastActive: new Date().toISOString()
-      };
-      if (!serverMemoryStore.users) serverMemoryStore.users = {};
-      serverMemoryStore.users[userId] = foundUser;
-
-      if (getIsRealAdminReady()) {
-        try {
-          await getAdminDb().collection("users").doc(userId).set(foundUser);
-        } catch (e) {}
-      }
+      targetTenant = foundUser.tenantId || "demo-tenant";
     }
 
-    if (!serverMemoryStore.tenants[targetTenant]) {
-      serverMemoryStore.tenants[targetTenant] = {
-        id: targetTenant,
-        name: foundUser.name ? `${foundUser.name}'s Workspace` : "Tenant Workspace",
-        domain: `${targetTenant}.marketforge.ai`,
-        ownerEmail: cleanEmail,
-        isCustom: true,
-        status: "active",
-        plan: "Growth",
-        mrr: 249,
-        currency: "USD",
-        subscriptionPrice: 249,
-        subscriptionPriceNpr: 33000,
-        trialDaysLeft: 30,
-        activeUsers: 1,
-        storageMb: 10.0,
-        health: "Healthy",
-        disabledModules: [],
-        activatedModules: ['office_hr', 'restaurant', 'hotel', 'website', 'marketing', 'finance'],
-        createdAt: new Date().toISOString()
-      };
-      if (getIsRealAdminReady()) {
-        try {
-          await getAdminDb().collection("tenants").doc(targetTenant).set(serverMemoryStore.tenants[targetTenant]);
-        } catch (e) {}
+    // Strict Password Verification
+    if (foundUser.password) {
+      const allowedDemoPasses = ["password123", "demopass123", "siennapass123", "superadmin123", "google_oauth_pass"];
+      const isDemoUser = cleanEmail === 'owner@democorp.com' || cleanEmail === 'admin@siennaclay.com' || cleanEmail === 'owner@siennaclay.com';
+      
+      const isPasswordValid = (password === foundUser.password) || (isDemoUser && allowedDemoPasses.includes(password));
+      if (!isPasswordValid) {
+        return res.status(401).json({ error: "Invalid password for this workspace account." });
       }
     }
 
@@ -1713,7 +1676,13 @@ app.post("/api/tenant/login", async (req: express.Request, res: express.Response
       name: foundUser.name || "Workspace Member",
       role: foundUser.role || "owner",
       token: `MOCK_JWT_TOKEN_${targetTenant}`,
-      user: foundUser
+      user: {
+        id: foundUser.id,
+        email: foundUser.email || cleanEmail,
+        name: foundUser.name || "Workspace Member",
+        role: foundUser.role || "owner",
+        tenantId: targetTenant
+      }
     });
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
@@ -1864,41 +1833,135 @@ app.post("/api/tenant/add-team-member", async (req: express.Request, res: expres
 // POST /api/tenants/signup (Type B: Creation by Self-Service Client Signup)
 app.post("/api/tenants/signup", async (req: express.Request, res: express.Response) => {
   try {
-    const { name, domain, ownerEmail, password, baseIndustry, selectedModules, paymentGateway, currency } = req.body;
+    const { 
+      name, 
+      ownerName, 
+      domain, 
+      ownerEmail, 
+      email, 
+      password, 
+      baseIndustry, 
+      selectedModules, 
+      paymentGateway, 
+      currency,
+      phone,
+      address 
+    } = req.body;
 
-    if (!name || !ownerEmail || !password) {
-      return res.status(400).json({ error: "Name, email, and password are required for signup." });
+    const targetEmail = (ownerEmail || email || '').toLowerCase().trim();
+    const targetName = (name || '').trim();
+    const targetOwnerName = (ownerName || targetName || targetEmail.split('@')[0] || 'Business Owner').trim();
+
+    // 1. Return useful validation errors
+    if (!targetName || targetName.length < 2) {
+      return res.status(400).json({ error: "Business name is required (at least 2 characters)." });
     }
 
-    const cleanSlug = (domain || name).split('.')[0].toLowerCase().replace(/[^a-z0-9]/g, '');
-    const tenantId = `${cleanSlug}-tenant`;
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!targetEmail || !emailRegex.test(targetEmail)) {
+      return res.status(400).json({ error: "A valid owner email address is required." });
+    }
 
-    // Compute total subscription price in NPR based on dynamic module rates
+    if (!password || typeof password !== 'string' || password.length < 6) {
+      return res.status(400).json({ error: "Password must be at least 6 characters long." });
+    }
+
+    // 2. Sync existing accounts from Firestore to ensure freshness
+    await syncFirebaseAccountsToMemoryAndFirestore();
+
+    // 3. Prevent duplicate owner email conflicts & role escalation attempts
+    if (serverMemoryStore.users) {
+      for (const u of Object.values(serverMemoryStore.users)) {
+        const userObj = u as any;
+        if (userObj.email?.toLowerCase() === targetEmail || userObj.username?.toLowerCase() === targetEmail) {
+          if (userObj.role === 'super_admin') {
+            return res.status(403).json({ error: "This email address is reserved for system administration. Please sign in." });
+          }
+          return res.status(409).json({ error: "An account with this email address already exists. Please sign in or use a different email." });
+        }
+      }
+    }
+
+    if (getIsRealAdminReady()) {
+      try {
+        const db = getAdminDb();
+        const existingUsers = await db.collection("users").where("email", "==", targetEmail).get();
+        if (!existingUsers.empty) {
+          return res.status(409).json({ error: "An account with this email address already exists. Please sign in or use a different email." });
+        }
+      } catch (e: any) {
+        console.warn("[Tenant Signup] Email check notice:", e.message);
+      }
+    }
+
+    // 4. Generate a safe, collision-free unique tenant slug
+    const reservedSlugs = [
+      'admin', 'superadmin', 'super-admin', 'api', 'login', 'register', 'auth', 
+      'signup', 'pricing', 'about', 'contact', 'dist', 'static', 'assets', 'favicon', 'root', 'demo'
+    ];
+
+    let baseSlug = (domain || targetName)
+      .split('.')[0]
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '')
+      .slice(0, 30);
+
+    if (!baseSlug || reservedSlugs.includes(baseSlug)) {
+      baseSlug = `workspace-${Math.random().toString(36).substr(2, 4)}`;
+    }
+
+    let tenantId = `${baseSlug}-tenant`;
+    let attempts = 0;
+    
+    // Check for duplicate tenant identifiers and resolve uniqueness
+    while (serverMemoryStore.tenants && serverMemoryStore.tenants[tenantId] && attempts < 10) {
+      attempts++;
+      tenantId = `${baseSlug}-${Math.random().toString(36).substr(2, 4)}-tenant`;
+    }
+
+    if (getIsRealAdminReady()) {
+      try {
+        const db = getAdminDb();
+        const existingDoc = await db.collection("tenants").doc(tenantId).get();
+        if (existingDoc.exists) {
+          tenantId = `${baseSlug}-${Math.random().toString(36).substr(2, 4)}-tenant`;
+        }
+      } catch (e: any) {
+        console.warn("[Tenant Signup] Unique tenant check notice:", e.message);
+      }
+    }
+
+    // 5. Compute dynamic module rates and pricing
     const activeMods = Array.isArray(selectedModules) && selectedModules.length > 0 
       ? selectedModules 
-      : (baseIndustry === 'tours' ? ['tours', 'website'] : ['restaurant', 'website']);
+      : (baseIndustry === 'tours' ? ['tours', 'website', 'marketing'] : ['restaurant', 'website', 'marketing']);
 
     let totalNpr = 0;
     activeMods.forEach((modId: string) => {
-      const p = serverMemoryStore.module_pricing[modId];
+      const p = serverMemoryStore.module_pricing?.[modId];
       if (p) {
         totalNpr += (p.priceNpr || 0);
       }
     });
 
+    const selCurrency = currency || (paymentGateway === 'stripe' ? 'USD' : 'NPR');
+    const calcMrrUsd = Math.round(totalNpr / 133.5);
+
+    // 6. Create tenant document preserving tenant boundary isolation
     const newTenant = {
       id: tenantId,
-      name,
-      domain: domain || `${cleanSlug}.marketforge.ai`,
-      ownerEmail,
+      name: targetName,
+      domain: domain || `${tenantId.replace(/-tenant$/, '')}.marketforge.ai`,
+      ownerEmail: targetEmail,
       isCustom: true,
       status: 'active',
-      plan: 'Custom',
-      mrr: Math.round(totalNpr / 133.5),
+      plan: 'Growth (Self-Service)',
+      currency: selCurrency,
+      mrr: calcMrrUsd,
       subscriptionPriceNpr: totalNpr,
       trialDaysLeft: 30,
       activeUsers: 1,
-      storageMb: 5.0,
+      storageMb: 10.0,
       health: 'Healthy',
       apiRequests: 0,
       pdfExports: 0,
@@ -1911,30 +1974,82 @@ app.post("/api/tenants/signup", async (req: express.Request, res: express.Respon
       createdAt: new Date().toISOString()
     };
 
+    if (!serverMemoryStore.tenants) serverMemoryStore.tenants = {};
     serverMemoryStore.tenants[tenantId] = newTenant;
 
-    // Register user account
+    // 7. Create owner user strictly with role: 'owner' (prevent role escalation)
     const userId = `usr_${Math.random().toString(36).substr(2, 8)}`;
-    serverMemoryStore.users[userId] = {
+    const ownerUser = {
       id: userId,
-      name,
-      email: ownerEmail,
-      username: cleanSlug,
-      role: 'owner',
-      tenantId: tenantId,
+      name: targetOwnerName,
+      email: targetEmail,
+      username: targetEmail.split('@')[0].replace(/[^a-z0-9_-]/gi, '').toLowerCase() || baseSlug,
+      role: 'owner', // Strictly forced to owner
+      tenantId: tenantId, // Strictly isolated to newly created tenant
       status: 'active',
       lastActive: 'Just registered',
-      password: password
+      password: password,
+      createdAt: new Date().toISOString()
     };
 
-    return res.json({
+    if (!serverMemoryStore.users) serverMemoryStore.users = {};
+    serverMemoryStore.users[userId] = ownerUser;
+
+    // 8. Initialize default tenant configuration & white-label branding
+    const defaultBranding = {
+      tenantId: tenantId,
+      companyName: targetName,
+      tagline: `${targetName} - Next-Generation Enterprise OS`,
+      logoUrl: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=200&q=80",
+      address: address || "Corporate Headquarters",
+      phone: phone || "+1 (800) 555-0199",
+      supportEmail: targetEmail,
+      primaryColor: "#6366f1",
+      accentColor: "#06b6d4",
+      customDomain: newTenant.domain,
+      domainRoutingMode: "path",
+      dnsStatus: "verified",
+      sslStatus: "active",
+      homepageSource: "default",
+      createdAt: new Date().toISOString(),
+      lastUpdated: new Date().toISOString()
+    };
+
+    if (!serverMemoryStore.tenant_brandings) serverMemoryStore.tenant_brandings = {};
+    serverMemoryStore.tenant_brandings[tenantId] = defaultBranding;
+
+    // 9. Synchronize to Firestore if ready
+    if (getIsRealAdminReady()) {
+      try {
+        const db = getAdminDb();
+        await db.collection("tenants").doc(tenantId).set(newTenant, { merge: true });
+        await db.collection("users").doc(userId).set(ownerUser, { merge: true });
+        await db.collection("tenant_brandings").doc(tenantId).set(defaultBranding, { merge: true });
+      } catch (dbErr: any) {
+        console.warn("[Tenant Signup] Firestore persistence notice:", dbErr.message);
+      }
+    }
+
+    // 10. Return clean payload without leaking password or sensitive data
+    return res.status(201).json({
       success: true,
-      message: "Tenant registration & subscription setup complete!",
+      message: `Tenant workspace "${targetName}" registered successfully!`,
       tenant: newTenant,
+      tenantSlug: tenantId,
+      redirectUrl: `/${tenantId}`,
+      user: {
+        id: userId,
+        name: ownerUser.name,
+        email: targetEmail,
+        role: 'owner',
+        tenantId: tenantId,
+        status: 'active',
+        createdAt: ownerUser.createdAt
+      },
       token: `MOCK_JWT_TOKEN_${tenantId}`
     });
   } catch (err: any) {
-    return res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: err.message || "Internal server error during registration." });
   }
 });
 

@@ -6,6 +6,8 @@ import { getTenantBranding, saveTenantBranding, TenantBranding } from '../lib/te
 import type { CompanyPageType } from './CompanyPagesModal';
 
 const CompanyPagesModal = React.lazy(() => import('./CompanyPagesModal'));
+import { clientAuth } from '../lib/firebase';
+import { InfrastructureHub } from '../lib/infrastructure';
 import {
   Sparkles,
   Building2,
@@ -43,16 +45,25 @@ import {
   Award,
   Heart,
   KeyRound,
-  RefreshCw
+  RefreshCw,
+  AlertCircle
 } from 'lucide-react';
 
 export interface MarketForgeLandingProps {
   tenantId?: string;
+  initialAuthModalOpen?: boolean;
   onSelectFeature?: (featureId: string) => void;
   onEnterOS?: () => void;
+  onLogin?: (role: string, tenantId: string, email: string) => void;
 }
 
-export function MarketForgeLanding({ tenantId = 'demo-tenant', onSelectFeature, onEnterOS }: MarketForgeLandingProps) {
+export function MarketForgeLanding({ 
+  tenantId = 'demo-tenant', 
+  initialAuthModalOpen = false,
+  onSelectFeature, 
+  onEnterOS,
+  onLogin 
+}: MarketForgeLandingProps) {
   // Tenant White-Label & Dynamic Theme State
   const [branding, setBranding] = useState<TenantBranding>(() => getTenantBranding(tenantId));
   const [companyPagesModalOpen, setCompanyPagesModalOpen] = useState<boolean>(false);
@@ -73,14 +84,98 @@ export function MarketForgeLanding({ tenantId = 'demo-tenant', onSelectFeature, 
   const [copiedToast, setCopiedToast] = useState<string | null>(null);
 
   // Staff Auth & Password Reset Modal State
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(initialAuthModalOpen);
   const [authModalTab, setAuthModalTab] = useState<'login' | 'reset'>('login');
+  
+  // Direct Tenant Login Form State
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [isLoginLoading, setIsLoginLoading] = useState(false);
+  const [loginError, setLoginError] = useState<string | null>(null);
+
+  // Password Reset State
   const [resetEmail, setResetEmail] = useState('');
   const [resetCode, setResetCode] = useState('');
   const [resetNewPassword, setResetNewPassword] = useState('');
   const [isResetLoading, setIsResetLoading] = useState(false);
   const [resetCodeSent, setResetCodeSent] = useState(false);
   const [resetMessage, setResetMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Open modal if requested via URL params or initialAuthModalOpen prop
+  useEffect(() => {
+    if (initialAuthModalOpen) {
+      setIsAuthModalOpen(true);
+      setAuthModalTab('login');
+      return;
+    }
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('login') === 'true' || params.get('auth') === 'true' || params.get('action') === 'login' || params.get('action') === 'workspace') {
+      setIsAuthModalOpen(true);
+      setAuthModalTab('login');
+    }
+  }, [initialAuthModalOpen]);
+
+  const handleTenantLoginSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoginError(null);
+
+    const email = loginEmail.trim();
+    const pass = loginPassword;
+
+    if (!email) {
+      setLoginError('Please enter your workspace email or username.');
+      return;
+    }
+    if (!pass) {
+      setLoginError('Please enter your workspace password.');
+      return;
+    }
+
+    setIsLoginLoading(true);
+
+    try {
+      const resp = await fetch("/api/tenant/login", {
+        method: "POST",
+        headers: { 
+          "Content-Type": "application/json", 
+          "Authorization": "Bearer MOCK_ENTERPRISE_JWT_TOKEN_123" 
+        },
+        body: JSON.stringify({
+          tenantId: tenantId,
+          email: email,
+          password: pass
+        })
+      });
+
+      if (!resp.ok) {
+        const errJson = await resp.json().catch(() => ({}));
+        throw new Error(errJson.error || "Workspace authentication failed. Check credentials or password!");
+      }
+
+      const userSession = await resp.json();
+      const finalTenantId = userSession.tenantId || tenantId;
+
+      try {
+        await clientAuth.signInWithEmailAndPassword(email, pass, finalTenantId);
+      } catch (e) {}
+
+      try {
+        await InfrastructureHub.getAuth().signInWithEmailAndPassword(email, pass, finalTenantId);
+      } catch (e) {}
+
+      setIsAuthModalOpen(false);
+      setIsLoginLoading(false);
+
+      if (onLogin) {
+        onLogin(userSession.role || 'owner', finalTenantId, userSession.email || email);
+      } else if (onEnterOS) {
+        onEnterOS();
+      }
+    } catch (err: any) {
+      setIsLoginLoading(false);
+      setLoginError(err.message || 'Authentication failed. Please check your credentials.');
+    }
+  };
 
   // Active Category Filter for Menu/Catalog
   const [activeCatalogCategory, setActiveCatalogCategory] = useState<string>('All');
@@ -655,7 +750,11 @@ export function MarketForgeLanding({ tenantId = 'demo-tenant', onSelectFeature, 
                 </a>
 
                 <button
-                  onClick={onEnterOS}
+                  onClick={() => {
+                    setLoginError(null);
+                    setAuthModalTab('login');
+                    setIsAuthModalOpen(true);
+                  }}
                   className="px-5 py-3.5 bg-white/5 hover:bg-white/10 text-slate-200 font-bold text-xs sm:text-sm rounded-2xl border border-white/10 flex items-center gap-2 transition cursor-pointer"
                 >
                   <Lock className="w-4 h-4 text-cyan-400" />
@@ -1191,37 +1290,100 @@ export function MarketForgeLanding({ tenantId = 'demo-tenant', onSelectFeature, 
             {/* TAB 1: LOGIN TAB */}
             {authModalTab === 'login' ? (
               <div className="space-y-4">
-                <p className="text-xs text-slate-300 leading-relaxed">
-                  Enter your workspace credentials to access the <strong>{branding.companyName}</strong> management platform.
-                </p>
-
-                <div className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-3">
-                  <div className="text-xs text-slate-400">
-                    Clicking below will navigate to the primary workspace authorization portal with <strong>{tenantId}</strong> preselected.
+                {/* Locked Tenant Context Indicator */}
+                <div className="p-3 bg-indigo-950/40 border border-indigo-500/30 rounded-2xl flex items-center justify-between">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0 animate-pulse"></span>
+                    <div className="min-w-0">
+                      <p className="text-[9px] font-mono uppercase text-indigo-300 font-bold tracking-wider">Tenant Context Locked</p>
+                      <p className="text-xs font-semibold text-white truncate">{branding.companyName}</p>
+                    </div>
                   </div>
-                  <button
-                    onClick={() => {
-                      setIsAuthModalOpen(false);
-                      onEnterOS?.();
-                    }}
-                    className="w-full py-3.5 bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 hover:from-indigo-500 hover:to-purple-500 text-white font-extrabold text-xs rounded-xl shadow-lg border border-indigo-400/30 flex items-center justify-center gap-2 cursor-pointer transition transform hover:-translate-y-0.5"
-                  >
-                    <span>Proceed to Tenant Workspace Sign In</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </button>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-white/10 text-slate-300 border border-white/10 shrink-0">
+                    {tenantId}
+                  </span>
                 </div>
 
-                <div className="pt-2 text-center">
+                {/* Error Banner */}
+                {loginError && (
+                  <div className="p-3.5 rounded-xl text-xs font-mono font-medium bg-red-950/60 border border-red-800 text-red-200 flex items-start gap-2 animate-in fade-in">
+                    <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+                    <span className="leading-relaxed">{loginError}</span>
+                  </div>
+                )}
+
+                {/* Direct Login Form */}
+                <form onSubmit={handleTenantLoginSubmit} className="space-y-3.5">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-mono font-bold uppercase text-slate-400 block">
+                      Workspace Email / Username
+                    </label>
+                    <div className="relative">
+                      <Mail className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        value={loginEmail}
+                        onChange={(e) => setLoginEmail(e.target.value)}
+                        placeholder="e.g. owner@democorp.com or admin"
+                        className="w-full bg-black/50 border border-white/15 text-white text-xs rounded-xl pl-10 pr-3.5 py-2.5 focus:outline-none focus:border-indigo-500 transition"
+                        required
+                        autoFocus
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[10px] font-mono font-bold uppercase text-slate-400 block">
+                        Workspace Password
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAuthModalTab('reset');
+                          setResetMessage(null);
+                        }}
+                        className="text-[11px] text-indigo-400 hover:text-indigo-300 font-semibold transition hover:underline cursor-pointer"
+                      >
+                        Forgot password?
+                      </button>
+                    </div>
+                    <div className="relative">
+                      <Lock className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="password"
+                        value={loginPassword}
+                        onChange={(e) => setLoginPassword(e.target.value)}
+                        placeholder="••••••••••••"
+                        className="w-full bg-black/50 border border-white/15 text-white text-xs rounded-xl pl-10 pr-3.5 py-2.5 focus:outline-none focus:border-indigo-500 transition"
+                        required
+                      />
+                    </div>
+                  </div>
+
                   <button
-                    type="button"
-                    onClick={() => {
-                      setAuthModalTab('reset');
-                      setResetMessage(null);
-                    }}
-                    className="text-xs text-indigo-400 hover:text-indigo-300 font-bold transition hover:underline cursor-pointer"
+                    type="submit"
+                    disabled={isLoginLoading}
+                    className="w-full py-3 bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 hover:from-indigo-500 hover:to-purple-500 disabled:opacity-50 text-white font-extrabold text-xs rounded-xl shadow-lg border border-indigo-400/30 flex items-center justify-center gap-2 cursor-pointer transition transform hover:-translate-y-0.5"
                   >
-                    Forgot your password? Reset it here
+                    {isLoginLoading ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 animate-spin text-white" />
+                        <span>Authenticating Workspace...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>Sign In to {branding.companyName}</span>
+                        <ArrowRight className="w-4 h-4" />
+                      </>
+                    )}
                   </button>
+                </form>
+
+                <div className="pt-1 text-center">
+                  <p className="text-[11px] text-slate-500">
+                    Workspace isolation active. Only authorized team members of <strong className="text-slate-400">{tenantId}</strong> can authenticate.
+                  </p>
                 </div>
               </div>
             ) : (
