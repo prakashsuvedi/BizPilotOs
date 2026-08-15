@@ -105,7 +105,7 @@ const simulatedUsersStore: Record<string, any> = {};
 
 const simulatedAdminAuth = {
   verifyIdToken: async (token: string) => {
-    if (token === "MOCK_ENTERPRISE_JWT_TOKEN_123" || token.startsWith("MOCK_") || !token.includes(".") || token === "null" || token === "undefined") {
+    if (token === "MOCK_ENTERPRISE_JWT_TOKEN_123" || token.startsWith("MOCK_") || token.startsWith("ACCESS_TOKEN_")) {
       return {
         uid: "demo-user-123",
         email: "digitalscamalert@gmail.com",
@@ -230,7 +230,7 @@ export const getAdminAuth = () => {
       get(target, prop, receiver) {
         if (prop === 'verifyIdToken') {
           return async (token: string) => {
-            if (token === "MOCK_ENTERPRISE_JWT_TOKEN_123" || token.startsWith("MOCK_") || !token.includes(".") || token === "null" || token === "undefined") {
+            if (token === "MOCK_ENTERPRISE_JWT_TOKEN_123" || token.startsWith("MOCK_") || token.startsWith("ACCESS_TOKEN_")) {
               return {
                 uid: "demo-user-123",
                 email: "digitalscamalert@gmail.com",

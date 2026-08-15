@@ -57,6 +57,56 @@ export default function TenantTeamManagement({
     localStorage.setItem('marketforge_tenant_team_members', JSON.stringify(members));
   }, [members]);
 
+  // Load team members from backend to ensure real server synchronization
+  useEffect(() => {
+    const fetchTenantMembers = async () => {
+      try {
+        const res = await fetch(`/api/tenant/team-members?tenantId=${tenantId}`, {
+          headers: {
+            'Authorization': 'Bearer MOCK_ENTERPRISE_JWT_TOKEN_123',
+            'x-simulated-tenant': tenantId,
+            'x-simulated-role': userRole || 'owner'
+          }
+        });
+        if (res.ok) {
+          const serverMembers = await res.json();
+          if (Array.isArray(serverMembers) && serverMembers.length > 0) {
+            setMembers(prev => {
+              const map = new Map<string, TenantTeamMember>();
+              // Keep local items
+              prev.forEach(m => map.set(m.id || m.email, m));
+              // Merge/override with authoritative server members
+              serverMembers.forEach((sm: any) => {
+                const existing = map.get(sm.id || sm.email);
+                map.set(sm.id || sm.email, {
+                  id: sm.id,
+                  tenantId: sm.tenantId || tenantId,
+                  name: sm.name || existing?.name || sm.email.split('@')[0],
+                  email: sm.email,
+                  password: sm.password || existing?.password || 'Forge@123456',
+                  pinCode: sm.pinCode || existing?.pinCode || '1234',
+                  designation: sm.designation || existing?.designation || 'Team Member',
+                  department: sm.department || existing?.department || 'Operations',
+                  role: sm.role || existing?.role || 'writer',
+                  status: sm.status || existing?.status || 'active',
+                  permittedModules: sm.permittedModules || existing?.permittedModules || ['social_studio'],
+                  isInvestor: !!sm.isInvestor,
+                  investorDetails: sm.investorDetails || existing?.investorDetails,
+                  invitedAt: sm.invitedAt || existing?.invitedAt || new Date().toISOString().split('T')[0],
+                  lastActive: sm.lastActive || existing?.lastActive || 'Active'
+                });
+              });
+              return Array.from(map.values());
+            });
+          }
+        }
+      } catch (err) {
+        console.warn("[TenantTeamManagement] Error fetching members:", err);
+      }
+    };
+    fetchTenantMembers();
+  }, [tenantId]);
+
   // Tab view inside team management: 'members' | 'captable' | 'whitelabel'
   const [viewTab, setViewTab] = useState<'members' | 'captable' | 'whitelabel'>('members');
 
@@ -200,75 +250,69 @@ export default function TenantTeamManagement({
       notes: formInvestorNotes
     } : undefined;
 
+    const memberPayload = {
+      tenantId,
+      id: editingMemberId || `tm-${Date.now()}`,
+      name: formName,
+      email: formEmail,
+      password: formPassword || 'Forge@123456',
+      pinCode: formPinCode,
+      designation: formDesignation,
+      department: formDepartment,
+      role: formIsInvestor && formRoleScope === 'viewer' ? 'investor' : formRoleScope,
+      status: 'active',
+      permittedModules: formPermittedModules,
+      isInvestor: formIsInvestor,
+      investorDetails: investorData,
+      invitedAt: new Date().toISOString().split('T')[0],
+      lastActive: 'Active recently'
+    };
+
     if (editingMemberId) {
       // Edit existing member
       setMembers(prev => prev.map(m => {
         if (m.id === editingMemberId) {
           return {
             ...m,
-            name: formName,
-            email: formEmail,
-            password: formPassword,
-            pinCode: formPinCode,
-            designation: formDesignation,
-            department: formDepartment,
-            role: formIsInvestor && formRoleScope === 'viewer' ? 'investor' : formRoleScope,
-            permittedModules: formPermittedModules,
-            isInvestor: formIsInvestor,
-            investorDetails: investorData
+            ...memberPayload
           };
         }
         return m;
       }));
-      showToast(`Updated permissions & PIN profile for ${formName}`);
+      showToast(`Updated permissions & profile for ${formName}`);
     } else {
       // Create new invited member
       const newMember: TenantTeamMember = {
-        id: `tm-${Date.now()}`,
-        tenantId,
-        name: formName,
-        email: formEmail,
-        password: formPassword || 'Forge@123456',
-        pinCode: formPinCode,
-        designation: formDesignation,
-        department: formDepartment,
-        role: formIsInvestor && formRoleScope === 'viewer' ? 'investor' : formRoleScope,
-        status: 'active',
-        permittedModules: formPermittedModules,
-        isInvestor: formIsInvestor,
-        investorDetails: investorData,
-        invitedAt: new Date().toISOString().split('T')[0],
+        ...memberPayload,
         lastActive: 'Invited Just Now'
       };
 
       setMembers(prev => [newMember, ...prev]);
       showToast(`Inviting ${formName} (${formEmail})...`);
-
-      // Dispatch Outbound Invitation Email via Server API
-      fetch('/api/tenant/add-team-member', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          tenantId,
-          name: formName,
-          email: formEmail,
-          role: formRoleScope,
-          password: formPassword || 'Forge@123456',
-          username: formName ? formName.toLowerCase().replace(/\s+/g, '') : formEmail.split('@')[0]
-        })
-      })
-      .then(res => res.json())
-      .then(data => {
-        if (data.success) {
-          showToast(`✉️ Invitation email successfully dispatched to ${formEmail}!`);
-        } else {
-          showToast(`Member added, but email dispatch failed: ${data.error || 'SMTP timeout'}`);
-        }
-      })
-      .catch(err => {
-        showToast(`Member added locally. Server response: ${err.message}`);
-      });
     }
+
+    // Persist to backend authoritative store with full RBAC & module permissions
+    fetch('/api/tenant/save-team-member', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer MOCK_ENTERPRISE_JWT_TOKEN_123',
+        'x-simulated-tenant': tenantId,
+        'x-simulated-role': userRole || 'owner'
+      },
+      body: JSON.stringify(memberPayload)
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.success) {
+        showToast(`✅ Member profile & backend permissions synchronized!`);
+      } else if (data.error) {
+        showToast(`Server note: ${data.message || data.error}`);
+      }
+    })
+    .catch(err => {
+      console.warn("Backend save error:", err);
+    });
 
     setIsModalOpen(false);
   };
@@ -328,6 +372,24 @@ export default function TenantTeamManagement({
       if (m.id === id) {
         const nextStatus = m.status === 'active' ? 'revoked' : 'active';
         showToast(`Changed status of ${m.name} to ${nextStatus.toUpperCase()}`);
+
+        // Sync with backend
+        fetch('/api/tenant/update-team-member-status', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer MOCK_ENTERPRISE_JWT_TOKEN_123',
+            'x-simulated-tenant': tenantId,
+            'x-simulated-role': userRole || 'owner'
+          },
+          body: JSON.stringify({
+            tenantId,
+            memberId: m.id,
+            email: m.email,
+            status: nextStatus
+          })
+        }).catch(err => console.warn('Status sync error:', err));
+
         return { ...m, status: nextStatus };
       }
       return m;
@@ -337,8 +399,27 @@ export default function TenantTeamManagement({
   // Delete Member
   const handleDeleteMember = (id: string, name: string) => {
     if (confirm(`Are you sure you want to remove ${name} from this tenant workspace?`)) {
+      const target = members.find(m => m.id === id);
       setMembers(prev => prev.filter(m => m.id !== id));
       showToast(`Removed ${name} from workspace.`);
+
+      // Sync deletion with backend
+      if (target) {
+        fetch('/api/tenant/delete-team-member', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer MOCK_ENTERPRISE_JWT_TOKEN_123',
+            'x-simulated-tenant': tenantId,
+            'x-simulated-role': userRole || 'owner'
+          },
+          body: JSON.stringify({
+            tenantId,
+            memberId: target.id,
+            email: target.email
+          })
+        }).catch(err => console.warn('Delete sync error:', err));
+      }
     }
   };
 

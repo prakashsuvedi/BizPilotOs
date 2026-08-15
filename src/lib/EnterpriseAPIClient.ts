@@ -82,13 +82,29 @@ class EnterpriseAPIClient {
     headers.set('X-Correlation-ID', correlationId);
     headers.set('X-Client-Timestamp', new Date().toISOString());
 
-    // Automatically inject JWT if available in local state
+    // Automatically inject JWT and active member identity if available in local state
     if (typeof window !== 'undefined') {
       const tenant = localStorage.getItem('mf_simulated_tenant') || 'demo-tenant';
       const role = localStorage.getItem('mf_simulated_role') || 'owner';
       headers.set('Authorization', 'Bearer MOCK_ENTERPRISE_JWT_TOKEN_123');
       headers.set('x-simulated-tenant', tenant);
       headers.set('x-simulated-role', role);
+
+      try {
+        const activeMemberRaw = localStorage.getItem('marketforge_active_team_member');
+        if (activeMemberRaw) {
+          const activeMember = JSON.parse(activeMemberRaw);
+          if (activeMember?.email) {
+            headers.set('x-user-email', activeMember.email);
+          }
+          if (activeMember?.tenantId) {
+            headers.set('x-simulated-tenant', activeMember.tenantId);
+          }
+          if (activeMember?.role) {
+            headers.set('x-simulated-role', activeMember.role);
+          }
+        }
+      } catch (e) {}
     }
 
     let attempt = 0;

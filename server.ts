@@ -17,7 +17,10 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { 
   requireAuth, 
   requireRole, 
+  requireModule,
   requireTenantScope,
+  setAuthUserLookup,
+  setAuthTenantLookup,
   validateBody, 
   rateLimiter, 
   logAuditEvent, 
@@ -852,9 +855,51 @@ const serverMemoryStore: any = {
     "usr-4": { id: "usr-4", name: "Sienna Designer", email: "designer@siennaclay.com", username: "designer", role: "writer", tenantId: "sienna-tenant", status: "active", lastActive: "1 day ago", password: "password123" },
     "usr-5": { id: "usr-5", name: "Solas Admin", email: "ops@solas.io", username: "solas_ops", role: "admin", tenantId: "solas-tenant", status: "active", lastActive: "4 mins ago", password: "password123" },
     "usr-6": { id: "usr-6", name: "Alpha Owner", email: "founder@alpha.io", username: "alpha_founder", role: "owner", tenantId: "alpha-tenant", status: "active", lastActive: "12 mins ago", password: "password123" },
+    "usr-member": { id: "usr-member", name: "Demo Member", email: "member@democorp.com", username: "member", role: "writer", designation: "Marketing Associate", tenantId: "demo-tenant", status: "active", lastActive: "10 mins ago", password: "password123", permittedModules: ["social_studio", "command"] },
     "usr-norvik": { id: "usr-norvik", name: "Nirajan Acharya", email: "sidad44178@applamos.com", username: "nirajan", role: "owner", tenantId: "norvikmarketing-tenant", status: "active", lastActive: "Active Now", password: "password123" }
   }
 };
+
+// Wire up Authoritative User Lookup Hook for Backend Auth Middleware
+setAuthUserLookup(async (email: string, tenantId?: string) => {
+  const cleanEmail = email.toLowerCase().trim();
+  let foundUser: any = null;
+
+  if (serverMemoryStore.users) {
+    const userList = Object.values(serverMemoryStore.users);
+    foundUser = userList.find((u: any) => 
+      u.email?.toLowerCase() === cleanEmail || 
+      u.username?.toLowerCase() === cleanEmail
+    );
+  }
+
+  if (!foundUser && getIsRealAdminReady()) {
+    try {
+      const db = getAdminDb();
+      const userQuery = await db.collection("users").where("email", "==", cleanEmail).get();
+      if (!userQuery.empty) {
+        foundUser = { id: userQuery.docs[0].id, ...userQuery.docs[0].data() };
+      }
+    } catch (e) {}
+  }
+
+  return foundUser;
+});
+
+// Wire up Authoritative Tenant Lookup Hook for Backend Auth & Module Gating Middleware
+setAuthTenantLookup(async (tenantId: string) => {
+  if (!tenantId) return null;
+  let tenant = serverMemoryStore.tenants?.[tenantId];
+  if (!tenant && getIsRealAdminReady()) {
+    try {
+      const doc = await getAdminDb().collection("tenants").doc(tenantId).get();
+      if (doc.exists) {
+        tenant = { id: doc.id, ...doc.data() };
+      }
+    } catch (e) {}
+  }
+  return tenant || null;
+});
 
 // Seeding default tenant localization & commerce data
 const seedCommerceData = () => {
@@ -1075,7 +1120,7 @@ app.get("/api/superadmin/pricing", async (req: express.Request, res: express.Res
 });
 
 // PUT /api/superadmin/pricing (Superadmin live price updates)
-app.put("/api/superadmin/pricing", async (req: express.Request, res: express.Response) => {
+app.put("/api/superadmin/pricing", requireAuth, requireRole(["super_admin"]), async (req: express.Request, res: express.Response) => {
   try {
     const { modules } = req.body;
     if (!Array.isArray(modules)) {
@@ -1111,7 +1156,7 @@ app.put("/api/superadmin/pricing", async (req: express.Request, res: express.Res
 });
 
 // POST /api/superadmin/pricing/module (Add new custom module to catalog)
-app.post("/api/superadmin/pricing/module", async (req: express.Request, res: express.Response) => {
+app.post("/api/superadmin/pricing/module", requireAuth, requireRole(["super_admin"]), async (req: express.Request, res: express.Response) => {
   try {
     const { id, name, category, priceNpr, priceUsd, description, isFree } = req.body;
     if (!id || !name) {
@@ -1151,7 +1196,7 @@ app.post("/api/superadmin/pricing/module", async (req: express.Request, res: exp
 });
 
 // GET /api/superadmin/tenants (List all tenants with activated modules)
-app.get("/api/superadmin/tenants", async (req: express.Request, res: express.Response) => {
+app.get("/api/superadmin/tenants", requireAuth, requireRole(["super_admin"]), async (req: express.Request, res: express.Response) => {
   try {
     const tenantsList = Object.values(serverMemoryStore.tenants || {});
     return res.json({ success: true, tenants: tenantsList });
@@ -1161,7 +1206,7 @@ app.get("/api/superadmin/tenants", async (req: express.Request, res: express.Res
 });
 
 // POST /api/superadmin/tenants (Type A: Creation by Superadmin with Multi-currency, Module Selection, and Onboarding Email)
-app.post("/api/superadmin/tenants", async (req: express.Request, res: express.Response) => {
+app.post("/api/superadmin/tenants", requireAuth, requireRole(["super_admin"]), async (req: express.Request, res: express.Response) => {
   try {
     const { name, domain, ownerEmail, password, plan, activatedModules, subscriptionPriceNpr, currency, subscriptionPrice, paymentGateway } = req.body;
     
@@ -1316,7 +1361,7 @@ app.post("/api/admin/create-tenant", async (req: express.Request, res: express.R
 });
 
 // PUT /api/superadmin/tenants/:id/modules (Superadmin module activation manager)
-app.put("/api/superadmin/tenants/:id/modules", async (req: express.Request, res: express.Response) => {
+app.put("/api/superadmin/tenants/:id/modules", requireAuth, requireRole(["super_admin"]), async (req: express.Request, res: express.Response) => {
   try {
     const tenantId = req.params.id;
     const { activatedModules, disabledModules } = req.body;
@@ -1343,7 +1388,7 @@ app.put("/api/superadmin/tenants/:id/modules", async (req: express.Request, res:
 });
 
 // DELETE /api/superadmin/tenants/:id (Hard delete tenant from memory, Firestore, and Firebase Auth)
-app.delete("/api/superadmin/tenants/:id", async (req: express.Request, res: express.Response) => {
+app.delete("/api/superadmin/tenants/:id", requireAuth, requireRole(["super_admin"]), async (req: express.Request, res: express.Response) => {
   try {
     const tenantId = req.params.id;
     if (!tenantId) {
@@ -1405,7 +1450,7 @@ app.delete("/api/superadmin/tenants/:id", async (req: express.Request, res: expr
 });
 
 // PUT /api/superadmin/tenants/:id (Update tenant plan, period extension, tier, MRR, status)
-app.put("/api/superadmin/tenants/:id", async (req: express.Request, res: express.Response) => {
+app.put("/api/superadmin/tenants/:id", requireAuth, requireRole(["super_admin"]), async (req: express.Request, res: express.Response) => {
   try {
     const tenantId = req.params.id;
     const { plan, trialDaysLeft, status, name, domain, ownerEmail, subscriptionPriceNpr, mrr } = req.body;
@@ -1553,7 +1598,7 @@ const syncFirebaseAccountsToMemoryAndFirestore = async () => {
 };
 
 // GET /api/superadmin/tenants (List all tenants with activated modules)
-app.get("/api/superadmin/tenants", async (req: express.Request, res: express.Response) => {
+app.get("/api/superadmin/tenants", requireAuth, requireRole(["super_admin"]), async (req: express.Request, res: express.Response) => {
   try {
     await syncFirebaseAccountsToMemoryAndFirestore();
     const tenantsList = Object.values(serverMemoryStore.tenants || {});
@@ -1564,7 +1609,7 @@ app.get("/api/superadmin/tenants", async (req: express.Request, res: express.Res
 });
 
 // GET /api/superadmin/users (List all registered users across tenants)
-app.get("/api/superadmin/users", async (req: express.Request, res: express.Response) => {
+app.get("/api/superadmin/users", requireAuth, requireRole(["super_admin"]), async (req: express.Request, res: express.Response) => {
   try {
     await syncFirebaseAccountsToMemoryAndFirestore();
     const usersList = Object.values(serverMemoryStore.users || {});
@@ -1578,17 +1623,17 @@ app.get("/api/superadmin/users", async (req: express.Request, res: express.Respo
 app.post("/api/tenant/login", async (req: express.Request, res: express.Response) => {
   try {
     const { tenantId, email, password } = req.body;
-    if (!email) {
+    if (!email || !String(email).trim()) {
       return res.status(400).json({ error: "Email or username is required for login." });
     }
-    if (!password) {
+    if (!password || !String(password).trim()) {
       return res.status(400).json({ error: "Password is required for login." });
     }
 
     await syncFirebaseAccountsToMemoryAndFirestore();
 
-    const cleanEmail = email.toLowerCase().trim();
-    let targetTenant = tenantId;
+    const cleanEmail = String(email).toLowerCase().trim();
+    let targetTenant = tenantId ? String(tenantId).trim() : undefined;
     let foundUser: any = null;
 
     if (serverMemoryStore.users) {
@@ -1619,6 +1664,7 @@ app.post("/api/tenant/login", async (req: express.Request, res: express.Response
           name: 'DemoCorp Owner',
           role: 'owner',
           tenantId: 'demo-tenant',
+          status: 'active',
           password: 'password123'
         };
         if (!serverMemoryStore.users) serverMemoryStore.users = {};
@@ -1630,6 +1676,7 @@ app.post("/api/tenant/login", async (req: express.Request, res: express.Response
           name: 'Sienna Clay Owner',
           role: 'owner',
           tenantId: 'sienna-tenant',
+          status: 'active',
           password: 'password123'
         };
         if (!serverMemoryStore.users) serverMemoryStore.users = {};
@@ -1658,34 +1705,172 @@ app.post("/api/tenant/login", async (req: express.Request, res: express.Response
       targetTenant = foundUser.tenantId || "demo-tenant";
     }
 
-    // Strict Password Verification
-    if (foundUser.password) {
-      const allowedDemoPasses = ["password123", "demopass123", "siennapass123", "superadmin123", "google_oauth_pass"];
-      const isDemoUser = cleanEmail === 'owner@democorp.com' || cleanEmail === 'admin@siennaclay.com' || cleanEmail === 'owner@siennaclay.com';
-      
-      const isPasswordValid = (password === foundUser.password) || (isDemoUser && allowedDemoPasses.includes(password));
-      if (!isPasswordValid) {
-        return res.status(401).json({ error: "Invalid password for this workspace account." });
-      }
+    // Check account active / revoked status
+    if (foundUser.status === 'revoked' || foundUser.status === 'disabled' || foundUser.status === 'inactive') {
+      return res.status(403).json({ error: "Access denied. Your account has been deactivated or revoked by your workspace administrator." });
     }
+
+    // Strict Server-Side Password Verification
+    const isDemoUser = cleanEmail === 'owner@democorp.com' || cleanEmail === 'admin@siennaclay.com' || cleanEmail === 'owner@siennaclay.com';
+    const allowedDemoPasses = ["password123", "demopass123", "siennapass123", "superadmin123", "google_oauth_pass"];
+    
+    let expectedPassword = foundUser.password;
+    if (!expectedPassword && isDemoUser) {
+      expectedPassword = "password123";
+    }
+
+    if (!expectedPassword) {
+      return res.status(401).json({ error: "Invalid credentials. Password not configured for this account. Please use your invitation setup link." });
+    }
+
+    const isPasswordValid = (password === expectedPassword) || (isDemoUser && allowedDemoPasses.includes(password));
+    if (!isPasswordValid) {
+      return res.status(401).json({ error: "Invalid password for this workspace account." });
+    }
+
+    const assignedRole = foundUser.role || "writer";
 
     return res.json({
       success: true,
       tenantId: targetTenant,
       email: foundUser.email || cleanEmail,
       name: foundUser.name || "Workspace Member",
-      role: foundUser.role || "owner",
+      role: assignedRole,
       token: `MOCK_JWT_TOKEN_${targetTenant}`,
       user: {
-        id: foundUser.id,
+        id: foundUser.id || foundUser.uid,
         email: foundUser.email || cleanEmail,
         name: foundUser.name || "Workspace Member",
-        role: foundUser.role || "owner",
-        tenantId: targetTenant
+        role: assignedRole,
+        tenantId: targetTenant,
+        status: foundUser.status || "active",
+        designation: foundUser.designation || (assignedRole === 'owner' ? 'Business Owner' : 'Team Member'),
+        permittedModules: foundUser.permittedModules || null
       }
     });
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/tenant/verify-session (Authoritative Session Verification & Identity Hydration)
+app.post("/api/tenant/verify-session", async (req: express.Request, res: express.Response) => {
+  try {
+    const { email, tenantId, role } = req.body;
+    if (!email || !String(email).trim()) {
+      return res.status(400).json({ success: false, valid: false, error: "Email is required for session verification." });
+    }
+
+    await syncFirebaseAccountsToMemoryAndFirestore();
+
+    const cleanEmail = String(email).toLowerCase().trim();
+    let foundUser: any = null;
+
+    if (serverMemoryStore.users) {
+      const userList = Object.values(serverMemoryStore.users);
+      foundUser = userList.find((u: any) => 
+        u.email?.toLowerCase() === cleanEmail || 
+        u.username?.toLowerCase() === cleanEmail
+      );
+    }
+
+    if (!foundUser && getIsRealAdminReady()) {
+      try {
+        const db = getAdminDb();
+        const userQuery = await db.collection("users").where("email", "==", cleanEmail).get();
+        if (!userQuery.empty) {
+          foundUser = { id: userQuery.docs[0].id, ...userQuery.docs[0].data() };
+        }
+      } catch (e) {}
+    }
+
+    if (!foundUser) {
+      if (cleanEmail === 'digitalscamalert@gmail.com') {
+        foundUser = {
+          id: 'usr_super_admin',
+          email: 'digitalscamalert@gmail.com',
+          name: 'Super Administrator',
+          role: 'super_admin',
+          tenantId: 'demo-tenant',
+          status: 'active',
+          designation: 'System Administrator'
+        };
+      } else if (cleanEmail === 'owner@democorp.com') {
+        foundUser = {
+          id: 'usr_democorp_owner',
+          email: 'owner@democorp.com',
+          name: 'DemoCorp Owner',
+          role: 'owner',
+          tenantId: 'demo-tenant',
+          status: 'active',
+          designation: 'Business Owner'
+        };
+      } else if (cleanEmail === 'admin@siennaclay.com' || cleanEmail === 'owner@siennaclay.com') {
+        foundUser = {
+          id: 'usr_sienna_owner',
+          email: cleanEmail,
+          name: 'Sienna Clay Owner',
+          role: 'owner',
+          tenantId: 'sienna-tenant',
+          status: 'active',
+          designation: 'Business Owner'
+        };
+      } else {
+        return res.status(401).json({ success: false, valid: false, error: "Session account not found or expired." });
+      }
+    }
+
+    // Check account status
+    if (foundUser.status === 'revoked' || foundUser.status === 'disabled' || foundUser.status === 'inactive') {
+      return res.status(403).json({ success: false, valid: false, error: "Account has been revoked or deactivated." });
+    }
+
+    // Cross-tenant check for non-super_admins
+    if (tenantId && foundUser.role !== 'super_admin') {
+      const requestedTenantDoc = serverMemoryStore.tenants?.[tenantId];
+      const isOwnerOfTarget = requestedTenantDoc?.ownerEmail?.toLowerCase() === cleanEmail;
+      const tenantMatches = 
+        foundUser.tenantId === tenantId || 
+        (foundUser.tenantId && tenantId.startsWith(foundUser.tenantId)) || 
+        (foundUser.tenantId && foundUser.tenantId.startsWith(tenantId.replace(/-tenant$/, ''))) || 
+        isOwnerOfTarget;
+
+      if (!tenantMatches) {
+        return res.status(403).json({ 
+          success: false, 
+          valid: false, 
+          error: "Cross-tenant access prohibited. Account not registered under this tenant workspace." 
+        });
+      }
+    }
+
+    const assignedRole = foundUser.role || role || "writer";
+    const resolvedTenant = foundUser.tenantId || tenantId || "demo-tenant";
+    const resolvedDesignation = foundUser.designation || (assignedRole === 'owner' ? 'Business Owner' : (assignedRole === 'super_admin' ? 'System Administrator' : 'Team Member'));
+
+    return res.json({
+      success: true,
+      valid: true,
+      tenantId: resolvedTenant,
+      email: foundUser.email || cleanEmail,
+      name: foundUser.name || "Workspace Member",
+      role: assignedRole,
+      designation: resolvedDesignation,
+      status: foundUser.status || "active",
+      permittedModules: foundUser.permittedModules || null,
+      user: {
+        id: foundUser.id || foundUser.uid,
+        email: foundUser.email || cleanEmail,
+        name: foundUser.name || "Workspace Member",
+        role: assignedRole,
+        tenantId: resolvedTenant,
+        status: foundUser.status || "active",
+        designation: resolvedDesignation,
+        permittedModules: foundUser.permittedModules || null
+      }
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, valid: false, error: err.message });
   }
 });
 
@@ -1785,45 +1970,6 @@ app.post("/api/admin/login", async (req: express.Request, res: express.Response)
       role: "super_admin",
       name: "Super Admin",
       token: "MOCK_ENTERPRISE_JWT_TOKEN_123"
-    });
-  } catch (err: any) {
-    return res.status(500).json({ error: err.message });
-  }
-});
-
-// POST /api/tenant/add-team-member (Self-registration or admin team member addition)
-app.post("/api/tenant/add-team-member", async (req: express.Request, res: express.Response) => {
-  try {
-    const { tenantId, name, email, role, password, username } = req.body;
-    if (!email) {
-      return res.status(400).json({ error: "Email required for team member registration." });
-    }
-    const targetTenant = tenantId || "demo-tenant";
-    const userId = `usr_${Math.random().toString(36).substr(2, 8)}`;
-    const newMember = {
-      id: userId,
-      tenantId: targetTenant,
-      name: name || email.split('@')[0],
-      email: email,
-      username: username || email.split('@')[0],
-      role: role || "writer",
-      status: "active",
-      lastActive: "Just registered"
-    };
-
-    if (!serverMemoryStore.users) serverMemoryStore.users = {};
-    serverMemoryStore.users[userId] = newMember;
-
-    if (getIsRealAdminReady()) {
-      try {
-        await getAdminDb().collection("users").doc(userId).set(newMember);
-      } catch (e) {}
-    }
-
-    return res.json({
-      success: true,
-      message: `Team member ${name || email} registered to tenant ${targetTenant}`,
-      user: newMember
     });
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
@@ -2300,7 +2446,7 @@ app.post("/api/payments/webhook", async (req: express.Request, res: express.Resp
 
 
 // 1. Marketing Strategist Assistant Route (Secured with rateLimiter, requireAuth, and validation)
-app.post("/api/agent/strategist", rateLimiter, requireAuth, validateBody(businessProfileSchema), async (req: AuthRequest, res) => {
+app.post("/api/agent/strategist", rateLimiter, requireAuth, requireModule('strategist'), validateBody(businessProfileSchema), async (req: AuthRequest, res) => {
   const profile = req.body;
   const tenantId = req.tenantId || "demo-tenant";
 
@@ -2471,7 +2617,7 @@ app.post("/api/agent/strategist", rateLimiter, requireAuth, validateBody(busines
 });
 
 // 2. Campaign Planner Assistant Route (Secured)
-app.post("/api/agent/planner", rateLimiter, requireAuth, async (req: AuthRequest, res) => {
+app.post("/api/agent/planner", rateLimiter, requireAuth, requireModule('planner'), async (req: AuthRequest, res) => {
   const { profile } = req.body;
   const tenantId = req.tenantId || "demo-tenant";
 
@@ -5321,7 +5467,7 @@ function generateOfflineSequencePlan(goal: string, audience: string, tone: strin
 }
 
 // 1. Get sequences lists
-app.get("/api/agent/email/sequences", requireAuth, async (req: AuthRequest, res) => {
+app.get("/api/agent/email/sequences", requireAuth, requireModule('email_studio'), async (req: AuthRequest, res) => {
   const tenantId = req.tenantId || "demo-tenant";
   try {
     const list = await getFromSaaSStore("email_sequences", tenantId);
@@ -5332,7 +5478,7 @@ app.get("/api/agent/email/sequences", requireAuth, async (req: AuthRequest, res)
 });
 
 // Update or Create sequence
-app.post("/api/agent/email/sequences", requireAuth, async (req: AuthRequest, res) => {
+app.post("/api/agent/email/sequences", requireAuth, requireModule('email_studio'), async (req: AuthRequest, res) => {
   const tenantId = req.tenantId || "demo-tenant";
   const id = req.body.id || `seq_${Math.random().toString(36).substr(2, 9)}`;
   const payload = {
@@ -5351,7 +5497,7 @@ app.post("/api/agent/email/sequences", requireAuth, async (req: AuthRequest, res
 });
 
 // Delete sequence
-app.delete("/api/agent/email/sequences/:id", requireAuth, async (req: AuthRequest, res) => {
+app.delete("/api/agent/email/sequences/:id", requireAuth, requireModule('email_studio'), async (req: AuthRequest, res) => {
   const tenantId = req.tenantId || "demo-tenant";
   const id = req.params.id;
   try {
@@ -5370,7 +5516,7 @@ app.delete("/api/agent/email/sequences/:id", requireAuth, async (req: AuthReques
 });
 
 // 2. Get Emails lists
-app.get("/api/agent/email/emails", requireAuth, async (req: AuthRequest, res) => {
+app.get("/api/agent/email/emails", requireAuth, requireModule('email_studio'), async (req: AuthRequest, res) => {
   const tenantId = req.tenantId || "demo-tenant";
   try {
     const list = await getFromSaaSStore("emails", tenantId);
@@ -5381,7 +5527,7 @@ app.get("/api/agent/email/emails", requireAuth, async (req: AuthRequest, res) =>
 });
 
 // Create/Update Email
-app.post("/api/agent/email/emails", requireAuth, async (req: AuthRequest, res) => {
+app.post("/api/agent/email/emails", requireAuth, requireModule('email_studio'), async (req: AuthRequest, res) => {
   const tenantId = req.tenantId || "demo-tenant";
   const id = req.body.id || `eml_${Math.random().toString(36).substr(2, 9)}`;
   const payload = {
@@ -5400,7 +5546,7 @@ app.post("/api/agent/email/emails", requireAuth, async (req: AuthRequest, res) =
 });
 
 // Delete Email
-app.delete("/api/agent/email/emails/:id", requireAuth, async (req: AuthRequest, res) => {
+app.delete("/api/agent/email/emails/:id", requireAuth, requireModule('email_studio'), async (req: AuthRequest, res) => {
   const tenantId = req.tenantId || "demo-tenant";
   const id = req.params.id;
   try {
@@ -5419,7 +5565,7 @@ app.delete("/api/agent/email/emails/:id", requireAuth, async (req: AuthRequest, 
 });
 
 // 3. Get Segments list
-app.get("/api/agent/email/segments", requireAuth, async (req: AuthRequest, res) => {
+app.get("/api/agent/email/segments", requireAuth, requireModule('email_studio'), async (req: AuthRequest, res) => {
   const tenantId = req.tenantId || "demo-tenant";
   try {
     const list = await getFromSaaSStore("segments", tenantId);
@@ -5430,7 +5576,7 @@ app.get("/api/agent/email/segments", requireAuth, async (req: AuthRequest, res) 
 });
 
 // Create/Update Segment
-app.post("/api/agent/email/segments", requireAuth, async (req: AuthRequest, res) => {
+app.post("/api/agent/email/segments", requireAuth, requireModule('email_studio'), async (req: AuthRequest, res) => {
   const tenantId = req.tenantId || "demo-tenant";
   const id = req.body.id || `seg_${Math.random().toString(36).substr(2, 9)}`;
   const payload = {
@@ -5449,7 +5595,7 @@ app.post("/api/agent/email/segments", requireAuth, async (req: AuthRequest, res)
 });
 
 // Delete Segment
-app.delete("/api/agent/email/segments/:id", requireAuth, async (req: AuthRequest, res) => {
+app.delete("/api/agent/email/segments/:id", requireAuth, requireModule('email_studio'), async (req: AuthRequest, res) => {
   const tenantId = req.tenantId || "demo-tenant";
   const id = req.params.id;
   try {
@@ -5468,7 +5614,7 @@ app.delete("/api/agent/email/segments/:id", requireAuth, async (req: AuthRequest
 });
 
 // 4. Get Templates list
-app.get("/api/agent/email/templates", requireAuth, async (req: AuthRequest, res) => {
+app.get("/api/agent/email/templates", requireAuth, requireModule('email_studio'), async (req: AuthRequest, res) => {
   const tenantId = req.tenantId || "demo-tenant";
   try {
     const list = await getFromSaaSStore("email_templates", tenantId);
@@ -5479,7 +5625,7 @@ app.get("/api/agent/email/templates", requireAuth, async (req: AuthRequest, res)
 });
 
 // Create/Update Template
-app.post("/api/agent/email/templates", requireAuth, async (req: AuthRequest, res) => {
+app.post("/api/agent/email/templates", requireAuth, requireModule('email_studio'), async (req: AuthRequest, res) => {
   const tenantId = req.tenantId || "demo-tenant";
   const id = req.body.id || `tmpl_${Math.random().toString(36).substr(2, 9)}`;
   const payload = {
@@ -5498,7 +5644,7 @@ app.post("/api/agent/email/templates", requireAuth, async (req: AuthRequest, res
 });
 
 // Delete Template
-app.delete("/api/agent/email/templates/:id", requireAuth, async (req: AuthRequest, res) => {
+app.delete("/api/agent/email/templates/:id", requireAuth, requireModule('email_studio'), async (req: AuthRequest, res) => {
   const tenantId = req.tenantId || "demo-tenant";
   const id = req.params.id;
   try {
@@ -5517,7 +5663,7 @@ app.delete("/api/agent/email/templates/:id", requireAuth, async (req: AuthReques
 });
 
 // 5. AI SEQUENCE GENERATION PIPELINE (Gemini / Fallback)
-app.post("/api/agent/email/generate_sequence", requireAuth, async (req: AuthRequest, res) => {
+app.post("/api/agent/email/generate_sequence", requireAuth, requireModule('email_studio'), async (req: AuthRequest, res) => {
   const tenantId = req.tenantId || "demo-tenant";
   const { campaignId, goalType, audienceProfile, tone } = req.body;
   
@@ -5628,8 +5774,8 @@ export class SendGridEmailProvider implements EmailProvider {
   constructor(private apiKey: string, private fromEmail: string) {}
 
   async send(to: string, subject: string, htmlBody: string, displayName: string) {
-    if (process.env.DISABLE_SENDGRID === "true" || process.env.EMAIL_PROVIDER === "simulator") {
-      console.warn("[SendGrid Provider] Bypassing dispatch (disabled by configuration)");
+    if (process.env.DISABLE_SENDGRID === "true" || process.env.EMAIL_PROVIDER === "simulator" || (process.env.EMAIL_MODE || "sandbox").toLowerCase() === "sandbox") {
+      console.log("[SendGrid Provider] Using sandbox simulator dispatch mode");
       return { success: true, provider: "simulator" };
     }
     try {
@@ -5667,6 +5813,10 @@ export class SmtpEmailProvider implements EmailProvider {
   ) {}
 
   async send(to: string, subject: string, htmlBody: string, displayName: string) {
+    if (!this.host || !this.user || !this.pass || (process.env.EMAIL_MODE || "sandbox").toLowerCase() === "sandbox") {
+      console.log(`[SMTP Provider] Sandbox mode active - recorded email dispatch to ${to}`);
+      return { success: true, provider: "simulator" };
+    }
     try {
       const transporter = nodemailer.createTransport({
         host: this.host,
@@ -5687,10 +5837,10 @@ export class SmtpEmailProvider implements EmailProvider {
         subject,
         html: htmlBody,
       });
-      console.log(`[SMTP Direct Dispatch Success] To: ${to}, MessageId: ${info.messageId}, Response: ${info.response}`);
+      console.log(`[SMTP Direct Dispatch Success] To: ${to}, MessageId: ${info.messageId}`);
       return { success: true, provider: "smtp", messageId: info.messageId };
     } catch (err: any) {
-      console.error(`[SMTP Direct Dispatch Error] To: ${to}, Error: ${err.message}`);
+      console.warn(`[SMTP Direct Dispatch Warning] To: ${to}, Error: ${err.message}`);
       const enriched = new Error(err.message);
       enriched.stack = err.stack;
       if (err.responseCode) {
@@ -5707,7 +5857,7 @@ export class SmtpEmailProvider implements EmailProvider {
 export class SimulatorEmailProvider implements EmailProvider {
   name = "simulator";
   async send(to: string, subject: string, htmlBody: string, displayName: string) {
-    console.log(`[SANDBOX SIMULATOR] Mock sending email to ${to} (Subject: "${subject}") via "${displayName}"`);
+    console.log(`[SANDBOX SIMULATOR] Dispatched simulated email to ${to} (Subject: "${subject}") via "${displayName}"`);
     return { success: true, provider: "simulator" };
   }
 }
@@ -5762,13 +5912,6 @@ async function sendRealEmail(to: string, subject: string, htmlBody: string, from
     };
   }
 
-  // High-Deliverability Scamspike Secondary SMTP Relays
-  const backupSmtpHost = "scamspike.com";
-  const backupSmtpPort = 465;
-  const backupSmtpUser = "marketforge@scamspike.com";
-  const backupSmtpPass = "MkForge_2026_SecurePass!";
-  const backupSmtpFrom = "marketforge@scamspike.com";
-
   // Attempt to load dynamic multi-tenant configuration from Firestore/memory store first
   let customConfig: any = null;
   if (tenantId) {
@@ -5782,36 +5925,39 @@ async function sendRealEmail(to: string, subject: string, htmlBody: string, from
     }
   }
 
+  const isExplicitSandbox = (process.env.EMAIL_MODE || "sandbox").toLowerCase() === "sandbox" || process.env.EMAIL_PROVIDER === "simulator";
+
   // Resolve config keys
-  const resendKey = customConfig?.resendApiKey || (process.env.RESEND_API_KEY !== "YOUR_RESEND_KEY" ? process.env.RESEND_API_KEY : undefined);
+  const resendKey = customConfig?.resendApiKey || (process.env.RESEND_API_KEY && process.env.RESEND_API_KEY !== "YOUR_RESEND_KEY" ? process.env.RESEND_API_KEY : undefined);
   const resendFrom = customConfig?.resendFromEmail || process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev";
 
   const globalCfg = (global as any).globalSmtpConfig;
   const sgKey = customConfig?.sendgridApiKey || (process.env.SENDGRID_API_KEY && process.env.SENDGRID_API_KEY !== "YOUR_SENDGRID_KEY" ? process.env.SENDGRID_API_KEY : undefined);
-  const sgFrom = customConfig?.sendgridFromEmail || globalCfg?.fromEmail || process.env.SENDGRID_FROM_EMAIL || "marketforge@scamspike.com";
+  const sgFrom = customConfig?.sendgridFromEmail || globalCfg?.fromEmail || process.env.SENDGRID_FROM_EMAIL || "marketforge@democorp.com";
 
-  const primarySmtpHost = customConfig?.smtpHost || globalCfg?.host || (process.env.SMTP_HOST && !process.env.SMTP_HOST.includes("sendgrid") ? process.env.SMTP_HOST : backupSmtpHost);
-  const primarySmtpPort = customConfig?.smtpPort ? parseInt(customConfig.smtpPort) : (globalCfg?.port ? parseInt(globalCfg.port) : (process.env.SMTP_PORT ? parseInt(process.env.SMTP_PORT) : backupSmtpPort));
-  const primarySmtpUser = customConfig?.smtpUser || globalCfg?.username || process.env.SMTP_USER || backupSmtpUser;
-  const primarySmtpPass = customConfig?.smtpPass || globalCfg?.password || process.env.SMTP_PASS || backupSmtpPass;
-  const primarySmtpFrom = customConfig?.smtpFromEmail || globalCfg?.fromEmail || process.env.SMTP_FROM_EMAIL || backupSmtpFrom;
+  const primarySmtpHost = customConfig?.smtpHost || globalCfg?.host || (process.env.SMTP_HOST && !process.env.SMTP_HOST.includes("sendgrid") ? process.env.SMTP_HOST : undefined);
+  const primarySmtpPort = customConfig?.smtpPort ? parseInt(customConfig.smtpPort) : (globalCfg?.port ? parseInt(globalCfg.port) : (process.env.SMTP_PORT ? parseInt(process.env.SMTP_PORT) : 587));
+  const primarySmtpUser = customConfig?.smtpUser || globalCfg?.username || process.env.SMTP_USER;
+  const primarySmtpPass = customConfig?.smtpPass || globalCfg?.password || process.env.SMTP_PASS;
+  const primarySmtpFrom = customConfig?.smtpFromEmail || globalCfg?.fromEmail || process.env.SMTP_FROM_EMAIL || "marketforge@democorp.com";
 
-  const displayName = fromName || customConfig?.displayName || (tenantId === "sienna-tenant" ? "Sienna Studio" : (tenantId === "solas-tenant" ? "Solas Spa" : "MarketForge AI Engine"));
+  const displayName = fromName || customConfig?.displayName || (tenantId === "sienna-tenant" ? "Sienna Studio" : (tenantId === "solas-tenant" ? "Solas Spa" : "MarketForge Operations"));
 
   // Build Drivers
   let primaryDriver: EmailProvider;
-  if (sgKey && sgKey.startsWith("SG.")) {
+  if (isExplicitSandbox && !customConfig) {
+    primaryDriver = new SimulatorEmailProvider();
+  } else if (sgKey && sgKey.startsWith("SG.")) {
     primaryDriver = new SendGridEmailProvider(sgKey, sgFrom);
   } else if (resendKey && resendKey.startsWith("re_")) {
     primaryDriver = new ResendEmailProvider(resendKey, resendFrom);
-  } else {
+  } else if (primarySmtpHost && primarySmtpUser && primarySmtpPass) {
     primaryDriver = new SmtpEmailProvider(primarySmtpHost, primarySmtpPort, primarySmtpUser, primarySmtpPass, primarySmtpFrom);
+  } else {
+    primaryDriver = new SimulatorEmailProvider();
   }
 
-  const secondaryDriver = new SmtpEmailProvider(backupSmtpHost, backupSmtpPort, backupSmtpUser, backupSmtpPass, backupSmtpFrom);
   const tertiaryDriver = new SimulatorEmailProvider();
-
-  console.log(`[Email Dispatch Engine] Primary Driver: ${primaryDriver.name} -> Target: ${to}`);
 
   // Driver Execution with Fallback Logic
   let finalResult: any = null;
@@ -5824,7 +5970,7 @@ async function sendRealEmail(to: string, subject: string, htmlBody: string, from
     finalResult = await primaryDriver.send(to, subject, htmlBody, displayName);
   } catch (primaryErr: any) {
     primaryErrorMsg = primaryErr.message || "Primary Mail Gateway Timeout/Rejected";
-    console.warn(`[Email Primary Driver Failover Triggered] Primary (${primaryDriver.name}) failed: ${primaryErrorMsg}. Switching to Secondary High-Deliverability SMTP Relay...`);
+    console.info(`[Email Gateway Failover] Driver (${primaryDriver.name}) unavailable (${primaryErrorMsg}). Routing through Sandbox Simulator.`);
     
     // Log error to diagnostic store
     (global as any).emailSmtpErrors.unshift({
@@ -5835,35 +5981,13 @@ async function sendRealEmail(to: string, subject: string, htmlBody: string, from
       subject,
       error: primaryErrorMsg,
       code: primaryErr.httpStatus || 500,
-      failoverTarget: "Secondary Scamspike SMTP Relay"
+      failoverTarget: "Sandbox Simulator"
     });
 
     attempts++;
     failoverOccurred = true;
-    usedDriverName = "scamspike-smtp-relay";
-
-    try {
-      finalResult = await secondaryDriver.send(to, subject, htmlBody, displayName);
-      console.log(`[Email Fallback Successful] Delivered via Secondary Relay to ${to}`);
-    } catch (secondaryErr: any) {
-      const secondaryErrorMsg = secondaryErr.message || "Secondary SMTP Connection Error";
-      console.error(`[Email Secondary Relay Error] ${secondaryErrorMsg}. Falling back to Sandbox Simulator.`);
-      
-      (global as any).emailSmtpErrors.unshift({
-        id: `err_${Date.now()}_${Math.random().toString(36).substring(2,6)}`,
-        timestamp: new Date().toISOString(),
-        driver: "scamspike-smtp-relay",
-        recipient: to,
-        subject,
-        error: secondaryErrorMsg,
-        code: 503,
-        failoverTarget: "Sandbox Simulator"
-      });
-
-      attempts++;
-      usedDriverName = "sandbox-simulator";
-      finalResult = await tertiaryDriver.send(to, subject, htmlBody, displayName);
-    }
+    usedDriverName = "sandbox-simulator";
+    finalResult = await tertiaryDriver.send(to, subject, htmlBody, displayName);
   }
 
   const latencyMs = Date.now() - startTime;
@@ -6844,7 +6968,7 @@ app.get("/api/tenant/details", async (req, res) => {
 });
 
 // Admin endpoint to create a new tenant with Firestore + memory store persistence
-app.post("/api/admin/tenants/create", async (req, res) => {
+app.post("/api/admin/tenants/create", requireAuth, requireRole(["super_admin"]), async (req, res) => {
   try {
     const { name, domain, ownerEmail, plan = "Growth", status = "active", mrr = 249, isTemplate = false } = req.body;
     if (!name) return res.status(400).json({ error: "Tenant name is required." });
@@ -6898,7 +7022,7 @@ app.post("/api/admin/tenants/create", async (req, res) => {
 });
 
 // Admin endpoint to update tenant details
-app.post("/api/admin/tenants/update", async (req, res) => {
+app.post("/api/admin/tenants/update", requireAuth, requireRole(["super_admin"]), async (req, res) => {
   try {
     const { tenantId, updates } = req.body;
     if (!tenantId || !updates) return res.status(400).json({ error: "tenantId and updates are required." });
@@ -6929,7 +7053,7 @@ app.post("/api/admin/tenants/update", async (req, res) => {
 });
 
 // Admin endpoint to update tenant status (active, suspended, archived)
-app.post("/api/admin/tenants/update-status", async (req, res) => {
+app.post("/api/admin/tenants/update-status", requireAuth, requireRole(["super_admin"]), async (req, res) => {
   try {
     const { tenantIds, status } = req.body;
     if (!Array.isArray(tenantIds) || !status) {
@@ -6962,7 +7086,7 @@ app.post("/api/admin/tenants/update-status", async (req, res) => {
 });
 
 // Admin endpoint to delete / archive tenant
-app.post("/api/admin/tenants/delete", async (req, res) => {
+app.post("/api/admin/tenants/delete", requireAuth, requireRole(["super_admin"]), async (req, res) => {
   try {
     const { tenantIds } = req.body;
     if (!Array.isArray(tenantIds)) return res.status(400).json({ error: "tenantIds array required." });
@@ -6990,7 +7114,7 @@ app.post("/api/admin/tenants/delete", async (req, res) => {
 });
 
 // Endpoint to save tenant custom branding
-app.post("/api/tenant/branding/save", async (req, res) => {
+app.post("/api/tenant/branding/save", requireAuth, requireTenantScope, requireRole(["owner", "admin"]), async (req, res) => {
   try {
     const { tenantId, branding } = req.body;
     if (!tenantId || !branding) return res.status(400).json({ error: "tenantId and branding required." });
@@ -7069,14 +7193,344 @@ app.get("/api/tenant/branding", async (req, res) => {
 });
 
 // Endpoint to list tenant team members
-app.get("/api/tenant/team-members", async (req, res) => {
-  const tenantId = req.query.tenantId as string || "demo-tenant";
+app.get("/api/tenant/team-members", requireAuth, requireTenantScope, requireRole(["owner", "admin"]), async (req: AuthRequest, res) => {
+  const tenantId = (req.query.tenantId as string) || req.tenantId || "demo-tenant";
   try {
     const allUsers = Object.values(serverMemoryStore.users || {});
-    const filtered = allUsers.filter((u: any) => u.tenantId === tenantId);
-    res.json(filtered);
+    let filtered = allUsers.filter((u: any) => u.tenantId === tenantId);
+
+    // Merge from Firestore if available
+    if (getIsRealAdminReady()) {
+      try {
+        const db = getAdminDb();
+        const snap = await db.collection("users").where("tenantId", "==", tenantId).get();
+        const fsUsers = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const map = new Map<string, any>();
+        filtered.forEach(u => map.set(u.id || u.email, u));
+        fsUsers.forEach(u => map.set(u.id || u.email, u));
+        filtered = Array.from(map.values());
+      } catch (e) {}
+    }
+
+    // Strip passwords before returning while preserving all metadata
+    const sanitized = filtered.map((u: any) => {
+      const { password, ...rest } = u;
+      return {
+        id: rest.id || rest.uid,
+        name: rest.name || "Workspace Member",
+        email: rest.email,
+        username: rest.username || rest.email?.split("@")[0],
+        role: rest.role || "writer",
+        status: rest.status || "active",
+        tenantId: rest.tenantId || tenantId,
+        designation: rest.designation || (rest.role === 'owner' ? 'Business Owner' : 'Team Member'),
+        department: rest.department || 'Operations',
+        pinCode: rest.pinCode || undefined,
+        permittedModules: rest.permittedModules || (rest.role === 'owner' ? null : ['social_studio']),
+        isInvestor: !!rest.isInvestor,
+        investorDetails: rest.investorDetails || undefined,
+        lastActive: rest.lastActive || "Active recently",
+        invitedAt: rest.createdAt || rest.invitedAt || new Date().toISOString()
+      };
+    });
+
+    res.json(sanitized);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// Endpoint to create or edit team member with full field validation and backend RBAC
+app.post("/api/tenant/save-team-member", requireAuth, requireTenantScope, async (req: AuthRequest, res) => {
+  try {
+    const caller = req.user;
+    const callerRole = req.userRole;
+    const { 
+      tenantId, 
+      id, 
+      memberId, 
+      name, 
+      email, 
+      role, 
+      password, 
+      pinCode, 
+      designation, 
+      department, 
+      status, 
+      permittedModules, 
+      isInvestor, 
+      investorDetails 
+    } = req.body;
+
+    const targetTenant = tenantId || req.tenantId || "demo-tenant";
+    const targetId = id || memberId;
+    const cleanEmail = email ? String(email).toLowerCase().trim() : null;
+
+    if (!cleanEmail) {
+      return res.status(400).json({ error: "Team member email is required." });
+    }
+
+    // Role check: Only Owner, Admin, or Super Admin can create/edit team members
+    if (callerRole !== "owner" && callerRole !== "admin" && callerRole !== "super_admin") {
+      return res.status(403).json({
+        error: "Forbidden",
+        message: "Only workspace owners and administrators are authorized to create or modify team members."
+      });
+    }
+
+    // Tenant boundary check: Admin/Owner can only manage users within their own tenant (Requirement 7)
+    if (callerRole !== "super_admin" && req.tenantId && req.tenantId !== targetTenant) {
+      return res.status(403).json({
+        error: "Tenant Isolation Violation",
+        message: "You cannot manage team members outside of your assigned tenant workspace."
+      });
+    }
+
+    // Lookup existing user
+    let existingUser: any = null;
+    let targetKey: string | null = null;
+
+    if (serverMemoryStore.users) {
+      for (const [key, user] of Object.entries(serverMemoryStore.users)) {
+        const u = user as any;
+        if ((targetId && (u.id === targetId || u.uid === targetId)) || (cleanEmail && u.email?.toLowerCase() === cleanEmail)) {
+          existingUser = u;
+          targetKey = key;
+          break;
+        }
+      }
+    }
+
+    if (!existingUser && getIsRealAdminReady()) {
+      try {
+        const db = getAdminDb();
+        if (targetId) {
+          const doc = await db.collection("users").doc(targetId).get();
+          if (doc.exists) {
+            existingUser = { id: doc.id, ...doc.data() };
+            targetKey = doc.id;
+          }
+        } else if (cleanEmail) {
+          const q = await db.collection("users").where("email", "==", cleanEmail).get();
+          if (!q.empty) {
+            existingUser = { id: q.docs[0].id, ...q.docs[0].data() };
+            targetKey = q.docs[0].id;
+          }
+        }
+      } catch (e) {}
+    }
+
+    // Self-modification rule: An admin or member cannot modify their own role or permissions (Requirement 5)
+    if (caller?.email && caller.email.toLowerCase() === cleanEmail && callerRole !== "super_admin" && callerRole !== "owner") {
+      if ((role && role !== callerRole) || permittedModules !== undefined) {
+        return res.status(403).json({
+          error: "Permission Escalation Denied",
+          message: "Team members cannot alter their own role or elevate their own module privileges."
+        });
+      }
+    }
+
+    // Prevent non-owners/non-super_admins from demoting or editing the workspace owner
+    if (existingUser && existingUser.role === "owner" && callerRole !== "owner" && callerRole !== "super_admin") {
+      return res.status(403).json({
+        error: "Forbidden",
+        message: "Only the workspace owner can modify the owner profile."
+      });
+    }
+
+    const finalId = targetId || existingUser?.id || existingUser?.uid || `usr-${Date.now().toString(36)}`;
+    const finalRole = role || existingUser?.role || "writer";
+    const finalStatus = status || existingUser?.status || "active";
+
+    const updatedPayload = {
+      id: finalId,
+      uid: finalId,
+      name: name || existingUser?.name || cleanEmail.split("@")[0],
+      email: cleanEmail,
+      username: existingUser?.username || cleanEmail.split("@")[0],
+      role: finalRole,
+      tenantId: targetTenant,
+      designation: designation !== undefined ? designation : (existingUser?.designation || (finalRole === 'owner' ? 'Business Owner' : 'Team Member')),
+      department: department !== undefined ? department : (existingUser?.department || 'Operations'),
+      pinCode: pinCode !== undefined ? pinCode : (existingUser?.pinCode || undefined),
+      permittedModules: permittedModules !== undefined ? permittedModules : (existingUser?.permittedModules || (finalRole === 'owner' ? null : ['social_studio'])),
+      isInvestor: isInvestor !== undefined ? !!isInvestor : (existingUser?.isInvestor || false),
+      investorDetails: isInvestor ? (investorDetails || existingUser?.investorDetails) : undefined,
+      status: finalStatus,
+      password: password || existingUser?.password || "password123",
+      lastActive: existingUser?.lastActive || "Active Now",
+      updatedAt: new Date().toISOString(),
+      createdAt: existingUser?.createdAt || new Date().toISOString()
+    };
+
+    // Save to memory store
+    const storeKey = targetKey || finalId;
+    serverMemoryStore.users[storeKey] = updatedPayload;
+
+    // Save to Firestore
+    await saveToSaaSStore("users", finalId, updatedPayload, targetTenant, caller?.email || "admin@marketforge.scamspike.com");
+
+    const { password: _p, ...sanitizedUser } = updatedPayload;
+
+    return res.json({
+      success: true,
+      message: existingUser ? "Team member updated successfully." : "Team member created successfully.",
+      user: sanitizedUser
+    });
+  } catch (err: any) {
+    return res.status(500).json({ error: "Failed to save team member", message: err.message });
+  }
+});
+
+// Endpoint to update team member status (active / revoked / disabled)
+app.post("/api/tenant/update-team-member-status", requireAuth, requireTenantScope, async (req: AuthRequest, res) => {
+  try {
+    const caller = req.user;
+    const callerRole = req.userRole;
+    const { tenantId, memberId, email, status } = req.body;
+    if (!status || (!memberId && !email)) {
+      return res.status(400).json({ error: "Missing required parameters (status and memberId or email)." });
+    }
+
+    // Role check: Only Owner, Admin, or Super Admin can change status
+    if (callerRole !== "owner" && callerRole !== "admin" && callerRole !== "super_admin") {
+      return res.status(403).json({ error: "Forbidden", message: "Insufficient permissions to change member status." });
+    }
+
+    // Tenant isolation check
+    const targetTenant = tenantId || req.tenantId;
+    if (callerRole !== "super_admin" && req.tenantId && req.tenantId !== targetTenant) {
+      return res.status(403).json({ error: "Tenant Isolation Violation", message: "Cannot alter status of member in another tenant." });
+    }
+
+    const cleanEmail = email ? String(email).toLowerCase().trim() : null;
+    let targetUser: any = null;
+    let targetKey: string | null = null;
+
+    if (serverMemoryStore.users) {
+      for (const [key, user] of Object.entries(serverMemoryStore.users)) {
+        const u = user as any;
+        if ((memberId && (u.id === memberId || u.uid === memberId)) || (cleanEmail && u.email?.toLowerCase() === cleanEmail)) {
+          targetUser = u;
+          targetKey = key;
+          break;
+        }
+      }
+    }
+
+    if (!targetUser && getIsRealAdminReady()) {
+      try {
+        const db = getAdminDb();
+        if (memberId) {
+          const doc = await db.collection("users").doc(memberId).get();
+          if (doc.exists) {
+            targetUser = { id: doc.id, ...doc.data() };
+            targetKey = doc.id;
+          }
+        } else if (cleanEmail) {
+          const q = await db.collection("users").where("email", "==", cleanEmail).get();
+          if (!q.empty) {
+            targetUser = { id: q.docs[0].id, ...q.docs[0].data() };
+            targetKey = q.docs[0].id;
+          }
+        }
+      } catch (e) {}
+    }
+
+    if (!targetUser) {
+      return res.status(404).json({ error: "Team member not found." });
+    }
+
+    // Cannot revoke or disable owner unless super_admin
+    if (targetUser.role === "owner" && callerRole !== "super_admin") {
+      return res.status(403).json({ error: "Forbidden", message: "Cannot deactivate workspace owner account." });
+    }
+
+    targetUser.status = status;
+    targetUser.lastUpdated = new Date().toISOString();
+
+    if (targetKey && serverMemoryStore.users) {
+      serverMemoryStore.users[targetKey] = targetUser;
+    }
+
+    if (getIsRealAdminReady() && targetKey) {
+      try {
+        const db = getAdminDb();
+        await db.collection("users").doc(targetKey).update({ status, lastUpdated: new Date().toISOString() });
+      } catch (e) {}
+    }
+
+    return res.json({
+      success: true,
+      message: `Member status updated to ${status}`,
+      member: {
+        id: targetUser.id || targetUser.uid,
+        email: targetUser.email,
+        name: targetUser.name,
+        role: targetUser.role,
+        tenantId: targetUser.tenantId,
+        status: targetUser.status
+      }
+    });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// Endpoint to delete/remove a team member
+app.post("/api/tenant/delete-team-member", requireAuth, requireTenantScope, async (req: AuthRequest, res) => {
+  try {
+    const caller = req.user;
+    const callerRole = req.userRole;
+    const { tenantId, memberId, email } = req.body;
+    if (!memberId && !email) {
+      return res.status(400).json({ error: "memberId or email is required to remove team member." });
+    }
+
+    // Role check: Only Owner, Admin, or Super Admin can delete members
+    if (callerRole !== "owner" && callerRole !== "admin" && callerRole !== "super_admin") {
+      return res.status(403).json({ error: "Forbidden", message: "Insufficient permissions to remove team member." });
+    }
+
+    // Tenant boundary check
+    const targetTenant = tenantId || req.tenantId;
+    if (callerRole !== "super_admin" && req.tenantId && req.tenantId !== targetTenant) {
+      return res.status(403).json({ error: "Tenant Isolation Violation", message: "Cannot remove team member from another tenant." });
+    }
+
+    const cleanEmail = email ? String(email).toLowerCase().trim() : null;
+
+    let targetUser: any = null;
+    let targetKey: string | null = null;
+    if (serverMemoryStore.users) {
+      for (const [key, user] of Object.entries(serverMemoryStore.users)) {
+        const u = user as any;
+        if ((memberId && (u.id === memberId || u.uid === memberId)) || (cleanEmail && u.email?.toLowerCase() === cleanEmail)) {
+          targetUser = u;
+          targetKey = key;
+          break;
+        }
+      }
+    }
+
+    if (targetUser && targetUser.role === "owner" && callerRole !== "super_admin") {
+      return res.status(403).json({ error: "Forbidden", message: "Cannot delete workspace owner account." });
+    }
+
+    if (targetKey && serverMemoryStore.users) {
+      delete serverMemoryStore.users[targetKey];
+    }
+
+    if (getIsRealAdminReady() && memberId) {
+      try {
+        const db = getAdminDb();
+        await db.collection("users").doc(memberId).delete();
+      } catch (e) {}
+    }
+
+    return res.json({ success: true, message: "Team member removed successfully." });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
   }
 });
 
@@ -7148,11 +7602,31 @@ app.get("/api/telemetry/feedback", async (req, res) => {
 
 
 // Endpoint to register key internal team personnel
-app.post("/api/tenant/add-team-member", async (req, res) => {
-  const { tenantId, name, email, role, password, username } = req.body;
+app.post("/api/tenant/add-team-member", requireAuth, requireTenantScope, requireRole(["owner", "admin"]), async (req: AuthRequest, res) => {
+  const { 
+    tenantId, 
+    name, 
+    email, 
+    role, 
+    password, 
+    username, 
+    designation, 
+    department, 
+    pinCode, 
+    permittedModules, 
+    isInvestor, 
+    investorDetails, 
+    status 
+  } = req.body;
   
   if (!tenantId || !email || !role) {
     return res.status(400).json({ error: "Missing required personnel parameters (tenantId, email, role)." });
+  }
+
+  // Tenant boundary check
+  const targetTenant = tenantId || req.tenantId;
+  if (req.userRole !== "super_admin" && req.tenantId && req.tenantId !== targetTenant) {
+    return res.status(403).json({ error: "Tenant Isolation Violation", message: "Cannot add team member to another tenant." });
   }
 
   const isReal = getIsRealAdminReady();
@@ -7217,7 +7691,13 @@ app.post("/api/tenant/add-team-member", async (req, res) => {
       username: finalUsername,
       role: userRole,
       tenantId: tenantId,
-      status: "active",
+      designation: designation || (userRole === 'owner' ? 'Business Owner' : 'Team Member'),
+      department: department || 'Operations',
+      pinCode: pinCode || undefined,
+      permittedModules: permittedModules || (userRole === 'owner' ? null : ['social_studio']),
+      isInvestor: !!isInvestor,
+      investorDetails: isInvestor ? investorDetails : undefined,
+      status: status || "active",
       lastActive: "Newly Invited",
       password: tempPassword,
       createdAt: new Date().toISOString()
@@ -7316,13 +7796,18 @@ app.post("/api/tenant/add-team-member", async (req, res) => {
       timestamp: new Date().toISOString()
     });
 
+    // Return sanitized response with invitation delivery metadata
+    const { password: _p, ...sanitizedUser } = userPayload;
+
     return res.json({ 
       success: true, 
-      user: userPayload,
+      user: sanitizedUser,
       inviteLink,
-      tempPassword,
       passwordResetLink,
-      mailDispatch: emailStatus === "delivered"
+      mailDispatch: emailStatus === "delivered",
+      emailDeliveryStatus: emailStatus,
+      emailProvider: mailResult?.provider || "simulator",
+      emailError: mailResult && !mailResult.success ? mailResult.error || "Email delivery failed" : null
     });
 
   } catch (err: any) {
@@ -11515,7 +12000,7 @@ app.post("/api/agent/social/validate", requireAuth, async (req: AuthRequest, res
 });
 
 // 1. GET /api/agent/social/accounts
-app.get("/api/agent/social/accounts", requireAuth, async (req: AuthRequest, res) => {
+app.get("/api/agent/social/accounts", requireAuth, requireModule('social_studio'), async (req: AuthRequest, res) => {
   const tenantId = req.tenantId || "demo-tenant";
   try {
     let list = await getFromSaaSStore("social_accounts", tenantId);
@@ -11574,7 +12059,7 @@ app.get("/api/agent/social/accounts", requireAuth, async (req: AuthRequest, res)
 });
 
 // 2. POST /api/agent/social/accounts
-app.post("/api/agent/social/accounts", requireAuth, async (req: AuthRequest, res) => {
+app.post("/api/agent/social/accounts", requireAuth, requireModule('social_studio'), async (req: AuthRequest, res) => {
   const tenantId = req.tenantId || "demo-tenant";
   const id = req.body.id || `acc_${Math.random().toString(36).substr(2, 9)}`;
   const payload = {
@@ -11964,7 +12449,7 @@ app.all("/api/agent/social/oauth/callback", async (req: express.Request, res) =>
 });
 
 // 5. GET /api/agent/social/posts
-app.get("/api/agent/social/posts", requireAuth, async (req: AuthRequest, res) => {
+app.get("/api/agent/social/posts", requireAuth, requireModule('social_studio'), async (req: AuthRequest, res) => {
   const tenantId = req.tenantId || "demo-tenant";
   try {
     let posts = await getFromSaaSStore("social_posts", tenantId);
@@ -12007,7 +12492,7 @@ app.get("/api/agent/social/posts", requireAuth, async (req: AuthRequest, res) =>
 });
 
 // 6. POST /api/agent/social/posts
-app.post("/api/agent/social/posts", requireAuth, async (req: AuthRequest, res) => {
+app.post("/api/agent/social/posts", requireAuth, requireModule('social_studio'), async (req: AuthRequest, res) => {
   const tenantId = req.tenantId || "demo-tenant";
   const id = req.body.id || `post_${Math.random().toString(36).substr(2, 9)}`;
   const payload = {
@@ -12026,7 +12511,7 @@ app.post("/api/agent/social/posts", requireAuth, async (req: AuthRequest, res) =
 });
 
 // 6a. POST /api/agent/social/schedule_post
-app.post("/api/agent/social/schedule_post", requireAuth, async (req: AuthRequest, res) => {
+app.post("/api/agent/social/schedule_post", requireAuth, requireModule('social_studio'), async (req: AuthRequest, res) => {
   const tenantId = req.tenantId || "demo-tenant";
   const { platforms, caption, media, scheduledFor, cta, campaignId, postType } = req.body;
   const id = req.body.id || `post_${Math.random().toString(36).substr(2, 9)}`;
@@ -12060,7 +12545,7 @@ app.post("/api/agent/social/schedule_post", requireAuth, async (req: AuthRequest
 });
 
 // 7. POST /api/agent/social/generate_caption
-app.post("/api/agent/social/generate_caption", requireAuth, async (req: AuthRequest, res) => {
+app.post("/api/agent/social/generate_caption", requireAuth, requireModule('social_studio'), async (req: AuthRequest, res) => {
   const { postType, brandVoice, mediaDescription, platform, goal } = req.body;
   const ai = getGeminiClient();
 
@@ -12136,7 +12621,7 @@ Do not output markdown backticks, explanations, or text outside the JSON block.`
 });
 
 // 8. POST /api/agent/social/adapt_content (Module 7 Content Repurposing)
-app.post("/api/agent/social/adapt_content", requireAuth, async (req: AuthRequest, res) => {
+app.post("/api/agent/social/adapt_content", requireAuth, requireModule('social_studio'), async (req: AuthRequest, res) => {
   const { sourcePost, sourcePlatform, targetPlatforms } = req.body;
   const ai = getGeminiClient();
 
@@ -12191,7 +12676,7 @@ Do not output markdown code guards or raw text outside the JSON object.`;
 });
 
 // 9. POST /api/agent/social/hashtag_research (Module 8 Hashtag Research)
-app.post("/api/agent/social/hashtag_research", requireAuth, async (req: AuthRequest, res) => {
+app.post("/api/agent/social/hashtag_research", requireAuth, requireModule('social_studio'), async (req: AuthRequest, res) => {
   const { keyword, platform } = req.body;
   const ai = getGeminiClient();
 

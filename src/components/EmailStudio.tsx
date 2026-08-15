@@ -255,16 +255,28 @@ export default function EmailStudio({
       setIsLoading(true);
       try {
         const seqRes = await fetch('/api/agent/email/sequences', {
-          headers: { 'x-simulated-tenant': tenantId }
+          headers: { 
+            'Authorization': 'Bearer MOCK_ENTERPRISE_JWT_TOKEN_123',
+            'x-simulated-tenant': tenantId 
+          }
         });
         const emailsRes = await fetch('/api/agent/email/emails', {
-          headers: { 'x-simulated-tenant': tenantId }
+          headers: { 
+            'Authorization': 'Bearer MOCK_ENTERPRISE_JWT_TOKEN_123',
+            'x-simulated-tenant': tenantId 
+          }
         });
         const segmentsRes = await fetch('/api/agent/email/segments', {
-          headers: { 'x-simulated-tenant': tenantId }
+          headers: { 
+            'Authorization': 'Bearer MOCK_ENTERPRISE_JWT_TOKEN_123',
+            'x-simulated-tenant': tenantId 
+          }
         });
         const consentsRes = await fetch('/api/agent/email/consents', {
-          headers: { 'x-simulated-tenant': tenantId }
+          headers: { 
+            'Authorization': 'Bearer MOCK_ENTERPRISE_JWT_TOKEN_123',
+            'x-simulated-tenant': tenantId 
+          }
         });
 
         let loadedSequences: EmailSequence[] = [];
@@ -333,7 +345,11 @@ export default function EmailStudio({
           // Save seed default
           await fetch('/api/agent/email/sequences', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'x-simulated-tenant': tenantId },
+            headers: { 
+              'Content-Type': 'application/json', 
+              'Authorization': 'Bearer MOCK_ENTERPRISE_JWT_TOKEN_123',
+              'x-simulated-tenant': tenantId 
+            },
             body: JSON.stringify(defaultSeq)
           });
         }
@@ -433,7 +449,11 @@ export default function EmailStudio({
       try {
         const response = await fetch('/api/agent/email/schedule_send', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'x-simulated-tenant': tenantId },
+          headers: { 
+            'Content-Type': 'application/json', 
+            'Authorization': 'Bearer MOCK_ENTERPRISE_JWT_TOKEN_123',
+            'x-simulated-tenant': tenantId 
+          },
           body: JSON.stringify(item)
         });
         if (response.ok) successCount++;
@@ -512,7 +532,11 @@ export default function EmailStudio({
       // Save to server SaaS store
       await fetch('/api/agent/email/sequences', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-simulated-tenant': tenantId },
+        headers: { 
+          'Content-Type': 'application/json', 
+          'Authorization': 'Bearer MOCK_ENTERPRISE_JWT_TOKEN_123',
+          'x-simulated-tenant': tenantId 
+        },
         body: JSON.stringify(manualSeq)
       });
       return;
@@ -523,7 +547,11 @@ export default function EmailStudio({
       setLogHistory(p => [{ time: new Date().toLocaleTimeString(), msg: `📡 Initiating Gemini AI Direct Copywriter for parameters: "${objective}"...` }, ...p]);
       const res = await fetch('/api/agent/email/generate_sequence', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-simulated-tenant': tenantId },
+        headers: { 
+          'Content-Type': 'application/json', 
+          'Authorization': 'Bearer MOCK_ENTERPRISE_JWT_TOKEN_123',
+          'x-simulated-tenant': tenantId 
+        },
         body: JSON.stringify({
           campaignId: `camp_ai_${Date.now()}`,
           goalType: objective,
@@ -577,7 +605,11 @@ export default function EmailStudio({
 
       await fetch('/api/agent/email/sequences', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-simulated-tenant': tenantId },
+        headers: { 
+          'Content-Type': 'application/json', 
+          'Authorization': 'Bearer MOCK_ENTERPRISE_JWT_TOKEN_123',
+          'x-simulated-tenant': tenantId 
+        },
         body: JSON.stringify(aiSeqObj)
       });
 
@@ -623,7 +655,11 @@ export default function EmailStudio({
       // 1. Post modified sequence
       await fetch('/api/agent/email/sequences', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-simulated-tenant': tenantId },
+        headers: { 
+          'Content-Type': 'application/json', 
+          'Authorization': 'Bearer MOCK_ENTERPRISE_JWT_TOKEN_123',
+          'x-simulated-tenant': tenantId 
+        },
         body: JSON.stringify(updatedSeq)
       });
 
@@ -632,7 +668,11 @@ export default function EmailStudio({
       const emailRecordId = `email-${tenantId}-${activeTouch.touchNumber}`;
       await fetch('/api/agent/email/emails', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-simulated-tenant': tenantId },
+        headers: { 
+          'Content-Type': 'application/json', 
+          'Authorization': 'Bearer MOCK_ENTERPRISE_JWT_TOKEN_123',
+          'x-simulated-tenant': tenantId 
+        },
         body: JSON.stringify({
           id: emailRecordId,
           tenantId,
@@ -807,7 +847,11 @@ export default function EmailStudio({
 
     await fetch('/api/agent/email/consents', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-simulated-tenant': tenantId },
+      headers: { 
+        'Content-Type': 'application/json', 
+        'Authorization': 'Bearer MOCK_ENTERPRISE_JWT_TOKEN_123',
+        'x-simulated-tenant': tenantId 
+      },
       body: JSON.stringify(newRecord)
     });
   };
@@ -831,7 +875,11 @@ export default function EmailStudio({
         // Background update
         fetch('/api/agent/email/consents', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'x-simulated-tenant': tenantId },
+          headers: { 
+            'Content-Type': 'application/json', 
+            'Authorization': 'Bearer MOCK_ENTERPRISE_JWT_TOKEN_123',
+            'x-simulated-tenant': tenantId 
+          },
           body: JSON.stringify(updated)
         });
 

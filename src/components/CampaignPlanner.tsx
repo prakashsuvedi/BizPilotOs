@@ -57,7 +57,11 @@ export default function CampaignPlanner({
     try {
       const res = await fetch('/api/agent/planner', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer MOCK_ENTERPRISE_JWT_TOKEN_123' },
+        headers: { 
+          'Content-Type': 'application/json', 
+          'Authorization': 'Bearer MOCK_ENTERPRISE_JWT_TOKEN_123',
+          'x-simulated-tenant': profile.tenantId || 'demo-tenant'
+        },
         body: JSON.stringify({ profile, targetMarket: targetDemographicsMarket }),
       });
       if (!res.ok) throw new Error('Unsuccessful campaign creation');

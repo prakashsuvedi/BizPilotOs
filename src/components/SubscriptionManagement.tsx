@@ -62,13 +62,17 @@ export default function SubscriptionManagement({ isOpen = true, onClose, activeT
 
     try {
       const tenantId = activeTenant?.id || 'demo-tenant';
-      const res = await fetch(`/api/superadmin/tenants`);
-      const data = await res.json();
-      if (data.success && Array.isArray(data.tenants)) {
-        const found = data.tenants.find((t: any) => t.id === tenantId);
-        if (found && Array.isArray(found.activatedModules)) {
-          setActiveModulesList(found.activatedModules);
+      const res = await fetch(`/api/tenant/details?tenantId=${tenantId}`, {
+        headers: {
+          'Authorization': 'Bearer MOCK_ENTERPRISE_JWT_TOKEN_123',
+          'x-simulated-tenant': tenantId
         }
+      });
+      const data = await res.json();
+      if (data && data.tenant && Array.isArray(data.tenant.activatedModules)) {
+        setActiveModulesList(data.tenant.activatedModules);
+      } else if (data && Array.isArray(data.activatedModules)) {
+        setActiveModulesList(data.activatedModules);
       }
     } catch (e) {}
 

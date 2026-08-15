@@ -496,7 +496,7 @@ export function ModuleShowcaseSlider() {
 }
 
 interface LoginPortalProps {
-  onLogin: (role: string, tenantId: string, email: string) => void;
+  onLogin: (role: string, tenantId: string, email: string, name?: string, designation?: string, userObj?: any) => void;
   tenantsList: any[];
   onActivateTenant: (tenant: any) => void;
 }
@@ -657,7 +657,7 @@ export default function LoginPortal({ onLogin, tenantsList, onActivateTenant }: 
       setMemRegSuccess(`✓ Team member account registered for ${memRegName}! Confirmation email sent. Auto-logging into ${targetTenant}...`);
 
       setTimeout(() => {
-        onLogin(memRegRole || 'writer', targetTenant, memRegEmail);
+        onLogin(memRegRole || 'writer', targetTenant, memRegEmail, memRegName, memRegDesignation);
       }, 1200);
 
     } catch (err: any) {
@@ -786,7 +786,14 @@ export default function LoginPortal({ onLogin, tenantsList, onActivateTenant }: 
 
       await new Promise(r => setTimeout(r, 250));
       setIsTenantAuthenticating(false);
-      onLogin('owner', finalTenantId, email);
+      onLogin(
+        userSession?.role || 'owner', 
+        finalTenantId, 
+        email, 
+        userSession?.name || userSession?.user?.name, 
+        userSession?.user?.designation || (userSession?.role === 'owner' ? 'Business Owner' : 'Team Member'),
+        userSession?.user
+      );
 
     } catch (err: any) {
       setIsTenantAuthenticating(false);
@@ -839,7 +846,7 @@ export default function LoginPortal({ onLogin, tenantsList, onActivateTenant }: 
 
       setOnboardSuccess("✓ Workspace claimed successfully! Redirecting to command dashboard...");
       setTimeout(() => {
-        onLogin('owner', onboardTenantId, onboardEmail);
+        onLogin('owner', onboardTenantId, onboardEmail, onboardFullName, 'Business Owner');
       }, 1200);
 
     } catch (err: any) {
@@ -872,7 +879,7 @@ export default function LoginPortal({ onLogin, tenantsList, onActivateTenant }: 
       const adminSession = await resp.json();
       await clientAuth.signInWithEmailAndPassword(adminEmail, adminPassword, adminSession.tenantId || "demo-tenant");
 
-      onLogin('super_admin', adminSession.tenantId || 'demo-tenant', adminEmail);
+      onLogin('super_admin', adminSession.tenantId || 'demo-tenant', adminEmail, 'Super Administrator', 'System Administrator');
     } catch (err: any) {
       setAdminError(`⛔ Superadmin Auth Security Lock: ${err.message}`);
     } finally {

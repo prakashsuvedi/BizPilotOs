@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Lock, Mail, Key, ShieldCheck, UserCheck, AlertCircle, Sparkles, X, ChevronRight, Award } from 'lucide-react';
+import { Lock, Mail, Key, ShieldCheck, UserCheck, AlertCircle, Sparkles, X, ChevronRight, Award, Loader2 } from 'lucide-react';
 import { TenantTeamMember } from '../types';
 
 interface Props {
@@ -23,12 +23,13 @@ export default function MemberAuthModal({
 }: Props) {
   if (!isOpen) return null;
 
-  const [authMode, setAuthMode] = useState<'password' | 'pin'>('pin');
+  const [authMode, setAuthMode] = useState<'password' | 'pin'>('password');
   const [emailInput, setEmailInput] = useState('');
   const [passwordInput, setPasswordInput] = useState('');
   const [pinInput, setPinInput] = useState('');
   const [selectedPinMemberId, setSelectedPinMemberId] = useState<string>('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
 
   // Read team members from localStorage
   const getSavedMembers = (): TenantTeamMember[] => {
@@ -54,7 +55,7 @@ export default function MemberAuthModal({
     }
   };
 
-  const handlePinLoginSubmit = (e?: React.FormEvent) => {
+  const handlePinLoginSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     setErrorMessage(null);
 
@@ -72,58 +73,123 @@ export default function MemberAuthModal({
     }
 
     if (!targetMember) {
-      setErrorMessage(`Invalid PIN or selected member not found. Please verify your 4-digit POS PIN.`);
+      setErrorMessage(`Invalid PIN or selected member not found. Please verify your 4-digit PIN.`);
       return;
     }
 
-    if (targetMember.status === 'revoked') {
+    if (targetMember.status === 'revoked' || targetMember.status === 'disabled') {
       setErrorMessage(`Access for user ${targetMember.name} has been revoked by Tenant Admin.`);
       return;
     }
 
     // Verify PIN code
-    const expectedPin = targetMember.pinCode || '1234';
+    const expectedPin = targetMember.pinCode || targetMember.password || '1234';
     if (pinInput !== expectedPin && targetMember.password !== pinInput) {
       setErrorMessage(`Incorrect PIN code for ${targetMember.name}. Please try again.`);
       return;
     }
 
-    onLoginSuccess(targetMember);
-    onClose();
+    setIsLoading(true);
+    try {
+      // Verify via backend
+      const loginPayload = {
+        tenantId,
+        email: targetMember.email,
+        password: targetMember.password || pinInput
+      };
+      const resp = await fetch("/api/tenant/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(loginPayload)
+      });
+      const data = await resp.json();
+
+      if (!resp.ok || !data.success) {
+        setErrorMessage(data.error || "Authentication failed on workspace server.");
+        setIsLoading(false);
+        return;
+      }
+
+      const verifiedMember: TenantTeamMember = {
+        ...targetMember,
+        role: data.role || targetMember.role,
+        designation: data.user?.designation || targetMember.designation
+      };
+
+      onLoginSuccess(verifiedMember);
+      onClose();
+    } catch (err: any) {
+      setErrorMessage(err.message || "Failed to authenticate PIN with workspace server.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleLoginSubmit = (e: React.FormEvent) => {
+  const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
+    setIsLoading(true);
 
-    const foundMember = tenantMembers.find(
-      m => m.email.toLowerCase() === emailInput.trim().toLowerCase()
-    );
+    try {
+      const cleanEmail = emailInput.trim();
+      const cleanPassword = passwordInput.trim();
 
-    if (!foundMember) {
-      setErrorMessage(`No registered team member found with email "${emailInput}" in ${tenantName}. Please verify credentials with your Tenant Admin.`);
-      return;
+      if (!cleanEmail || !cleanPassword) {
+        setErrorMessage("Please provide both email address and password.");
+        setIsLoading(false);
+        return;
+      }
+
+      // Authenticate directly with backend server
+      const response = await fetch("/api/tenant/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          tenantId,
+          email: cleanEmail,
+          password: cleanPassword
+        })
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        setErrorMessage(result.error || "Authentication failed. Please check your credentials.");
+        setIsLoading(false);
+        return;
+      }
+
+      // Locate or synthesize team member representation
+      const localMember = tenantMembers.find(
+        m => m.email.toLowerCase() === cleanEmail.toLowerCase()
+      );
+
+      const authenticatedMember: TenantTeamMember = {
+        id: result.user?.id || localMember?.id || `mem_${Date.now()}`,
+        name: result.name || result.user?.name || localMember?.name || cleanEmail.split('@')[0],
+        email: result.email || cleanEmail,
+        role: result.role || result.user?.role || "writer",
+        tenantId: result.tenantId || tenantId,
+        status: (result.user?.status as any) || "active",
+        designation: result.user?.designation || localMember?.designation || (result.role === 'owner' ? 'Business Owner' : 'Team Member'),
+        lastActive: "Active Now",
+        permittedModules: result.user?.permittedModules || localMember?.permittedModules
+      };
+
+      onLoginSuccess(authenticatedMember);
+      onClose();
+    } catch (err: any) {
+      setErrorMessage(`Authentication error: ${err.message}`);
+    } finally {
+      setIsLoading(false);
     }
-
-    if (foundMember.status === 'revoked') {
-      setErrorMessage(`Access for user ${emailInput} has been revoked by the Tenant Admin.`);
-      return;
-    }
-
-    // Check password if set
-    if (foundMember.password && foundMember.password !== passwordInput.trim()) {
-      setErrorMessage("Invalid password. Please check your password and try again.");
-      return;
-    }
-
-    // Login successful
-    onLoginSuccess(foundMember);
-    onClose();
   };
 
-  const handleQuickLogin = (member: TenantTeamMember) => {
-    onLoginSuccess(member);
-    onClose();
+  const handleSelectMemberToAuthenticate = (member: TenantTeamMember) => {
+    setEmailInput(member.email);
+    setPasswordInput(member.password || '');
+    setAuthMode('password');
+    setErrorMessage(null);
   };
 
   return (
@@ -183,21 +249,21 @@ export default function MemberAuthModal({
         <div className="flex bg-slate-100 p-1 rounded-2xl text-xs font-bold border border-slate-200">
           <button
             type="button"
-            onClick={() => { setAuthMode('pin'); setErrorMessage(null); }}
-            className={`flex-1 py-2 rounded-xl transition cursor-pointer flex items-center justify-center gap-1.5 ${
-              authMode === 'pin' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-800'
-            }`}
-          >
-            <Key className="w-4 h-4 text-indigo-600" /> Touch POS PIN Keypad
-          </button>
-          <button
-            type="button"
             onClick={() => { setAuthMode('password'); setErrorMessage(null); }}
             className={`flex-1 py-2 rounded-xl transition cursor-pointer flex items-center justify-center gap-1.5 ${
               authMode === 'password' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-800'
             }`}
           >
             <Mail className="w-4 h-4 text-indigo-600" /> Email & Password
+          </button>
+          <button
+            type="button"
+            onClick={() => { setAuthMode('pin'); setErrorMessage(null); }}
+            className={`flex-1 py-2 rounded-xl transition cursor-pointer flex items-center justify-center gap-1.5 ${
+              authMode === 'pin' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <Key className="w-4 h-4 text-indigo-600" /> Touch POS PIN Keypad
           </button>
         </div>
 
@@ -206,6 +272,50 @@ export default function MemberAuthModal({
             <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
             <span>{errorMessage}</span>
           </div>
+        )}
+
+        {/* EMAIL & PASSWORD MODE */}
+        {authMode === 'password' && (
+          <form onSubmit={handleLoginSubmit} className="space-y-4 animate-fade-in">
+            <div>
+              <label className="text-xs font-bold text-slate-700 block mb-1">Email Address</label>
+              <div className="relative">
+                <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+                <input
+                  type="email"
+                  required
+                  placeholder="you@tenantcompany.com"
+                  value={emailInput}
+                  onChange={(e) => setEmailInput(e.target.value)}
+                  className="w-full pl-10 pr-3.5 py-2.5 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="text-xs font-bold text-slate-700 block mb-1">Password</label>
+              <div className="relative">
+                <Key className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+                <input
+                  type="password"
+                  required
+                  placeholder="••••••••••••"
+                  value={passwordInput}
+                  onChange={(e) => setPasswordInput(e.target.value)}
+                  className="w-full pl-10 pr-3.5 py-2.5 border border-slate-300 rounded-xl text-xs font-mono font-bold text-slate-900 focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-md transition cursor-pointer flex items-center justify-center gap-2"
+            >
+              {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
+              <span>{isLoading ? "Authenticating..." : "Authenticate & Access Workspace"}</span>
+            </button>
+          </form>
         )}
 
         {/* PIN CODE KEYPAD MODE */}
@@ -225,14 +335,14 @@ export default function MemberAuthModal({
                 <option value="">-- Tap or Select Staff Member --</option>
                 {tenantMembers.map(m => (
                   <option key={m.id} value={m.id}>
-                    {m.name} ({m.designation} - PIN: {m.pinCode || '1234'})
+                    {m.name} ({m.designation})
                   </option>
                 ))}
               </select>
             </div>
 
             <div className="space-y-2 text-center">
-              <label className="text-xs font-bold text-slate-700 block">4-Digit Terminal PIN Code</label>
+              <label className="text-xs font-bold text-slate-700 block">Terminal PIN Code</label>
               <div className="flex justify-center gap-2">
                 {[0, 1, 2, 3, 4, 5].map((idx) => (
                   <div
@@ -275,68 +385,27 @@ export default function MemberAuthModal({
             <button
               type="button"
               onClick={() => handlePinLoginSubmit()}
-              disabled={pinInput.length < 4}
+              disabled={pinInput.length < 4 || isLoading}
               className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-md transition cursor-pointer flex items-center justify-center gap-2"
             >
-              <ShieldCheck className="w-4 h-4" /> Log In with PIN Code
+              {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
+              <span>{isLoading ? "Verifying PIN..." : "Log In with PIN Code"}</span>
             </button>
           </div>
         )}
 
-        {/* EMAIL & PASSWORD MODE */}
-        {authMode === 'password' && (
-          <form onSubmit={handleLoginSubmit} className="space-y-4 animate-fade-in">
-            <div>
-              <label className="text-xs font-bold text-slate-700 block mb-1">Email Address</label>
-              <div className="relative">
-                <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
-                <input
-                  type="email"
-                  required
-                  placeholder="you@tenantcompany.com"
-                  value={emailInput}
-                  onChange={(e) => setEmailInput(e.target.value)}
-                  className="w-full pl-10 pr-3.5 py-2.5 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:border-indigo-500"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="text-xs font-bold text-slate-700 block mb-1">Password</label>
-              <div className="relative">
-                <Key className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
-                <input
-                  type="password"
-                  required
-                  placeholder="••••••••••••"
-                  value={passwordInput}
-                  onChange={(e) => setPasswordInput(e.target.value)}
-                  className="w-full pl-10 pr-3.5 py-2.5 border border-slate-300 rounded-xl text-xs font-mono font-bold text-slate-900 focus:outline-none focus:border-indigo-500"
-                />
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-md transition cursor-pointer flex items-center justify-center gap-2"
-            >
-              <ShieldCheck className="w-4 h-4" /> Authenticate & Access Workspace
-            </button>
-          </form>
-        )}
-
-        {/* QUICK SWITCHER PRESETS FOR TESTING */}
+        {/* TEAM MEMBER QUICK SELECTOR */}
         {tenantMembers.length > 0 && (
           <div className="pt-3 border-t border-slate-100 space-y-2">
             <span className="text-[10px] font-extrabold uppercase text-slate-400 block">
-              Quick Switch Invited Team Members ({tenantMembers.length})
+              Workspace Team Members ({tenantMembers.length})
             </span>
             <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
               {tenantMembers.map((mem) => (
                 <button
                   key={mem.id}
                   type="button"
-                  onClick={() => handleQuickLogin(mem)}
+                  onClick={() => handleSelectMemberToAuthenticate(mem)}
                   className="w-full p-2.5 bg-slate-50 hover:bg-indigo-50/80 border border-slate-200 hover:border-indigo-300 rounded-2xl flex items-center justify-between text-left transition cursor-pointer group"
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
@@ -345,7 +414,7 @@ export default function MemberAuthModal({
                     </div>
                     <div className="min-w-0">
                       <p className="text-xs font-bold text-slate-900 truncate group-hover:text-indigo-900">{mem.name}</p>
-                      <p className="text-[10px] text-slate-500 font-mono truncate">{mem.designation} • Pass: {mem.password}</p>
+                      <p className="text-[10px] text-slate-500 font-mono truncate">{mem.email} • {mem.designation}</p>
                     </div>
                   </div>
 
@@ -355,6 +424,7 @@ export default function MemberAuthModal({
                         <Award className="w-3 h-3 text-amber-600" /> Investor
                       </span>
                     )}
+                    <span className="text-[10px] text-indigo-600 font-bold hidden group-hover:inline">Select</span>
                     <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-indigo-600" />
                   </div>
                 </button>

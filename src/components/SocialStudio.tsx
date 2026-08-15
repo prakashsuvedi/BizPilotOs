@@ -722,7 +722,11 @@ export default function SocialStudio({ profile, tenantId, userRole, onCreateAudi
 
       const res = await fetch('/api/social/history-insights', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer MOCK_ENTERPRISE_JWT_TOKEN_123',
+          'x-simulated-tenant': tenantId 
+        },
         body: JSON.stringify({ pastPosts: pastSuccessfulPosts })
       });
 
@@ -866,7 +870,11 @@ export default function SocialStudio({ profile, tenantId, userRole, onCreateAudi
     try {
       const res = await fetch('/api/social/discover-pages', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer MOCK_ENTERPRISE_JWT_TOKEN_123',
+          'x-simulated-tenant': tenantId 
+        },
         body: JSON.stringify({
           platform: plat,
           brandName: profile.name,
@@ -1096,7 +1104,11 @@ export default function SocialStudio({ profile, tenantId, userRole, onCreateAudi
     try {
       const res = await fetch('/api/social/publish-now', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer MOCK_ENTERPRISE_JWT_TOKEN_123',
+          'x-simulated-tenant': tenantId 
+        },
         body: JSON.stringify({
           postId: targetPostId,
           caption: targetCaption,
@@ -1243,7 +1255,11 @@ export default function SocialStudio({ profile, tenantId, userRole, onCreateAudi
       const prompt = `High quality celebratory social media banner for ${festivalCustomTitle}. Festive decorations, elegant lighting, warm festive atmosphere, golden accents, 8k resolution graphic design style.`;
       const res = await fetch('/api/agent/image_gen', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer MOCK_ENTERPRISE_JWT_TOKEN_123',
+          'x-simulated-tenant': tenantId 
+        },
         body: JSON.stringify({ prompt })
       });
       if (res.ok) {

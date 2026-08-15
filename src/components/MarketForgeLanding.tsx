@@ -54,7 +54,7 @@ export interface MarketForgeLandingProps {
   initialAuthModalOpen?: boolean;
   onSelectFeature?: (featureId: string) => void;
   onEnterOS?: () => void;
-  onLogin?: (role: string, tenantId: string, email: string) => void;
+  onLogin?: (role: string, tenantId: string, email: string, name?: string, designation?: string, userObj?: any) => void;
 }
 
 export function MarketForgeLanding({ 
@@ -167,7 +167,14 @@ export function MarketForgeLanding({
       setIsLoginLoading(false);
 
       if (onLogin) {
-        onLogin(userSession.role || 'owner', finalTenantId, userSession.email || email);
+        onLogin(
+          userSession.role || 'owner', 
+          finalTenantId, 
+          userSession.email || email,
+          userSession.name || userSession.user?.name,
+          userSession.user?.designation || (userSession.role === 'owner' ? 'Business Owner' : 'Team Member'),
+          userSession.user
+        );
       } else if (onEnterOS) {
         onEnterOS();
       }

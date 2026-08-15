@@ -93,7 +93,11 @@ export default function RevenueIntelligenceOS({
       // Simulate calling a payment API to get a QR string or redirect URL
       const response = await fetch('/api/subscription/nepalpay/initiate', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer MOCK_ENTERPRISE_JWT_TOKEN_123',
+          'x-simulated-tenant': tenantId 
+        },
         body: JSON.stringify({
           plan_name: paymentDesc,
           amount: parseFloat(paymentAmount),
@@ -320,6 +324,7 @@ export default function RevenueIntelligenceOS({
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': 'Bearer MOCK_ENTERPRISE_JWT_TOKEN_123',
           'x-simulated-tenant': tenantId
         },
         body: JSON.stringify({

@@ -141,7 +141,7 @@ const defaultGuideline: BrandGuideline = {
 
 export default function App() {
   // Session State
-  const [user, setUser] = useState<{ role: string; tenantId: string; email: string } | null>(() => {
+  const [user, setUser] = useState<{ role: string; tenantId: string; email: string; name?: string; designation?: string } | null>(() => {
     try {
       const saved = localStorage.getItem("marketforge_user_session");
       return saved ? JSON.parse(saved) : null;
@@ -538,6 +538,56 @@ export default function App() {
     resolveCurrentRoute(tenantsList);
     checkBackendAvailability();
 
+    // Verify session authenticity with backend (blocks invalid, revoked or cross-tenant sessions)
+    if (user?.email) {
+      fetch("/api/tenant/verify-session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: user.email,
+          tenantId: user.tenantId,
+          role: user.role
+        })
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.success && data.valid) {
+          const verifiedSession = {
+            role: data.role || user.role,
+            tenantId: data.tenantId || user.tenantId,
+            email: data.email || user.email,
+            name: data.name || user.name,
+            designation: data.designation || user.designation
+          };
+          setUser(verifiedSession);
+          localStorage.setItem("marketforge_user_session", JSON.stringify(verifiedSession));
+          if (activeTeamMember) {
+            const updatedMember = {
+              ...activeTeamMember,
+              name: data.name || activeTeamMember.name,
+              designation: data.designation || activeTeamMember.designation,
+              role: data.role || activeTeamMember.role,
+              permittedModules: data.permittedModules || activeTeamMember.permittedModules
+            };
+            setActiveTeamMember(updatedMember);
+            localStorage.setItem("marketforge_active_team_member", JSON.stringify(updatedMember));
+          }
+        } else if (data && data.valid === false) {
+          console.warn("Session verification failed or account revoked:", data?.error);
+          localStorage.removeItem("marketforge_user_session");
+          localStorage.removeItem("marketforge_active_team_member");
+          localStorage.removeItem("mf_simulated_tenant");
+          localStorage.removeItem("mf_simulated_role");
+          setUser(null);
+          setActiveTeamMember(null);
+          setDashboardTab('landing');
+        }
+      })
+      .catch(err => {
+        console.warn("Network error during session verification:", err);
+      });
+    }
+
     if (urlParams.get('payment_success')) {
        setIsPaymentSuccessOpen(true);
        window.history.replaceState({}, document.title, window.location.pathname);
@@ -640,10 +690,50 @@ export default function App() {
   }, [selectedTenantId, user?.tenantId, user?.role]);
 
   // Auth Callbacks
-  const handleLogin = (role: string, tenantId: string, email: string) => {
-    const session = { role, tenantId, email };
+  const handleLogin = (
+    role: string, 
+    tenantId: string, 
+    email: string, 
+    name?: string, 
+    designation?: string, 
+    userObj?: any
+  ) => {
+    const targetTenantObj = tenantsList.find(t => t.id === tenantId);
+    const tenantDisplayName = targetTenantObj?.name || (tenantId ? tenantId.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : "Enterprise Workspace");
+
+    const effectiveName = 
+      name || 
+      userObj?.name || 
+      (role === 'owner' ? `${tenantDisplayName} Owner` : (role === 'super_admin' ? 'Super Administrator' : (email ? email.split('@')[0] : 'Workspace User')));
+
+    const effectiveDesignation = 
+      designation || 
+      userObj?.designation || 
+      (role === 'owner' ? 'Business Owner' : (role === 'super_admin' ? 'System Administrator' : 'Team Member'));
+
+    const session = { 
+      role, 
+      tenantId, 
+      email, 
+      name: effectiveName, 
+      designation: effectiveDesignation 
+    };
     setUser(session);
     localStorage.setItem("marketforge_user_session", JSON.stringify(session));
+
+    const activeMember: TenantTeamMember = {
+      id: userObj?.id || `usr_${Date.now()}`,
+      name: effectiveName,
+      email: email,
+      role: (role as any) || "writer",
+      tenantId: tenantId,
+      status: "active",
+      designation: effectiveDesignation,
+      lastActive: "Active Now",
+      permittedModules: userObj?.permittedModules
+    };
+    handleSetActiveMember(activeMember);
+
     if (role === 'super_admin') {
       setSelectedTenantId('demo-tenant');
       setSuperAdminView('portal');
@@ -659,7 +749,11 @@ export default function App() {
   const handleLogout = async () => {
     await clientAuth.logout();
     localStorage.removeItem("marketforge_user_session");
+    localStorage.removeItem("marketforge_active_team_member");
+    localStorage.removeItem("mf_simulated_tenant");
+    localStorage.removeItem("mf_simulated_role");
     setUser(null);
+    setActiveTeamMember(null);
     setSuperAdminView('portal');
     setDashboardTab('landing');
     if (routeState.type === 'tenant_view' && routeState.tenant?.id) {
@@ -920,8 +1014,18 @@ export default function App() {
 
   // Active tenant name helper
   const activeTenantObj = tenantsList.find(t => t.id === (user?.role === 'super_admin' ? selectedTenantId : user?.tenantId));
+  const activeTenantName = activeTenantObj?.name || (user?.tenantId ? user.tenantId.replace(/-/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()) : "Enterprise Workspace");
 
-  const activeTenantName = activeTenantObj?.name || "Enterprise Workspace";
+  // Authenticated Member & Designation resolution
+  const authenticatedMemberName = 
+    activeTeamMember?.name || 
+    user?.name || 
+    (user?.role === 'super_admin' ? 'Super Administrator' : (user?.role === 'owner' ? `${activeTenantName} Owner` : (user?.email ? user.email.split('@')[0] : 'Workspace User')));
+
+  const authenticatedMemberDesignation = 
+    activeTeamMember?.designation || 
+    user?.designation || 
+    (user?.role === 'owner' ? 'Business Owner' : (user?.role === 'super_admin' ? 'System Administrator' : 'Team Member'));
   
   let trialDaysLeft = activeTenantObj?.trialDaysLeft !== undefined ? activeTenantObj.trialDaysLeft : 30;
   if (activeTenantObj?.createdAt && activeTenantObj?.plan === 'Trial') {
@@ -932,6 +1036,94 @@ export default function App() {
     trialDaysLeft = Math.max(0, 30 - diffDays);
   }
 
+
+  // Dynamic module mapping and aliases
+  const moduleAliasesMap: Record<string, string[]> = {
+    planner: ['planner', 'marketing_planner', 'marketing'],
+    ad_studio: ['ad_studio', 'adstudio', 'ads', 'ad'],
+    email_studio: ['email_studio', 'email', 'emailstudio'],
+    social_studio: ['social_studio', 'social', 'social_engine', 'socialstudio'],
+    revenue_intelligence: ['revenue_intelligence', 'revenue', 'commerce', 'revenue_os'],
+    restaurant_os: ['restaurant_os', 'restaurant', 'pos'],
+    hotel_os: ['hotel_os', 'hotel', 'hospitality'],
+    tours_os: ['tours_os', 'tours', 'travel', 'tours_and_travels'],
+    website_builder: ['website_builder', 'website', 'web_builder'],
+    business_ops: ['business_ops', 'hr', 'operations', 'team'],
+    omnicore_labs: ['omnicore_labs', 'omnicore', 'ai_labs'],
+    domains: ['domains', 'custom_domains', 'dns'],
+    whitelabel: ['whitelabel', 'branding', 'white_label'],
+    workflow_automation: ['workflow_automation', 'workflow', 'automation'],
+    integrations: ['integrations', 'connections'],
+    api_gateway: ['api_gateway', 'gateway'],
+    webhook_engine: ['webhook_engine', 'webhooks'],
+    subscription: ['subscription', 'billing', 'payments']
+  };
+
+  // Check designation-based module access
+  const isModulePermittedForMember = (tabId: string): boolean => {
+    if (!activeTeamMember) return true; // Owner/Tenant Admin by default
+    const designationLower = (activeTeamMember.designation || '').toLowerCase();
+    const roleLower = (activeTeamMember.role || '').toLowerCase();
+    if (
+      designationLower.includes('admin') || 
+      designationLower.includes('ceo') || 
+      designationLower.includes('founder') || 
+      designationLower.includes('owner') ||
+      roleLower === 'owner' ||
+      roleLower === 'admin' ||
+      roleLower === 'super_admin'
+    ) {
+      return true;
+    }
+
+    // Tabs available to all team members
+    if (['landing', 'command', 'success_center'].includes(tabId)) {
+      return true;
+    }
+
+    // Owner/Admin only tabs unless explicitly granted in permittedModules
+    const adminOnlyTabs = ['subscription', 'whitelabel', 'domains'];
+    const memberPerms = activeTeamMember.permittedModules || [];
+    const aliases = moduleAliasesMap[tabId] || [tabId];
+
+    const hasMatch = memberPerms.some(perm => 
+      aliases.includes(perm) || perm === tabId || aliases.some(a => perm.toLowerCase().includes(a))
+    );
+
+    if (adminOnlyTabs.includes(tabId)) {
+      return hasMatch;
+    }
+
+    return hasMatch;
+  };
+
+  // Check tenant module disabled / inactive status
+  const isModuleDisabledForTenant = (tabId: string): { disabled: boolean; reason: 'disabled' | 'inactive' | null } => {
+    if (!activeTenantObj) return { disabled: false, reason: null };
+    
+    // Core infrastructure tabs always accessible
+    if (['landing', 'command', 'success_center', 'subscription'].includes(tabId)) {
+      return { disabled: false, reason: null };
+    }
+
+    const aliases = moduleAliasesMap[tabId] || [tabId];
+
+    // 1. Explicitly disabled modules for tenant
+    if (activeTenantObj.disabledModules && Array.isArray(activeTenantObj.disabledModules)) {
+      const isDisabled = aliases.some(a => activeTenantObj.disabledModules.includes(a));
+      if (isDisabled) return { disabled: true, reason: 'disabled' };
+    }
+
+    // 2. Tenant subscription activated modules
+    if (activeTenantObj.activatedModules && Array.isArray(activeTenantObj.activatedModules) && activeTenantObj.activatedModules.length > 0) {
+      const isActivated = aliases.some(a => 
+        activeTenantObj.activatedModules.some((act: string) => act === a || a.startsWith(act) || act.startsWith(a))
+      );
+      if (!isActivated) return { disabled: true, reason: 'inactive' };
+    }
+
+    return { disabled: false, reason: null };
+  };
 
   // Sidebar Items for Tenant Dashboard
   const dashboardNavItems = [
@@ -959,37 +1151,38 @@ export default function App() {
 
   // Render Content based on views
   const renderDashboardContent = () => {
-    // Check designation-based module access
-    const isModulePermittedForMember = (tabId: string): boolean => {
-      if (!activeTeamMember) return true; // Owner/Tenant Admin by default
-      const designationLower = activeTeamMember.designation.toLowerCase();
-      if (designationLower.includes('admin') || designationLower.includes('ceo') || designationLower.includes('founder') || designationLower.includes('owner')) {
-        return true;
-      }
-
-      // Map tabId to module name
-      const tabToModuleMap: Record<string, string> = {
-        workflow_automation: 'workflow_automation',
-        api_gateway: 'api_gateway',
-        webhook_engine: 'webhook_engine',
-        integrations: 'integrations',
-        planner: 'marketing_planner',
-        ad_studio: 'ad_studio',
-        email_studio: 'email_studio',
-        social_studio: 'social_studio',
-        revenue_intelligence: 'revenue_intelligence',
-        domains: 'domains',
-        restaurant_os: 'restaurant_os',
-        tours_os: 'tours_os',
-        website_builder: 'website_builder',
-        business_ops: 'business_ops',
-        omnicore_labs: 'omnicore_labs'
-      };
-
-      const targetModule = tabToModuleMap[tabId];
-      if (!targetModule) return true; // landing, command, success_center available to all
-      return activeTeamMember.permittedModules?.includes(targetModule) ?? true;
-    };
+    const tenantStatus = isModuleDisabledForTenant(dashboardTab);
+    if (tenantStatus.disabled) {
+      return (
+        <div className="bg-[#0e101a] border border-red-500/20 rounded-3xl p-8 max-w-2xl mx-auto my-12 text-center space-y-6 shadow-2xl animate-fade-in">
+          <div className="w-16 h-16 bg-red-500/10 border border-red-500/30 rounded-2xl flex items-center justify-center mx-auto text-red-400">
+            <ShieldAlert className="w-8 h-8" />
+          </div>
+          <div>
+            <h2 className="text-xl font-extrabold text-white">
+              {tenantStatus.reason === 'disabled' ? 'Module Deactivated for Workspace' : 'Module Inactive on Current Plan'}
+            </h2>
+            <p className="text-xs text-slate-400 mt-2 leading-relaxed">
+              The module <strong className="text-indigo-400 font-mono">{dashboardTab}</strong> is currently {tenantStatus.reason === 'disabled' ? 'deactivated by workspace administrators in tenant settings' : 'not activated in your active workspace subscription plan'}.
+            </p>
+          </div>
+          <div className="flex items-center justify-center gap-3">
+            <button
+              onClick={() => setDashboardTab('subscription')}
+              className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl shadow-lg transition cursor-pointer"
+            >
+              Manage Subscriptions & Modules
+            </button>
+            <button
+              onClick={() => setDashboardTab('command')}
+              className="px-5 py-2.5 bg-white/10 hover:bg-white/20 text-slate-200 font-bold text-xs rounded-xl border border-white/10 transition cursor-pointer"
+            >
+              Return to Command Center
+            </button>
+          </div>
+        </div>
+      );
+    }
 
     if (!isModulePermittedForMember(dashboardTab)) {
       return (
@@ -1000,26 +1193,30 @@ export default function App() {
           <div>
             <h2 className="text-xl font-extrabold text-white">Module Access Restricted by Designation</h2>
             <p className="text-xs text-slate-400 mt-2 leading-relaxed">
-              Logged in as <strong className="text-amber-300 font-mono">{activeTeamMember?.name}</strong> ({activeTeamMember?.designation}).
-              The Tenant Admin has not granted access to feature module <strong className="text-indigo-400 font-mono">{dashboardTab}</strong>.
+              Logged in as <strong className="text-amber-300 font-mono">{activeTeamMember?.name}</strong> ({activeTeamMember?.designation || activeTeamMember?.role}).
+              The Workspace Administrator has not granted permission to module <strong className="text-indigo-400 font-mono">{dashboardTab}</strong>.
             </p>
           </div>
           <div className="p-4 bg-black/40 border border-white/5 rounded-2xl text-left space-y-2 font-mono text-[11px]">
-            <p className="text-slate-300 font-bold">Your Authorized Designation Modules:</p>
+            <p className="text-slate-300 font-bold">Your Permitted Workspace Modules:</p>
             <div className="flex flex-wrap gap-1.5">
-              {activeTeamMember?.permittedModules?.map((m, idx) => (
-                <span key={idx} className="px-2 py-0.5 bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 rounded">
-                  {m}
-                </span>
-              ))}
+              {activeTeamMember?.permittedModules && activeTeamMember.permittedModules.length > 0 ? (
+                activeTeamMember.permittedModules.map((m, idx) => (
+                  <span key={idx} className="px-2 py-0.5 bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 rounded">
+                    {m}
+                  </span>
+                ))
+              ) : (
+                <span className="text-slate-500 italic">No custom modules assigned yet. Accessing standard command center.</span>
+              )}
             </div>
           </div>
           <div className="flex items-center justify-center gap-3">
             <button
-              onClick={() => setDashboardTab('business_ops')}
+              onClick={() => setDashboardTab('command')}
               className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl shadow-lg transition cursor-pointer"
             >
-              Manage Team & Access
+              Go to Command Center
             </button>
             <button
               onClick={() => setIsMemberAuthModalOpen(true)}
@@ -1904,25 +2101,8 @@ export default function App() {
           </button>
         </div>
 
-        {/* Live status indicators & Universal Workspace Switcher */}
+        {/* Live status indicators & Universal Workspace Actions */}
         <div className="flex items-center gap-3 sm:gap-4 font-mono text-[11px] text-slate-400">
-          
-          {/* Universal Tenant Switcher Dropdown */}
-          <div className="relative hidden md:block">
-            <button
-              onClick={() => setIsSuperAdminQuickToggleOpen(!isSuperAdminQuickToggleOpen)}
-              className="flex items-center gap-2 bg-indigo-950/40 hover:bg-indigo-900/40 border border-indigo-500/30 px-3 py-1.5 rounded-xl text-xs text-indigo-200 transition cursor-pointer shadow-sm"
-              title="Switch Active Corporate Workspace Sandbox"
-            >
-              <Building2 className="w-3.5 h-3.5 text-indigo-400" />
-              <span className="font-bold uppercase tracking-wide max-w-[120px] truncate">{activeTenantName}</span>
-              <span className="text-[9px] bg-indigo-500/20 text-indigo-300 px-1.5 py-0.5 rounded font-mono font-bold">
-                {currency}
-              </span>
-              <ChevronDown className="w-3.5 h-3.5 text-indigo-400" />
-            </button>
-          </div>
-
           <div className="hidden md:flex items-center gap-2">
             <Database className="w-3.5 h-3.5 text-emerald-400" />
             <span className="text-slate-400">STATUS:</span>
@@ -2105,19 +2285,32 @@ export default function App() {
             </div>
           )}
 
-          {/* Active Team Member Login Badge */}
+          {/* Authenticated Workspace & Member Identity Badge */}
           <button 
+            id="workspace-identity-header"
             onClick={() => setIsMemberAuthModalOpen(true)}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/40 text-xs font-bold text-indigo-300 transition cursor-pointer"
+            className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-indigo-950/70 via-slate-900/80 to-indigo-950/60 hover:from-indigo-900/80 hover:to-indigo-900/70 border border-indigo-500/40 hover:border-indigo-400/60 text-left transition cursor-pointer shadow-md group shrink-0"
             title="Switch Team Member / Designation Login"
           >
-            <UserCheck className="w-3.5 h-3.5 text-indigo-400" />
-            <span className="hidden sm:inline font-sans truncate max-w-[110px]">
-              {activeTeamMember ? activeTeamMember.name : "Admin Session"}
-            </span>
-            <span className="text-[9px] bg-indigo-500/30 text-indigo-200 px-1.5 py-0.5 rounded font-mono uppercase">
-              {activeTeamMember ? activeTeamMember.designation : "Tenant Admin"}
-            </span>
+            <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-indigo-600/20 border border-indigo-500/30 text-indigo-400 font-bold group-hover:scale-105 transition shrink-0">
+              <Building2 className="w-3.5 h-3.5 text-indigo-400" />
+            </div>
+            <div className="flex flex-col min-w-0 text-left">
+              <div className="flex items-center gap-1.5 leading-tight">
+                <span className="font-extrabold text-xs text-white tracking-tight truncate max-w-[130px] sm:max-w-[200px]">
+                  {activeTenantName}
+                </span>
+                <span className="text-[9px] bg-indigo-500/20 text-indigo-300 px-1 py-0.2 rounded font-mono font-bold shrink-0">
+                  {currency}
+                </span>
+              </div>
+              <div className="flex items-center gap-1 text-[11px] font-sans text-slate-300 truncate max-w-[150px] sm:max-w-[230px] leading-tight mt-0.5">
+                <span className="font-semibold text-slate-200 truncate">{authenticatedMemberName}</span>
+                <span className="text-indigo-400/60 font-bold shrink-0">·</span>
+                <span className="text-indigo-300 font-medium truncate">{authenticatedMemberDesignation}</span>
+              </div>
+            </div>
+            <UserCheck className="w-3.5 h-3.5 text-indigo-400 group-hover:text-indigo-300 ml-1 shrink-0 hidden sm:block opacity-80 group-hover:opacity-100" />
           </button>
 
           <button 
@@ -2212,7 +2405,18 @@ export default function App() {
                       { id: 'omnicore_labs', label: 'OmniCore Labs', icon: FlaskConical, color: 'text-fuchsia-400' },
                     ]
                   }
-                ].map((group, groupIdx) => (
+                ]
+                  .map(group => ({
+                    ...group,
+                    items: group.items.filter(item => {
+                      if (!isModulePermittedForMember(item.id)) return false;
+                      const tenantStatus = isModuleDisabledForTenant(item.id);
+                      if (tenantStatus.disabled) return false;
+                      return true;
+                    })
+                  }))
+                  .filter(group => group.items.length > 0)
+                  .map((group, groupIdx) => (
                   <div key={groupIdx} className="space-y-1">
                     {!isSidebarCollapsed && (
                       <div className="text-[9px] font-mono font-bold text-slate-500 uppercase tracking-wider px-3 pt-1">
@@ -2305,7 +2509,9 @@ export default function App() {
 
           {/* Mobile Navigation Header */}
           <div className="lg:hidden mb-6 bg-[#0e101a] border border-white/5 p-1 rounded-xl flex items-center gap-1 overflow-x-auto">
-            {dashboardNavItems.map((item) => {
+            {dashboardNavItems
+              .filter((item) => isModulePermittedForMember(item.id) && !isModuleDisabledForTenant(item.id).disabled)
+              .map((item) => {
               const Icon = item.icon;
               const isActive = dashboardTab === item.id;
               return (
@@ -2494,10 +2700,13 @@ export default function App() {
       <MemberAuthModal
         isOpen={isMemberAuthModalOpen}
         onClose={() => setIsMemberAuthModalOpen(false)}
-        tenantId={user?.role === 'super_admin' ? selectedTenantId : (user?.tenantId || 'demo-tenant')}
+        tenantId={user?.role === 'super_admin' ? selectedTenantId : (user?.tenantId || (routeState.type === 'tenant_view' && routeState.tenant?.id) || selectedTenantId || 'demo-tenant')}
         tenantName={activeTenantName}
         currentMember={activeTeamMember}
-        onLoginSuccess={(member) => handleSetActiveMember(member)}
+        onLoginSuccess={(member) => {
+          handleSetActiveMember(member);
+          handleLogin(member.role, member.tenantId, member.email, member.name, member.designation, member);
+        }}
         onLogoutToGuest={() => handleSetActiveMember(null)}
       />
 
