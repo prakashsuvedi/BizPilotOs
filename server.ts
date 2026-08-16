@@ -6271,8 +6271,9 @@ app.post("/api/admin/database/clean-tenant-data", async (req: express.Request, r
 // POST /api/tenant/import-template-data (Import template showcase data to clean tenant)
 app.post("/api/tenant/import-template-data", async (req: express.Request, res: express.Response) => {
   try {
-    const { targetTenantId, templateId = "demo-tenant" } = req.body;
-    if (!targetTenantId) return res.status(400).json({ error: "Target tenant ID required." });
+    const { targetTenantId, tenantId: bodyTenantId, templateId = "demo-tenant" } = req.body;
+    const resolvedTarget = targetTenantId || bodyTenantId || req.tenantId || "demo-tenant";
+    if (!resolvedTarget) return res.status(400).json({ error: "Target tenant ID required." });
 
     const sampleMenuItems = [
       { id: `menu_${Date.now()}_1`, name: "Himalayan Wood-fired Artisan Pizza", category: "Wood-fired Pizza", price: 14.50, status: "Available", isVeg: true, prepTimeMins: 15, description: "Fresh mozzarella, organic basil, wood-fired crust." },
@@ -7387,8 +7388,9 @@ app.post("/api/tenant/update-team-member-status", requireAuth, requireTenantScop
   try {
     const caller = req.user;
     const callerRole = req.userRole;
-    const { tenantId, memberId, email, status } = req.body;
-    if (!status || (!memberId && !email)) {
+    const { tenantId, memberId, userId, id, email, status } = req.body;
+    const targetMemberId = memberId || userId || id;
+    if (!status || (!targetMemberId && !email)) {
       return res.status(400).json({ error: "Missing required parameters (status and memberId or email)." });
     }
 
@@ -7410,7 +7412,7 @@ app.post("/api/tenant/update-team-member-status", requireAuth, requireTenantScop
     if (serverMemoryStore.users) {
       for (const [key, user] of Object.entries(serverMemoryStore.users)) {
         const u = user as any;
-        if ((memberId && (u.id === memberId || u.uid === memberId)) || (cleanEmail && u.email?.toLowerCase() === cleanEmail)) {
+        if ((targetMemberId && (u.id === targetMemberId || u.uid === targetMemberId)) || (cleanEmail && u.email?.toLowerCase() === cleanEmail)) {
           targetUser = u;
           targetKey = key;
           break;
@@ -7421,8 +7423,8 @@ app.post("/api/tenant/update-team-member-status", requireAuth, requireTenantScop
     if (!targetUser && getIsRealAdminReady()) {
       try {
         const db = getAdminDb();
-        if (memberId) {
-          const doc = await db.collection("users").doc(memberId).get();
+        if (targetMemberId) {
+          const doc = await db.collection("users").doc(targetMemberId).get();
           if (doc.exists) {
             targetUser = { id: doc.id, ...doc.data() };
             targetKey = doc.id;
@@ -7482,8 +7484,9 @@ app.post("/api/tenant/delete-team-member", requireAuth, requireTenantScope, asyn
   try {
     const caller = req.user;
     const callerRole = req.userRole;
-    const { tenantId, memberId, email } = req.body;
-    if (!memberId && !email) {
+    const { tenantId, memberId, userId, id, email } = req.body;
+    const targetMemberId = memberId || userId || id;
+    if (!targetMemberId && !email) {
       return res.status(400).json({ error: "memberId or email is required to remove team member." });
     }
 
@@ -7505,7 +7508,7 @@ app.post("/api/tenant/delete-team-member", requireAuth, requireTenantScope, asyn
     if (serverMemoryStore.users) {
       for (const [key, user] of Object.entries(serverMemoryStore.users)) {
         const u = user as any;
-        if ((memberId && (u.id === memberId || u.uid === memberId)) || (cleanEmail && u.email?.toLowerCase() === cleanEmail)) {
+        if ((targetMemberId && (u.id === targetMemberId || u.uid === targetMemberId)) || (cleanEmail && u.email?.toLowerCase() === cleanEmail)) {
           targetUser = u;
           targetKey = key;
           break;
@@ -7521,10 +7524,10 @@ app.post("/api/tenant/delete-team-member", requireAuth, requireTenantScope, asyn
       delete serverMemoryStore.users[targetKey];
     }
 
-    if (getIsRealAdminReady() && memberId) {
+    if (getIsRealAdminReady() && targetMemberId) {
       try {
         const db = getAdminDb();
-        await db.collection("users").doc(memberId).delete();
+        await db.collection("users").doc(targetMemberId).delete();
       } catch (e) {}
     }
 
