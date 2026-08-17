@@ -11,6 +11,8 @@
     "prebuild": "node scripts/fix-encoding.js",
     "build": "node scripts/fix-encoding.js && node scripts/bump-version.js && vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
     "prepare": "husky || true",
+    "deploy": "wrangler pages deploy dist",
+    "deploy:pages": "wrangler pages deploy dist",
     "start": "node dist/server.cjs"
   },
   "dependencies": {
