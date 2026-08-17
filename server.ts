@@ -99,7 +99,7 @@ app.use((req: express.Request, res: express.Response, next: express.NextFunction
   }
 
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, x-user-email, x-simulated-tenant, x-simulated-role, x-tenant-id, X-Correlation-ID, X-Client-Timestamp");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, Cache-Control, cache-control, Pragma, Expires, X-Requested-With, Accept, x-user-email, x-simulated-tenant, x-simulated-role, x-tenant-id, X-Correlation-ID, X-Client-Timestamp");
   res.setHeader("Access-Control-Allow-Credentials", "true");
 
   if (req.method === "OPTIONS") {
@@ -2000,12 +2000,6 @@ app.post("/api/superadmin/tenants", requireAuth, requireRole(["super_admin"]), a
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }
-});
-
-// Alias POST /api/admin/create-tenant to /api/superadmin/tenants
-app.post("/api/admin/create-tenant", async (req: express.Request, res: express.Response) => {
-  req.url = "/api/superadmin/tenants";
-  return app._router.handle(req, res, () => {});
 });
 
 // PUT /api/superadmin/tenants/:id/modules (Superadmin module activation manager)
