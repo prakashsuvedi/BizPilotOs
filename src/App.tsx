@@ -539,8 +539,8 @@ export default function App() {
     resolveCurrentRoute(tenantsList);
     checkBackendAvailability();
 
-    // Verify session authenticity with backend (blocks invalid, revoked or cross-tenant sessions)
-    if (user?.email) {
+    // Verify session authenticity with backend (blocks invalid, revoked or cross-tenant sessions for tenant users)
+    if (user?.email && user.role !== 'super_admin') {
       fetch("/api/tenant/verify-session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -684,11 +684,18 @@ export default function App() {
   };
 
   useEffect(() => {
-    const activeId = user?.role === 'super_admin' ? selectedTenantId : user?.tenantId;
-    if (activeId) {
-      loadTenantDetails(activeId);
+    // Super Admins only load tenant data when actively inspecting a specific tenant workspace
+    if (user?.role === 'super_admin') {
+      if (superAdminView === 'dashboard' && selectedTenantId) {
+        loadTenantDetails(selectedTenantId);
+      }
+      return;
     }
-  }, [selectedTenantId, user?.tenantId, user?.role]);
+    // Tenant users load their assigned tenant workspace data
+    if (user?.tenantId) {
+      loadTenantDetails(user.tenantId);
+    }
+  }, [selectedTenantId, user?.tenantId, user?.role, superAdminView]);
 
   // Auth Callbacks
   const handleLogin = (
@@ -699,18 +706,44 @@ export default function App() {
     designation?: string, 
     userObj?: any
   ) => {
+    // 1. Super Admin Authentication -> Exclusively route to /admin Super Admin Portal
+    if (role === 'super_admin') {
+      localStorage.removeItem("marketforge_active_team_member");
+      localStorage.removeItem("mf_simulated_tenant");
+      localStorage.removeItem("mf_simulated_role");
+
+      const effectiveName = name || userObj?.name || 'Super Administrator';
+      const effectiveDesignation = designation || userObj?.designation || 'System Administrator';
+
+      const session = { 
+        role: 'super_admin', 
+        tenantId: '', 
+        email, 
+        name: effectiveName, 
+        designation: effectiveDesignation 
+      };
+      setUser(session);
+      localStorage.setItem("marketforge_user_session", JSON.stringify(session));
+      setActiveTeamMember(null);
+      setSelectedTenantId('');
+      setSuperAdminView('portal');
+      navigateToAdmin();
+      return;
+    }
+
+    // 2. Tenant Workspace Authentication -> Route to assigned tenant workspace
     const targetTenantObj = tenantsList.find(t => t.id === tenantId);
     const tenantDisplayName = targetTenantObj?.name || (tenantId ? tenantId.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : "Enterprise Workspace");
 
     const effectiveName = 
       name || 
       userObj?.name || 
-      (role === 'owner' ? `${tenantDisplayName} Owner` : (role === 'super_admin' ? 'Super Administrator' : (email ? email.split('@')[0] : 'Workspace User')));
+      (role === 'owner' ? `${tenantDisplayName} Owner` : (email ? email.split('@')[0] : 'Workspace User'));
 
     const effectiveDesignation = 
       designation || 
       userObj?.designation || 
-      (role === 'owner' ? 'Business Owner' : (role === 'super_admin' ? 'System Administrator' : 'Team Member'));
+      (role === 'owner' ? 'Business Owner' : 'Team Member');
 
     const session = { 
       role, 
@@ -735,16 +768,10 @@ export default function App() {
     };
     handleSetActiveMember(activeMember);
 
-    if (role === 'super_admin') {
-      setSelectedTenantId('demo-tenant');
-      setSuperAdminView('portal');
-      navigateToAdmin();
-    } else {
-      setSelectedTenantId(tenantId);
-      setDashboardTab('command');
-      setIsHeaderFolded(true);
-      navigateToTenant(tenantId, 'workspace');
-    }
+    setSelectedTenantId(tenantId);
+    setDashboardTab('command');
+    setIsHeaderFolded(true);
+    navigateToTenant(tenantId, 'workspace');
   };
 
   const handleLogout = async () => {
@@ -1021,8 +1048,69 @@ export default function App() {
     );
   }
 
-  // 6. Authenticated Workspace Access -> Guard against waking/offline backend for live operations
-  if (backendStatus === 'waking') {
+  // 6. Super Admin Direct Control Plane Access (Exclusively route to Super Admin Portal & Selector without tenant workspace connection)
+  if (user.role === 'super_admin' && superAdminView === 'portal') {
+    return (
+      <div className="min-h-screen bg-[#0C0D14] text-slate-100 flex flex-col font-sans">
+        {/* Super Admin Command Bar */}
+        <header className="border-b border-rose-500/10 bg-[#0e101a] px-6 py-3.5 flex items-center justify-between sticky top-0 z-50">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-rose-600/20 border border-rose-500/30 shadow-lg text-rose-400">
+              <Shield className="w-5 h-5" />
+            </div>
+            <div>
+              <h1 className="font-display font-bold text-sm tracking-wide text-white flex items-center gap-1.5">
+                SUPER ADMIN SYSTEM PANEL <span className="text-[10px] bg-rose-500/20 text-rose-300 px-1.5 py-0.5 rounded border border-rose-500/30">Root Security</span>
+              </h1>
+              <p className="text-[10px] font-mono text-slate-400 uppercase tracking-widest">Global SaaS Control Plane</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-4">
+            {/* Business Selection Button */}
+            <button 
+              onClick={() => setSuperAdminView('selection')}
+              className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 py-2 rounded-xl border border-indigo-500/30 shadow-md transition cursor-pointer"
+            >
+              <Building2 className="w-3.5 h-3.5" />
+              Business Selection
+            </button>
+
+            <div className="flex items-center gap-2 bg-white/5 border border-white/10 px-3 py-1.5 rounded-lg text-xs font-mono text-slate-300">
+              <Clock className="w-3.5 h-3.5 text-slate-400" />
+              {currentTime}
+            </div>
+
+            <button 
+              onClick={handleLogout}
+              className="flex items-center justify-center p-2 rounded-xl hover:bg-white/5 border border-transparent text-slate-400 hover:text-rose-400 transition cursor-pointer"
+              title="Logout Session"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+          </div>
+        </header>
+
+        {/* Portal component */}
+        <div className="flex-1 overflow-y-auto">
+          <React.Suspense fallback={<WorkspaceModuleLoader />}>
+            <SuperAdminPortal 
+              currentTenantId={selectedTenantId}
+              onTenantChange={(id) => {
+                setSelectedTenantId(id);
+                setSuperAdminView('dashboard');
+              }}
+              userRole="super_admin"
+              onTenantsUpdated={(newList) => setTenantsList(newList)}
+            />
+          </React.Suspense>
+        </div>
+      </div>
+    );
+  }
+
+  // 7. Authenticated Workspace Access -> Guard against waking/offline backend for live operations
+  if (user.role !== 'super_admin' && backendStatus === 'waking') {
     const currentSlug = routeState.slug || urlParams.get('tenant') || urlParams.get('slug') || (user?.tenantId || (routeState.tenant ? routeState.tenant.name : ''));
     return (
       <ConnectingState 
@@ -1036,7 +1124,7 @@ export default function App() {
     );
   }
 
-  if (backendStatus === 'error') {
+  if (user.role !== 'super_admin' && backendStatus === 'error') {
     const currentSlug = routeState.slug || urlParams.get('tenant') || urlParams.get('slug') || (user?.tenantId || (routeState.tenant ? routeState.tenant.name : ''));
     return (
       <ConnectingState 
@@ -1500,67 +1588,6 @@ export default function App() {
         return <DailyCommandCenter activeTenant={activeTenantObj} onOpenSubscription={() => setIsSubscriptionModalOpen(true)} />;
     }
   };
-
-  // If Super Admin view is Portal
-  if (user.role === 'super_admin' && superAdminView === 'portal') {
-    return (
-      <div className="min-h-screen bg-[#0C0D14] text-slate-100 flex flex-col font-sans">
-        {/* Super Admin Command Bar */}
-        <header className="border-b border-rose-500/10 bg-[#0e101a] px-6 py-3.5 flex items-center justify-between sticky top-0 z-50">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-rose-600/20 border border-rose-500/30 shadow-lg text-rose-400">
-              <Shield className="w-5 h-5" />
-            </div>
-            <div>
-              <h1 className="font-display font-bold text-sm tracking-wide text-white flex items-center gap-1.5">
-                SUPER ADMIN SYSTEM PANEL <span className="text-[10px] bg-rose-500/20 text-rose-300 px-1.5 py-0.5 rounded border border-rose-500/30">Root Security</span>
-              </h1>
-              <p className="text-[10px] font-mono text-slate-400 uppercase tracking-widest">Global SaaS Control Plane</p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-4">
-            {/* Business Selection Button */}
-            <button 
-              onClick={() => setSuperAdminView('selection')}
-              className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 py-2 rounded-xl border border-indigo-500/30 shadow-md transition cursor-pointer"
-            >
-              <Building2 className="w-3.5 h-3.5" />
-              Business Selection
-            </button>
-
-            <div className="flex items-center gap-2 bg-white/5 border border-white/10 px-3 py-1.5 rounded-lg text-xs font-mono text-slate-300">
-              <Clock className="w-3.5 h-3.5 text-slate-400" />
-              {currentTime}
-            </div>
-
-            <button 
-              onClick={handleLogout}
-              className="flex items-center justify-center p-2 rounded-xl hover:bg-white/5 border border-transparent text-slate-400 hover:text-rose-400 transition cursor-pointer"
-              title="Logout Session"
-            >
-              <LogOut className="w-4 h-4" />
-            </button>
-          </div>
-        </header>
-
-        {/* Portal component */}
-        <div className="flex-1 overflow-y-auto">
-          <React.Suspense fallback={<WorkspaceModuleLoader />}>
-            <SuperAdminPortal 
-              currentTenantId={selectedTenantId}
-              onTenantChange={(id) => {
-                setSelectedTenantId(id);
-                setSuperAdminView('dashboard');
-              }}
-              userRole="super_admin"
-              onTenantsUpdated={(newList) => setTenantsList(newList)}
-            />
-          </React.Suspense>
-        </div>
-      </div>
-    );
-  }
 
   // If Super Admin view is Business Selection Grid
   if (user.role === 'super_admin' && superAdminView === 'selection') {

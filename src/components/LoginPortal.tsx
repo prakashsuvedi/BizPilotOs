@@ -882,9 +882,9 @@ export default function LoginPortal({ onLogin, tenantsList, onActivateTenant }: 
       if (!adminSession || adminSession.role !== 'super_admin') {
         throw new Error("Access Denied: Designated Super Administrator privileges required.");
       }
-      await clientAuth.signInWithEmailAndPassword(adminEmail, adminPassword, adminSession.tenantId || "demo-tenant");
+      await clientAuth.signInWithEmailAndPassword(adminEmail, adminPassword, "super_admin");
 
-      onLogin(adminSession.role, adminSession.tenantId || 'demo-tenant', adminSession.email || adminEmail, adminSession.name || 'Super Administrator', 'System Administrator');
+      onLogin(adminSession.role, '', adminSession.email || adminEmail, adminSession.name || 'Super Administrator', 'System Administrator');
     } catch (err: any) {
       setAdminError(`⛔ Superadmin Auth Security Lock: ${err.message}`);
     } finally {
