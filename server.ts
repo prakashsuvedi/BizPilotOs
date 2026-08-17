@@ -12,7 +12,10 @@ try {
 
 
 import fs from "fs";
+import dns from "dns";
 import crypto from "crypto";
+import { initializeApp as initFbApp, getApps as getFbApps, deleteApp as deleteFbApp, cert as fbCert } from "firebase-admin/app";
+import { getFirestore as getFbFirestore } from "firebase-admin/firestore";
 import { GoogleGenAI, Type } from "@google/genai";
 import { 
   requireAuth, 
@@ -73,8 +76,36 @@ app.use(compression({
 
 app.use(express.json());
 
-// Enterprise Security & Performance Headers
+// Enterprise Security, CORS & Performance Headers
 app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
+  const origin = req.headers.origin as string | undefined;
+  const configuredAllowed = serverMemoryStore?.platform_domain_config?.allowedFrontendDomains || [];
+  const primaryPlatform = serverMemoryStore?.platform_domain_config?.primaryPlatformUrl;
+  const allowedOrigins = [
+    "https://marketforge.scamspike.com",
+    "https://marketforge-api-vpgj.onrender.com",
+    "http://localhost:3000",
+    "http://localhost:5173",
+    ...configuredAllowed,
+    ...(primaryPlatform ? [primaryPlatform] : [])
+  ];
+  
+  if (origin && (allowedOrigins.includes(origin) || origin.endsWith(".scamspike.com") || origin.endsWith(".run.app") || origin.endsWith(".onrender.com"))) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+  } else if (!origin) {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+  } else {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+  }
+
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, x-user-email, x-simulated-tenant, x-simulated-role, x-tenant-id, X-Correlation-ID, X-Client-Timestamp");
+  res.setHeader("Access-Control-Allow-Credentials", "true");
+
+  if (req.method === "OPTIONS") {
+    return res.status(204).end();
+  }
+
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("X-Frame-Options", "SAMEORIGIN");
   res.setHeader("X-XSS-Protection", "1; mode=block");
@@ -788,6 +819,38 @@ const serverMemoryStore: any = {
     primary_color: "#4f46e5",
     secondary_color: "#06b6d4"
   },
+  platform_domain_config: {
+    platformName: "MarketForge OS",
+    primaryPlatformUrl: "https://marketforge.scamspike.com",
+    apiBaseUrl: "https://marketforge-api-vpgj.onrender.com",
+    allowedFrontendDomains: [
+      "https://marketforge.scamspike.com",
+      "https://marketforge-api-vpgj.onrender.com"
+    ],
+    environment: "production",
+    updatedAt: new Date().toISOString(),
+    updatedBy: "system"
+  },
+  platform_email_config: {
+    provider: (process.env.EMAIL_PROVIDER as any) || "smtp",
+    smtpHost: (process.env.SMTP_HOST && !process.env.SMTP_HOST.includes("sendgrid")) ? process.env.SMTP_HOST : "scamspike.com",
+    smtpPort: process.env.SMTP_PORT ? parseInt(process.env.SMTP_PORT) : 465,
+    smtpUser: process.env.SMTP_USER || "marketforge@scamspike.com",
+    smtpPass: process.env.SMTP_PASS || "MkForge_2026_SecurePass!",
+    smtpSecurity: "ssl",
+    senderName: "MarketForge Operations",
+    senderEmail: process.env.SMTP_FROM_EMAIL || "marketforge@scamspike.com",
+    replyToEmail: "support@marketforge.scamspike.com",
+    enableProductionEmail: true,
+    sendgridApiKey: (process.env.SENDGRID_API_KEY && !process.env.SENDGRID_API_KEY.includes("YOUR")) ? process.env.SENDGRID_API_KEY : "",
+    resendApiKey: (process.env.RESEND_API_KEY && !process.env.RESEND_API_KEY.includes("YOUR")) ? process.env.RESEND_API_KEY : "",
+    lastTestStatus: "IDLE",
+    lastTestedAt: null,
+    lastTestRecipient: "",
+    lastTestError: null,
+    updatedAt: new Date().toISOString(),
+    updatedBy: "system"
+  },
   audit_logs: [],
   currencies: {},
   countries: {},
@@ -1192,6 +1255,591 @@ app.post("/api/superadmin/pricing/module", requireAuth, requireRole(["super_admi
     });
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/platform/config (Public platform domain info)
+app.get("/api/platform/config", (req: express.Request, res: express.Response) => {
+  const config = serverMemoryStore.platform_domain_config || {
+    platformName: "MarketForge OS",
+    primaryPlatformUrl: "https://marketforge.scamspike.com",
+    apiBaseUrl: "https://marketforge-api-vpgj.onrender.com",
+    allowedFrontendDomains: [
+      "https://marketforge.scamspike.com",
+      "https://marketforge-api-vpgj.onrender.com"
+    ],
+    environment: "production"
+  };
+  return res.json({
+    platformName: config.platformName,
+    primaryPlatformUrl: config.primaryPlatformUrl,
+    apiBaseUrl: config.apiBaseUrl,
+    environment: config.environment
+  });
+});
+
+// GET /api/superadmin/platform-domain (Super Admin Platform Domain & Deployment Configuration)
+app.get("/api/superadmin/platform-domain", requireAuth, requireRole(["super_admin"]), async (req: express.Request, res: express.Response) => {
+  try {
+    const config = serverMemoryStore.platform_domain_config || {
+      platformName: "MarketForge OS",
+      primaryPlatformUrl: "https://marketforge.scamspike.com",
+      apiBaseUrl: "https://marketforge-api-vpgj.onrender.com",
+      allowedFrontendDomains: [
+        "https://marketforge.scamspike.com",
+        "https://marketforge-api-vpgj.onrender.com"
+      ],
+      environment: "production"
+    };
+    return res.json({ success: true, config });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/superadmin/platform-domain (Save Super Admin Platform Domain & Deployment Configuration)
+app.post("/api/superadmin/platform-domain", requireAuth, requireRole(["super_admin"]), async (req: express.Request, res: express.Response) => {
+  try {
+    const { platformName, primaryPlatformUrl, apiBaseUrl, allowedFrontendDomains, environment } = req.body;
+
+    // 1. Validate platformName
+    if (!platformName || typeof platformName !== "string" || platformName.trim().length === 0) {
+      return res.status(400).json({ error: "Platform name is required." });
+    }
+    const cleanPlatformName = platformName.trim().slice(0, 100).replace(/[<>]/g, "");
+
+    // Helper: validate URL
+    const validateUrl = (urlStr: string, fieldName: string): string => {
+      if (!urlStr || typeof urlStr !== "string") {
+        throw new Error(`${fieldName} is required.`);
+      }
+      const trimmed = urlStr.trim();
+      let parsed: URL;
+      try {
+        parsed = new URL(trimmed);
+      } catch {
+        throw new Error(`${fieldName} must be a valid, well-formed URL (e.g., https://example.com).`);
+      }
+      if (parsed.protocol === "javascript:" || parsed.protocol === "data:" || parsed.protocol === "vbscript:") {
+        throw new Error(`${fieldName} contains an illegal or dangerous URL scheme.`);
+      }
+      if (process.env.NODE_ENV === "production" && parsed.protocol !== "https:" && parsed.hostname !== "localhost" && parsed.hostname !== "127.0.0.1") {
+        throw new Error(`${fieldName} must use HTTPS in production environments.`);
+      }
+      if (!parsed.hostname || parsed.hostname.length < 3) {
+        throw new Error(`${fieldName} has an invalid hostname.`);
+      }
+      return trimmed.replace(/\/+$/, "");
+    };
+
+    let cleanPrimaryUrl: string;
+    let cleanApiUrl: string;
+    try {
+      cleanPrimaryUrl = validateUrl(primaryPlatformUrl, "Primary Platform URL");
+      cleanApiUrl = validateUrl(apiBaseUrl, "API Base URL");
+    } catch (valErr: any) {
+      return res.status(400).json({ error: valErr.message });
+    }
+
+    // Validate allowedFrontendDomains
+    const cleanAllowedDomains: string[] = [];
+    if (Array.isArray(allowedFrontendDomains)) {
+      for (const d of allowedFrontendDomains) {
+        if (typeof d === "string" && d.trim()) {
+          try {
+            const cleanD = validateUrl(d, "Allowed Frontend Domain");
+            if (!cleanAllowedDomains.includes(cleanD)) {
+              cleanAllowedDomains.push(cleanD);
+            }
+          } catch (e: any) {
+            return res.status(400).json({ error: `Invalid entry in Allowed Frontend Domains: ${e.message}` });
+          }
+        }
+      }
+    }
+    if (!cleanAllowedDomains.includes(cleanPrimaryUrl)) {
+      cleanAllowedDomains.unshift(cleanPrimaryUrl);
+    }
+
+    // Validate environment
+    const allowedEnvs = ["production", "staging", "development"];
+    const cleanEnv = allowedEnvs.includes(environment) ? environment : "production";
+
+    const updatedConfig = {
+      platformName: cleanPlatformName,
+      primaryPlatformUrl: cleanPrimaryUrl,
+      apiBaseUrl: cleanApiUrl,
+      allowedFrontendDomains: cleanAllowedDomains,
+      environment: cleanEnv,
+      updatedAt: new Date().toISOString(),
+      updatedBy: (req as any).user?.email || "super_admin"
+    };
+
+    serverMemoryStore.platform_domain_config = updatedConfig;
+    
+    try {
+      await saveToSaaSStore("platform_settings", "domain_config", updatedConfig, "demo-tenant", (req as any).user?.email || "super_admin");
+      const db = getAdminDb();
+      if (db) {
+        await db.collection("platform_settings").doc("domain_config").set(updatedConfig, { merge: true });
+      }
+    } catch (e) {
+      console.warn("Firestore save fallback for platform_domain_config:", e);
+    }
+
+    return res.json({ 
+      success: true, 
+      message: "Platform domain & deployment configuration updated successfully.", 
+      config: updatedConfig 
+    });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/superadmin/platform-email (Get Platform Email & SMTP Configuration - Credentials Masked)
+app.get("/api/superadmin/platform-email", requireAuth, requireRole(["super_admin"]), async (req: express.Request, res: express.Response) => {
+  try {
+    const raw = serverMemoryStore.platform_email_config || {
+      provider: "smtp",
+      smtpHost: (process.env.SMTP_HOST && !process.env.SMTP_HOST.includes("sendgrid")) ? process.env.SMTP_HOST : "scamspike.com",
+      smtpPort: process.env.SMTP_PORT ? parseInt(process.env.SMTP_PORT) : 465,
+      smtpUser: process.env.SMTP_USER || "marketforge@scamspike.com",
+      smtpPass: process.env.SMTP_PASS || "MkForge_2026_SecurePass!",
+      smtpSecurity: "ssl",
+      senderName: "MarketForge Operations",
+      senderEmail: process.env.SMTP_FROM_EMAIL || "marketforge@scamspike.com",
+      replyToEmail: "support@marketforge.scamspike.com",
+      enableProductionEmail: true,
+      lastTestStatus: "IDLE",
+      lastTestedAt: null,
+      lastTestRecipient: "",
+      lastTestError: null
+    };
+
+    // Mask sensitive credentials - NEVER expose plaintext secrets over API
+    const safeConfig = {
+      provider: raw.provider || "smtp",
+      smtpHost: raw.smtpHost || "scamspike.com",
+      smtpPort: raw.smtpPort ? parseInt(raw.smtpPort) : 465,
+      smtpUser: raw.smtpUser || "marketforge@scamspike.com",
+      smtpPasswordSet: Boolean(raw.smtpPass && raw.smtpPass.length > 0),
+      smtpPasswordMasked: raw.smtpPass ? "••••••••" : "",
+      smtpSecurity: raw.smtpSecurity || (raw.smtpPort === 465 ? "ssl" : (raw.smtpPort === 587 ? "tls" : "none")),
+      senderName: raw.senderName || "MarketForge Operations",
+      senderEmail: raw.senderEmail || process.env.SMTP_FROM_EMAIL || "marketforge@scamspike.com",
+      replyToEmail: raw.replyToEmail || "support@marketforge.scamspike.com",
+      enableProductionEmail: raw.enableProductionEmail !== false,
+      sendgridApiKeySet: Boolean(raw.sendgridApiKey && raw.sendgridApiKey.length > 0),
+      sendgridApiKeyMasked: raw.sendgridApiKey ? "••••••••" : "",
+      resendApiKeySet: Boolean(raw.resendApiKey && raw.resendApiKey.length > 0),
+      resendApiKeyMasked: raw.resendApiKey ? "••••••••" : "",
+      lastTestStatus: raw.lastTestStatus || "IDLE",
+      lastTestedAt: raw.lastTestedAt || null,
+      lastTestRecipient: raw.lastTestRecipient || "",
+      lastTestError: raw.lastTestError || null,
+      updatedAt: raw.updatedAt || new Date().toISOString(),
+      updatedBy: raw.updatedBy || "system"
+    };
+
+    return res.json({ success: true, config: safeConfig });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/superadmin/platform-email (Save Platform Email & SMTP Configuration - Write-Only Credential Updates)
+app.post("/api/superadmin/platform-email", requireAuth, requireRole(["super_admin"]), async (req: express.Request, res: express.Response) => {
+  try {
+    const { 
+      provider, 
+      smtpHost, 
+      smtpPort, 
+      smtpUser, 
+      smtpPassword, 
+      smtpSecurity, 
+      senderName, 
+      senderEmail, 
+      replyToEmail, 
+      enableProductionEmail,
+      sendgridApiKey,
+      resendApiKey
+    } = req.body;
+
+    const allowedProviders = ["smtp", "sendgrid", "resend", "simulator"];
+    const cleanProvider = allowedProviders.includes(provider) ? provider : "smtp";
+
+    // 1. Validate Host
+    let cleanHost = "scamspike.com";
+    if (smtpHost && typeof smtpHost === "string") {
+      cleanHost = smtpHost.trim().replace(/^https?:\/\//i, "").replace(/^smtps?:\/\//i, "").replace(/\/+$/, "");
+      if (cleanHost.includes("/") || cleanHost.includes("?") || cleanHost.includes(" ") || cleanHost.length < 3) {
+        return res.status(400).json({ error: "Invalid SMTP Host format. Provide a valid hostname or IP (e.g. scamspike.com or mail.smtp2go.com)." });
+      }
+    }
+
+    // 2. Validate Port
+    let cleanPort = 465;
+    if (smtpPort !== undefined) {
+      const parsedPort = parseInt(smtpPort, 10);
+      if (isNaN(parsedPort) || parsedPort < 1 || parsedPort > 65535) {
+        return res.status(400).json({ error: "Invalid SMTP Port. Must be an integer between 1 and 65535 (commonly 465 for SSL, 587 for TLS, or 2525)." });
+      }
+      cleanPort = parsedPort;
+    }
+
+    // 3. Validate Security
+    const allowedSecurity = ["ssl", "tls", "none"];
+    const cleanSecurity = allowedSecurity.includes(smtpSecurity) ? smtpSecurity : (cleanPort === 465 ? "ssl" : "tls");
+
+    // 4. Validate Emails
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!senderEmail || !emailRegex.test(senderEmail.trim())) {
+      return res.status(400).json({ error: "Valid Sender Email is required (e.g. marketforge@scamspike.com)." });
+    }
+    const cleanSenderEmail = senderEmail.trim();
+
+    let cleanReplyToEmail = "";
+    if (replyToEmail && typeof replyToEmail === "string" && replyToEmail.trim().length > 0) {
+      if (!emailRegex.test(replyToEmail.trim())) {
+        return res.status(400).json({ error: "Invalid Reply-To Email address format." });
+      }
+      cleanReplyToEmail = replyToEmail.trim();
+    }
+
+    const cleanSenderName = (senderName && typeof senderName === "string") 
+      ? senderName.trim().slice(0, 100).replace(/[<>]/g, "") 
+      : "MarketForge Operations";
+
+    const cleanUser = (smtpUser && typeof smtpUser === "string") ? smtpUser.trim() : "";
+
+    // 5. Write-Only Secret Updates: Blank or masked string ("••••••••") retains existing secret
+    const current = serverMemoryStore.platform_email_config || {};
+    
+    let updatedSmtpPass = current.smtpPass || process.env.SMTP_PASS || "MkForge_2026_SecurePass!";
+    if (smtpPassword && typeof smtpPassword === "string" && smtpPassword.trim().length > 0 && !smtpPassword.includes("••••")) {
+      updatedSmtpPass = smtpPassword.trim();
+    }
+
+    let updatedSendgridKey = current.sendgridApiKey || process.env.SENDGRID_API_KEY || "";
+    if (sendgridApiKey && typeof sendgridApiKey === "string" && sendgridApiKey.trim().length > 0 && !sendgridApiKey.includes("••••")) {
+      updatedSendgridKey = sendgridApiKey.trim();
+    }
+
+    let updatedResendKey = current.resendApiKey || process.env.RESEND_API_KEY || "";
+    if (resendApiKey && typeof resendApiKey === "string" && resendApiKey.trim().length > 0 && !resendApiKey.includes("••••")) {
+      updatedResendKey = resendApiKey.trim();
+    }
+
+    const updatedConfig = {
+      provider: cleanProvider,
+      smtpHost: cleanHost,
+      smtpPort: cleanPort,
+      smtpUser: cleanUser,
+      smtpPass: updatedSmtpPass,
+      smtpSecurity: cleanSecurity,
+      senderName: cleanSenderName,
+      senderEmail: cleanSenderEmail,
+      replyToEmail: cleanReplyToEmail,
+      enableProductionEmail: Boolean(enableProductionEmail),
+      sendgridApiKey: updatedSendgridKey,
+      resendApiKey: updatedResendKey,
+      lastTestStatus: current.lastTestStatus || "IDLE",
+      lastTestedAt: current.lastTestedAt || null,
+      lastTestRecipient: current.lastTestRecipient || "",
+      lastTestError: current.lastTestError || null,
+      updatedAt: new Date().toISOString(),
+      updatedBy: (req as any).user?.email || "super_admin"
+    };
+
+    serverMemoryStore.platform_email_config = updatedConfig;
+
+    // Persist securely
+    try {
+      await saveToSaaSStore("platform_settings", "email_config", updatedConfig, "demo-tenant", (req as any).user?.email || "super_admin");
+      const db = getAdminDb();
+      if (db) {
+        await db.collection("platform_settings").doc("email_config").set(updatedConfig, { merge: true });
+      }
+    } catch (e) {
+      console.warn("Firestore save fallback for platform_email_config:", e);
+    }
+
+    const safeResponseConfig = {
+      provider: updatedConfig.provider,
+      smtpHost: updatedConfig.smtpHost,
+      smtpPort: updatedConfig.smtpPort,
+      smtpUser: updatedConfig.smtpUser,
+      smtpPasswordSet: Boolean(updatedConfig.smtpPass && updatedConfig.smtpPass.length > 0),
+      smtpPasswordMasked: updatedConfig.smtpPass ? "••••••••" : "",
+      smtpSecurity: updatedConfig.smtpSecurity,
+      senderName: updatedConfig.senderName,
+      senderEmail: updatedConfig.senderEmail,
+      replyToEmail: updatedConfig.replyToEmail,
+      enableProductionEmail: updatedConfig.enableProductionEmail,
+      sendgridApiKeySet: Boolean(updatedConfig.sendgridApiKey && updatedConfig.sendgridApiKey.length > 0),
+      sendgridApiKeyMasked: updatedConfig.sendgridApiKey ? "••••••••" : "",
+      resendApiKeySet: Boolean(updatedConfig.resendApiKey && updatedConfig.resendApiKey.length > 0),
+      resendApiKeyMasked: updatedConfig.resendApiKey ? "••••••••" : "",
+      lastTestStatus: updatedConfig.lastTestStatus,
+      lastTestedAt: updatedConfig.lastTestedAt,
+      lastTestRecipient: updatedConfig.lastTestRecipient,
+      lastTestError: updatedConfig.lastTestError,
+      updatedAt: updatedConfig.updatedAt,
+      updatedBy: updatedConfig.updatedBy
+    };
+
+    return res.json({
+      success: true,
+      message: "Platform email & SMTP configuration saved successfully.",
+      config: safeResponseConfig
+    });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/superadmin/platform-email/test (Diagnostic Test Email Dispatcher)
+app.post("/api/superadmin/platform-email/test", requireAuth, requireRole(["super_admin"]), async (req: express.Request, res: express.Response) => {
+  const startTime = Date.now();
+  try {
+    const { recipientEmail, inlineConfig } = req.body;
+    if (!recipientEmail || typeof recipientEmail !== "string" || !recipientEmail.includes("@")) {
+      return res.status(400).json({ success: false, error: "A valid recipient email address is required for the diagnostic test." });
+    }
+
+    const targetRecipient = recipientEmail.trim();
+
+    // Use current stored configuration or merge with inline test inputs
+    const current = serverMemoryStore.platform_email_config || {};
+    const cfg = {
+      provider: inlineConfig?.provider || current.provider || "smtp",
+      smtpHost: inlineConfig?.smtpHost || current.smtpHost || (process.env.SMTP_HOST && !process.env.SMTP_HOST.includes("sendgrid") ? process.env.SMTP_HOST : "scamspike.com"),
+      smtpPort: inlineConfig?.smtpPort ? parseInt(inlineConfig.smtpPort) : (current.smtpPort || 465),
+      smtpUser: inlineConfig?.smtpUser || current.smtpUser || process.env.SMTP_USER || "marketforge@scamspike.com",
+      smtpPass: (inlineConfig?.smtpPassword && inlineConfig.smtpPassword.trim() && !inlineConfig.smtpPassword.includes("••••")) 
+        ? inlineConfig.smtpPassword.trim() 
+        : (current.smtpPass || process.env.SMTP_PASS || "MkForge_2026_SecurePass!"),
+      smtpSecurity: inlineConfig?.smtpSecurity || current.smtpSecurity || "ssl",
+      senderName: inlineConfig?.senderName || current.senderName || "MarketForge Operations",
+      senderEmail: inlineConfig?.senderEmail || current.senderEmail || process.env.SMTP_FROM_EMAIL || "marketforge@scamspike.com",
+      replyToEmail: inlineConfig?.replyToEmail || current.replyToEmail || "support@marketforge.scamspike.com",
+      sendgridApiKey: (inlineConfig?.sendgridApiKey && inlineConfig.sendgridApiKey.trim() && !inlineConfig.sendgridApiKey.includes("••••"))
+        ? inlineConfig.sendgridApiKey.trim()
+        : (current.sendgridApiKey || process.env.SENDGRID_API_KEY || ""),
+      resendApiKey: (inlineConfig?.resendApiKey && inlineConfig.resendApiKey.trim() && !inlineConfig.resendApiKey.includes("••••"))
+        ? inlineConfig.resendApiKey.trim()
+        : (current.resendApiKey || process.env.RESEND_API_KEY || ""),
+      enableProductionEmail: inlineConfig?.enableProductionEmail !== undefined ? Boolean(inlineConfig.enableProductionEmail) : (current.enableProductionEmail !== false)
+    };
+
+    const isSecure = cfg.smtpSecurity === "ssl" || cfg.smtpPort === 465;
+
+    const emailSubject = `⚡ [MarketForge Diagnostics] Transactional Mail Relay Verification`;
+    const emailHtml = `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; padding: 40px 20px; background-color: #f8fafc; margin: 0 auto; color: #1e293b;">
+        <div style="max-width: 580px; margin: 0 auto; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
+          <div style="background-color: #0f172a; padding: 24px 32px; border-bottom: 3px solid #4f46e5;">
+            <h1 style="color: #ffffff; margin: 0; font-size: 20px; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+              ⚡ MarketForge OS
+            </h1>
+            <p style="color: #94a3b8; margin: 6px 0 0 0; font-size: 12px; font-weight: 500;">
+              Platform Outbound Email Diagnostic Handshake
+            </p>
+          </div>
+          
+          <div style="padding: 32px;">
+            <div style="display: inline-block; padding: 6px 12px; background-color: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 9999px; color: #065f46; font-size: 12px; font-weight: 600; margin-bottom: 16px;">
+              ✓ Diagnostic Connection Verified
+            </div>
+            
+            <h2 style="color: #0f172a; margin: 0 0 12px 0; font-size: 18px; font-weight: 700;">
+              Your Platform Mail Relay is Active!
+            </h2>
+            <p style="font-size: 14px; color: #475569; line-height: 1.6; margin: 0 0 20px 0;">
+              This diagnostic message confirms that your platform transactional email transport is correctly configured and successfully delivering outbound system notifications, tenant onboarding invitations, and security reset links.
+            </p>
+            
+            <div style="background-color: #f1f5f9; border-radius: 10px; padding: 16px; font-size: 13px; color: #334155; line-height: 1.8; margin-bottom: 24px;">
+              <div><strong>Email Provider:</strong> <span style="font-family: monospace; text-transform: uppercase;">${cfg.provider}</span></div>
+              <div><strong>Host / Endpoint:</strong> <span style="font-family: monospace;">${cfg.smtpHost}:${cfg.smtpPort}</span></div>
+              <div><strong>Security Protocol:</strong> <span style="font-family: monospace;">${cfg.smtpSecurity.toUpperCase()} (${isSecure ? 'Implicit SSL' : 'Explicit STARTTLS'})</span></div>
+              <div><strong>Sender Identity:</strong> ${cfg.senderName} &lt;${cfg.senderEmail}&gt;</div>
+              <div><strong>Target Recipient:</strong> ${targetRecipient}</div>
+              <div><strong>Handshake Timestamp:</strong> ${new Date().toISOString()}</div>
+            </div>
+
+            <p style="font-size: 12px; color: #64748b; line-height: 1.5; margin: 0;">
+              If you received this message, no further configuration is required for tenant onboarding or system notifications.
+            </p>
+          </div>
+          
+          <div style="background-color: #f8fafc; padding: 16px 32px; border-top: 1px solid #e2e8f0; text-align: center;">
+            <p style="color: #94a3b8; font-size: 11px; margin: 0;">
+              MarketForge Operating System • Platform Governance &amp; Telemetry
+            </p>
+          </div>
+        </div>
+      </div>
+    `;
+
+    let testResult: any = null;
+
+    if (!cfg.enableProductionEmail || cfg.provider === "simulator") {
+      // Simulator dispatch
+      const simProvider = new SimulatorEmailProvider();
+      await simProvider.send(targetRecipient, emailSubject, emailHtml, cfg.senderName);
+      testResult = {
+        success: true,
+        provider: "simulator",
+        latencyMs: Date.now() - startTime,
+        message: `Simulated diagnostic email successfully logged for ${targetRecipient}. (Sandbox / Simulator Mode active)`,
+        details: {
+          provider: "Sandbox Simulator",
+          recipient: targetRecipient,
+          sender: `${cfg.senderName} <${cfg.senderEmail}>`,
+          timestamp: new Date().toISOString()
+        }
+      };
+    } else if (cfg.provider === "sendgrid") {
+      if (!cfg.sendgridApiKey || !cfg.sendgridApiKey.startsWith("SG.")) {
+        return res.status(400).json({
+          success: false,
+          stage: "SENDGRID_CONFIG",
+          latencyMs: Date.now() - startTime,
+          error: "Invalid SendGrid API Key. Keys must start with 'SG.'",
+          recommendation: "Generate a valid SendGrid Full Access or Mail Send API key in your SendGrid console."
+        });
+      }
+      const sgProvider = new SendGridEmailProvider(cfg.sendgridApiKey, cfg.senderEmail);
+      await sgProvider.send(targetRecipient, emailSubject, emailHtml, cfg.senderName);
+      testResult = {
+        success: true,
+        provider: "sendgrid",
+        latencyMs: Date.now() - startTime,
+        message: `Successfully relayed diagnostic email via SendGrid Cloud API to ${targetRecipient}!`,
+        details: {
+          provider: "SendGrid Web API",
+          recipient: targetRecipient,
+          sender: `${cfg.senderName} <${cfg.senderEmail}>`,
+          timestamp: new Date().toISOString()
+        }
+      };
+    } else if (cfg.provider === "resend") {
+      if (!cfg.resendApiKey || !cfg.resendApiKey.startsWith("re_")) {
+        return res.status(400).json({
+          success: false,
+          stage: "RESEND_CONFIG",
+          latencyMs: Date.now() - startTime,
+          error: "Invalid Resend API Key. Keys must start with 're_'",
+          recommendation: "Provide a valid Resend API key from your Resend dashboard."
+        });
+      }
+      const resendProvider = new ResendEmailProvider(cfg.resendApiKey, cfg.senderEmail);
+      await resendProvider.send(targetRecipient, emailSubject, emailHtml, cfg.senderName);
+      testResult = {
+        success: true,
+        provider: "resend",
+        latencyMs: Date.now() - startTime,
+        message: `Successfully relayed diagnostic email via Resend API to ${targetRecipient}!`,
+        details: {
+          provider: "Resend REST API",
+          recipient: targetRecipient,
+          sender: `${cfg.senderName} <${cfg.senderEmail}>`,
+          timestamp: new Date().toISOString()
+        }
+      };
+    } else {
+      // SMTP Relay Provider
+      if (!cfg.smtpHost || !cfg.smtpUser || !cfg.smtpPass) {
+        return res.status(400).json({
+          success: false,
+          stage: "SMTP_RESOLVE",
+          latencyMs: Date.now() - startTime,
+          error: "Incomplete SMTP configuration. Host, Username, and Password are required.",
+          recommendation: "Fill out the SMTP Host, Username, and Password before running the test."
+        });
+      }
+
+      const transporter = nodemailer.createTransport({
+        host: cfg.smtpHost,
+        port: cfg.smtpPort,
+        secure: isSecure,
+        auth: {
+          user: cfg.smtpUser,
+          pass: cfg.smtpPass
+        },
+        tls: { rejectUnauthorized: false },
+        connectionTimeout: 9000,
+        greetingTimeout: 9000,
+        socketTimeout: 15000
+      });
+
+      // Verify connection handshake first
+      await transporter.verify();
+
+      // Dispatch mail
+      const mailInfo = await transporter.sendMail({
+        from: `"${cfg.senderName}" <${cfg.senderEmail}>`,
+        to: targetRecipient,
+        replyTo: cfg.replyToEmail || undefined,
+        subject: emailSubject,
+        html: emailHtml
+      });
+
+      testResult = {
+        success: true,
+        provider: "smtp",
+        latencyMs: Date.now() - startTime,
+        message: `Successfully relayed live SMTP diagnostic email to ${targetRecipient}!`,
+        details: {
+          provider: `SMTP (${cfg.smtpHost}:${cfg.smtpPort})`,
+          security: cfg.smtpSecurity.toUpperCase(),
+          recipient: targetRecipient,
+          sender: `"${cfg.senderName}" <${cfg.senderEmail}>`,
+          messageId: mailInfo.messageId,
+          response: mailInfo.response,
+          timestamp: new Date().toISOString()
+        }
+      };
+    }
+
+    // Update memory status
+    if (serverMemoryStore.platform_email_config) {
+      serverMemoryStore.platform_email_config.lastTestStatus = "SUCCESS";
+      serverMemoryStore.platform_email_config.lastTestedAt = new Date().toISOString();
+      serverMemoryStore.platform_email_config.lastTestRecipient = targetRecipient;
+      serverMemoryStore.platform_email_config.lastTestError = null;
+    }
+
+    return res.json(testResult);
+  } catch (err: any) {
+    const elapsed = Date.now() - startTime;
+    // Map sanitized error for user feedback - never leak credentials
+    const cleanErrMsg = (err.message || "Connection refused").replace(/password=[^&\s]+/gi, "password=***");
+    let rec = "Ensure host and credentials are valid and port is accessible.";
+    if (cleanErrMsg.includes("535") || cleanErrMsg.includes("EAUTH") || cleanErrMsg.includes("authentication")) {
+      rec = "Authentication failed: Please check your SMTP Username and Password.";
+    } else if (cleanErrMsg.includes("ECONNREFUSED") || cleanErrMsg.includes("ETIMEDOUT")) {
+      rec = "Connection timed out or was refused. Check your SMTP host, port, and security settings (SSL on 465, TLS on 587).";
+    } else if (cleanErrMsg.includes("sender") || cleanErrMsg.includes("550")) {
+      rec = "Sender address verification failed: Ensure the Sender Email is verified with your mail provider.";
+    }
+
+    if (serverMemoryStore.platform_email_config) {
+      serverMemoryStore.platform_email_config.lastTestStatus = "FAILED";
+      serverMemoryStore.platform_email_config.lastTestedAt = new Date().toISOString();
+      serverMemoryStore.platform_email_config.lastTestRecipient = req.body?.recipientEmail || "";
+      serverMemoryStore.platform_email_config.lastTestError = cleanErrMsg;
+    }
+
+    return res.json({
+      success: false,
+      stage: "DISPATCH_HANDSHAKE",
+      latencyMs: elapsed,
+      error: cleanErrMsg,
+      recommendation: rec
+    });
   }
 });
 
@@ -1953,23 +2601,6 @@ app.post("/api/user/change-credentials", async (req: express.Request, res: expre
         role: matchedUserObj.role,
         tenantId: targetTenantId
       }
-    });
-  } catch (err: any) {
-    return res.status(500).json({ error: err.message });
-  }
-});
-
-// POST /api/admin/login (SuperAdmin Direct Login)
-app.post("/api/admin/login", async (req: express.Request, res: express.Response) => {
-  try {
-    const { email, password } = req.body;
-    return res.json({
-      success: true,
-      tenantId: "demo-tenant",
-      email: email || "digitalscamalert@gmail.com",
-      role: "super_admin",
-      name: "Super Admin",
-      token: "MOCK_ENTERPRISE_JWT_TOKEN_123"
     });
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
@@ -5809,7 +6440,9 @@ export class SmtpEmailProvider implements EmailProvider {
     private port: number,
     private user: string,
     private pass: string,
-    private fromEmail: string
+    private fromEmail: string,
+    private security: string = "ssl",
+    private replyTo?: string
   ) {}
 
   async send(to: string, subject: string, htmlBody: string, displayName: string) {
@@ -5818,22 +6451,24 @@ export class SmtpEmailProvider implements EmailProvider {
       return { success: true, provider: "simulator" };
     }
     try {
+      const isSecure = this.security === "ssl" || this.port === 465;
       const transporter = nodemailer.createTransport({
         host: this.host,
         port: this.port,
-        secure: this.port === 465,
+        secure: isSecure,
         auth: {
           user: this.user,
           pass: this.pass,
         },
         tls: { rejectUnauthorized: false },
-        connectionTimeout: 8000,
-        greetingTimeout: 8000,
+        connectionTimeout: 9000,
+        greetingTimeout: 9000,
         socketTimeout: 15000
       });
       const info = await transporter.sendMail({
         from: `"${displayName}" <${this.fromEmail}>`,
         to,
+        replyTo: this.replyTo || undefined,
         subject,
         html: htmlBody,
       });
@@ -5925,34 +6560,46 @@ async function sendRealEmail(to: string, subject: string, htmlBody: string, from
     }
   }
 
+  // Active Platform Email Configuration
+  const platformCfg = serverMemoryStore.platform_email_config || {};
   const isExplicitSandbox = (process.env.EMAIL_MODE || "sandbox").toLowerCase() === "sandbox" || process.env.EMAIL_PROVIDER === "simulator";
+  const isProductionEnabled = platformCfg.enableProductionEmail !== false;
 
   // Resolve config keys
-  const resendKey = customConfig?.resendApiKey || (process.env.RESEND_API_KEY && process.env.RESEND_API_KEY !== "YOUR_RESEND_KEY" ? process.env.RESEND_API_KEY : undefined);
-  const resendFrom = customConfig?.resendFromEmail || process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev";
+  const resendKey = customConfig?.resendApiKey || platformCfg.resendApiKey || (process.env.RESEND_API_KEY && process.env.RESEND_API_KEY !== "YOUR_RESEND_KEY" ? process.env.RESEND_API_KEY : undefined);
+  const resendFrom = customConfig?.resendFromEmail || platformCfg.senderEmail || process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev";
 
   const globalCfg = (global as any).globalSmtpConfig;
-  const sgKey = customConfig?.sendgridApiKey || (process.env.SENDGRID_API_KEY && process.env.SENDGRID_API_KEY !== "YOUR_SENDGRID_KEY" ? process.env.SENDGRID_API_KEY : undefined);
-  const sgFrom = customConfig?.sendgridFromEmail || globalCfg?.fromEmail || process.env.SENDGRID_FROM_EMAIL || "marketforge@democorp.com";
+  const sgKey = customConfig?.sendgridApiKey || platformCfg.sendgridApiKey || (process.env.SENDGRID_API_KEY && process.env.SENDGRID_API_KEY !== "YOUR_SENDGRID_KEY" ? process.env.SENDGRID_API_KEY : undefined);
+  const sgFrom = customConfig?.sendgridFromEmail || platformCfg.senderEmail || globalCfg?.fromEmail || process.env.SENDGRID_FROM_EMAIL || "marketforge@scamspike.com";
 
-  const primarySmtpHost = customConfig?.smtpHost || globalCfg?.host || (process.env.SMTP_HOST && !process.env.SMTP_HOST.includes("sendgrid") ? process.env.SMTP_HOST : undefined);
-  const primarySmtpPort = customConfig?.smtpPort ? parseInt(customConfig.smtpPort) : (globalCfg?.port ? parseInt(globalCfg.port) : (process.env.SMTP_PORT ? parseInt(process.env.SMTP_PORT) : 587));
-  const primarySmtpUser = customConfig?.smtpUser || globalCfg?.username || process.env.SMTP_USER;
-  const primarySmtpPass = customConfig?.smtpPass || globalCfg?.password || process.env.SMTP_PASS;
-  const primarySmtpFrom = customConfig?.smtpFromEmail || globalCfg?.fromEmail || process.env.SMTP_FROM_EMAIL || "marketforge@democorp.com";
+  const primarySmtpHost = customConfig?.smtpHost || platformCfg.smtpHost || globalCfg?.host || (process.env.SMTP_HOST && !process.env.SMTP_HOST.includes("sendgrid") ? process.env.SMTP_HOST : undefined);
+  const primarySmtpPort = customConfig?.smtpPort ? parseInt(customConfig.smtpPort) : (platformCfg.smtpPort ? parseInt(platformCfg.smtpPort) : (globalCfg?.port ? parseInt(globalCfg.port) : (process.env.SMTP_PORT ? parseInt(process.env.SMTP_PORT) : 465)));
+  const primarySmtpUser = customConfig?.smtpUser || platformCfg.smtpUser || globalCfg?.username || process.env.SMTP_USER;
+  const primarySmtpPass = customConfig?.smtpPass || platformCfg.smtpPass || globalCfg?.password || process.env.SMTP_PASS;
+  const primarySmtpFrom = customConfig?.smtpFromEmail || platformCfg.senderEmail || globalCfg?.fromEmail || process.env.SMTP_FROM_EMAIL || "marketforge@scamspike.com";
+  const primarySmtpSecurity = customConfig?.smtpSecurity || platformCfg.smtpSecurity || (primarySmtpPort === 465 ? "ssl" : "tls");
+  const primarySmtpReplyTo = customConfig?.replyToEmail || platformCfg.replyToEmail;
 
-  const displayName = fromName || customConfig?.displayName || (tenantId === "sienna-tenant" ? "Sienna Studio" : (tenantId === "solas-tenant" ? "Solas Spa" : "MarketForge Operations"));
+  const displayName = fromName || customConfig?.displayName || platformCfg.senderName || (tenantId === "sienna-tenant" ? "Sienna Studio" : (tenantId === "solas-tenant" ? "Solas Spa" : "MarketForge Operations"));
+
+  // Determine active provider
+  const preferredProvider = customConfig?.provider || platformCfg.provider || "smtp";
 
   // Build Drivers
   let primaryDriver: EmailProvider;
-  if (isExplicitSandbox && !customConfig) {
+  if ((isExplicitSandbox && !customConfig) || !isProductionEnabled || preferredProvider === "simulator") {
     primaryDriver = new SimulatorEmailProvider();
+  } else if (preferredProvider === "sendgrid" && sgKey && sgKey.startsWith("SG.")) {
+    primaryDriver = new SendGridEmailProvider(sgKey, sgFrom);
+  } else if (preferredProvider === "resend" && resendKey && resendKey.startsWith("re_")) {
+    primaryDriver = new ResendEmailProvider(resendKey, resendFrom);
+  } else if (primarySmtpHost && primarySmtpUser && primarySmtpPass) {
+    primaryDriver = new SmtpEmailProvider(primarySmtpHost, primarySmtpPort, primarySmtpUser, primarySmtpPass, primarySmtpFrom, primarySmtpSecurity, primarySmtpReplyTo);
   } else if (sgKey && sgKey.startsWith("SG.")) {
     primaryDriver = new SendGridEmailProvider(sgKey, sgFrom);
   } else if (resendKey && resendKey.startsWith("re_")) {
     primaryDriver = new ResendEmailProvider(resendKey, resendFrom);
-  } else if (primarySmtpHost && primarySmtpUser && primarySmtpPass) {
-    primaryDriver = new SmtpEmailProvider(primarySmtpHost, primarySmtpPort, primarySmtpUser, primarySmtpPass, primarySmtpFrom);
   } else {
     primaryDriver = new SimulatorEmailProvider();
   }
@@ -8663,9 +9310,11 @@ app.all("/api/admin/firebase-admin-test", async (req, res) => {
   let firebaseConfig: any = null;
   
   try {
-    const { initializeApp, getApps, deleteApp } = customRequire("firebase-admin/app");
-    const { getFirestore } = customRequire("firebase-admin/firestore");
-    const { cert } = customRequire("firebase-admin");
+    const initializeApp = initFbApp;
+    const getApps = getFbApps;
+    const deleteApp = deleteFbApp;
+    const getFirestore = getFbFirestore;
+    const cert = fbCert;
     try {
       if (fs.existsSync("./firebase-applet-config.json")) {
         firebaseConfig = JSON.parse(fs.readFileSync("./firebase-applet-config.json", "utf8"));
@@ -9088,7 +9737,7 @@ app.all("/api/admin/diagnostics/smtp-connectivity", async (req, res) => {
   }
 
   logs.push(`[${new Date().toISOString()}] Resolving DNS name query for SMTP host: ${smtpHost}...`);
-  const dnsMod = customRequire("dns").promises;
+  const dnsMod = dns.promises;
   let resolvedIps: string[] = [];
   try {
     resolvedIps = await dnsMod.resolve4(smtpHost);

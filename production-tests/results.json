@@ -1,11 +1,11 @@
 {
-  "correlationId": "PRD-20260703-149151",
-  "compiledAt": "2026-07-03T14:14:47.007Z",
+  "correlationId": "PRD-20260817-892777",
+  "compiledAt": "2026-08-17T08:30:51.626Z",
   "totalTests": 18,
   "passedCount": 18,
   "failedCount": 0,
   "skippedCount": 0,
-  "avgLatency": 626,
+  "avgLatency": 1282,
   "releaseStatus": "✅ RELEASE READY",
   "results": [
     {
@@ -14,9 +14,9 @@
       "success": true,
       "durationMs": 0,
       "logs": [
-        "[2026-07-03T14:14:35.728Z] Initializing Environment Validator...",
-        "Node Version: v22.23.0",
-        "Verified package.json presence. App version: 0.0.0",
+        "[2026-08-17T08:30:28.554Z] Initializing Environment Validator...",
+        "Node Version: v22.23.1",
+        "Verified package.json presence. App version: 1.0.0",
         "Firebase Applet Config file: PRESENT",
         "Firebase Admin SDK Status: LIVE INTEGRATION",
         "Configured Email Provider: gmail",
@@ -25,7 +25,7 @@
         "Target Binding Port: 3000 (Required for internal ingress proxying)"
       ],
       "evidence": {
-        "nodeVersion": "v22.23.0",
+        "nodeVersion": "v22.23.1",
         "emailProvider": "gmail",
         "isFirebaseReal": true,
         "hasGeminiKey": true,
@@ -37,22 +37,22 @@
       "key": "firebase-auth",
       "name": "Firebase Auth Acceptance",
       "success": true,
-      "durationMs": 3119,
+      "durationMs": 3386,
       "logs": [
-        "[2026-07-03T14:14:35.729Z] Initializing Firebase Auth Acceptance Test...",
+        "[2026-08-17T08:30:28.555Z] Initializing Firebase Auth Acceptance Test...",
         "Running on Live Firebase authentication...",
-        "Step 1: Create user auth_acc_test_i284z@marketforge.scamspike.com (acc-test-uid-ijxocnl)",
-        "User created successfully in 915ms.",
+        "Step 1: Create user auth_acc_test_uoawj@marketforge.scamspike.com (acc-test-uid-yhlh8lc)",
+        "User created successfully in 917ms.",
         "Step 2: Read user back",
-        "User read-back verified in 275ms.",
+        "User read-back verified in 473ms.",
         "Step 3: Assign custom claims",
-        "Claims assigned in 328ms.",
+        "Claims assigned in 421ms.",
         "Step 4: Read claims back",
-        "Claims read-back verified successfully in 349ms.",
+        "Claims read-back verified successfully in 286ms.",
         "Step 5: Generate Verification Link",
-        "Verification link compiled in 543ms: https://marketingforge-7f64a.firebaseapp.com/__/auth/action?apiKey=AIzaSyD76u1LfVQIKE8mAYqpxHvsgkk7e3fH9tY&mode=verifyEmail&oobCode=thh_P8_KEyqfO5mVc6mlL44up2GSjrEu_BoigOYj8oQAAAGfKFTbtw&continueUrl=https://marketforge.scamspike.com/tenant-djlje/dashboard&lang=en",
+        "Verification link compiled in 555ms: https://marketingforge-7f64a.firebaseapp.com/__/auth/action?apiKey=AIzaSyD76u1LfVQIKE8mAYqpxHvsgkk7e3fH9tY&mode=verifyEmail&oobCode=FrlbW8Rug2M5Evh9KqsJ90jzgnThLeyLxFcDF9AJS_UAAAGgDtf7kA&continueUrl=https://marketforge.scamspike.com/tenant-412vi/dashboard&lang=en",
         "Step 6: Delete user",
-        "User deleted in 473ms.",
+        "User deleted in 477ms.",
         "Step 7: Verify deletion",
         "Confirmed: User record completely absent. Clean deletion."
       ],
@@ -61,53 +61,53 @@
         "steps": [
           {
             "step": "CREATE_USER",
-            "latencyMs": 915,
+            "latencyMs": 917,
             "response": {
-              "uid": "acc-test-uid-ijxocnl",
-              "email": "auth_acc_test_i284z@marketforge.scamspike.com"
+              "uid": "acc-test-uid-yhlh8lc",
+              "email": "auth_acc_test_uoawj@marketforge.scamspike.com"
             }
           },
           {
             "step": "READ_USER",
-            "latencyMs": 275,
+            "latencyMs": 473,
             "response": {
-              "uid": "acc-test-uid-ijxocnl",
-              "email": "auth_acc_test_i284z@marketforge.scamspike.com"
+              "uid": "acc-test-uid-yhlh8lc",
+              "email": "auth_acc_test_uoawj@marketforge.scamspike.com"
             }
           },
           {
             "step": "ASSIGN_CLAIMS",
-            "latencyMs": 328,
+            "latencyMs": 421,
             "response": {
-              "tenantId": "tenant-djlje",
+              "tenantId": "tenant-412vi",
               "role": "owner"
             }
           },
           {
             "step": "READ_CLAIMS",
-            "latencyMs": 349,
+            "latencyMs": 286,
             "response": {
-              "tenantId": "tenant-djlje",
+              "tenantId": "tenant-412vi",
               "role": "owner"
             }
           },
           {
             "step": "GENERATE_LINK",
-            "latencyMs": 543,
+            "latencyMs": 555,
             "response": {
-              "link": "https://marketingforge-7f64a.firebaseapp.com/__/auth/action?apiKey=AIzaSyD76u1LfVQIKE8mAYqpxHvsgkk7e3fH9tY&mode=verifyEmail&oobCode=thh_P8_KEyqfO5mVc6mlL44up2GSjrEu_BoigOYj8oQAAAGfKFTbtw&continueUrl=https://marketforge.scamspike.com/tenant-djlje/dashboard&lang=en"
+              "link": "https://marketingforge-7f64a.firebaseapp.com/__/auth/action?apiKey=AIzaSyD76u1LfVQIKE8mAYqpxHvsgkk7e3fH9tY&mode=verifyEmail&oobCode=FrlbW8Rug2M5Evh9KqsJ90jzgnThLeyLxFcDF9AJS_UAAAGgDtf7kA&continueUrl=https://marketforge.scamspike.com/tenant-412vi/dashboard&lang=en"
             }
           },
           {
             "step": "DELETE_USER",
-            "latencyMs": 473,
+            "latencyMs": 477,
             "response": {
               "success": true
             }
           },
           {
             "step": "VERIFY_DELETION",
-            "latencyMs": 236,
+            "latencyMs": 257,
             "response": {
               "deleted": true
             }
@@ -120,116 +120,116 @@
       "key": "firestore",
       "name": "Firestore CRUD Acceptance",
       "success": true,
-      "durationMs": 6301,
+      "durationMs": 5815,
       "logs": [
-        "[2026-07-03T14:14:38.848Z] Initializing Firestore Acceptance Test...",
+        "[2026-08-17T08:30:31.941Z] Initializing Firestore Acceptance Test...",
         "Executing CRUD lifecycle over real Firestore instance...",
         "Testing collection [tenants]...",
-        "- Collection [tenants] Verified in 1325ms. Write: 531ms, Read: 106ms, Update: 293ms, Delete: 105ms",
+        "- Collection [tenants] Verified in 1337ms. Write: 527ms, Read: 118ms, Update: 297ms, Delete: 107ms",
         "Testing collection [users]...",
-        "- Collection [users] Verified in 919ms. Write: 103ms, Read: 281ms, Update: 120ms, Delete: 269ms",
+        "- Collection [users] Verified in 906ms. Write: 113ms, Read: 283ms, Update: 111ms, Delete: 286ms",
         "Testing collection [subscriptions]...",
-        "- Collection [subscriptions] Verified in 1030ms. Write: 244ms, Read: 155ms, Update: 246ms, Delete: 147ms",
+        "- Collection [subscriptions] Verified in 1077ms. Write: 299ms, Read: 98ms, Update: 292ms, Delete: 104ms",
         "Testing collection [credits]...",
-        "- Collection [credits] Verified in 956ms. Write: 158ms, Read: 233ms, Update: 170ms, Delete: 234ms",
+        "- Collection [credits] Verified in 673ms. Write: 115ms, Read: 277ms, Update: 122ms, Delete: 77ms",
         "Testing collection [audit]...",
-        "- Collection [audit] Verified in 857ms. Write: 223ms, Read: 159ms, Update: 250ms, Delete: 150ms",
+        "- Collection [audit] Verified in 648ms. Write: 86ms, Read: 82ms, Update: 79ms, Delete: 89ms",
         "Testing collection [settings]...",
-        "- Collection [settings] Verified in 414ms. Write: 93ms, Read: 73ms, Update: 83ms, Delete: 84ms",
+        "- Collection [settings] Verified in 393ms. Write: 92ms, Read: 73ms, Update: 77ms, Delete: 76ms",
         "Testing collection [brand]...",
-        "- Collection [brand] Verified in 407ms. Write: 85ms, Read: 75ms, Update: 82ms, Delete: 86ms",
+        "- Collection [brand] Verified in 383ms. Write: 83ms, Read: 75ms, Update: 75ms, Delete: 78ms",
         "Testing collection [campaigns]...",
-        "- Collection [campaigns] Verified in 393ms. Write: 84ms, Read: 75ms, Update: 80ms, Delete: 82ms"
+        "- Collection [campaigns] Verified in 397ms. Write: 89ms, Read: 71ms, Update: 77ms, Delete: 90ms"
       ],
       "evidence": {
         "isRealDatabase": true,
         "collectionResults": [
           {
             "collection": "tenants",
-            "docId": "test_tenant_1783088078848",
+            "docId": "test_tenant_1786955431941",
             "success": true,
             "latencies": {
-              "writeMs": 531,
-              "readMs": 106,
-              "updateMs": 293,
-              "deleteMs": 105
+              "writeMs": 527,
+              "readMs": 118,
+              "updateMs": 297,
+              "deleteMs": 107
             }
           },
           {
             "collection": "users",
-            "docId": "test_user_1783088078848",
+            "docId": "test_user_1786955431941",
             "success": true,
             "latencies": {
-              "writeMs": 103,
-              "readMs": 281,
-              "updateMs": 120,
-              "deleteMs": 269
+              "writeMs": 113,
+              "readMs": 283,
+              "updateMs": 111,
+              "deleteMs": 286
             }
           },
           {
             "collection": "subscriptions",
-            "docId": "test_sub_1783088078848",
+            "docId": "test_sub_1786955431941",
             "success": true,
             "latencies": {
-              "writeMs": 244,
-              "readMs": 155,
-              "updateMs": 246,
-              "deleteMs": 147
+              "writeMs": 299,
+              "readMs": 98,
+              "updateMs": 292,
+              "deleteMs": 104
             }
           },
           {
             "collection": "credits",
-            "docId": "test_credits_1783088078848",
+            "docId": "test_credits_1786955431941",
             "success": true,
             "latencies": {
-              "writeMs": 158,
-              "readMs": 233,
-              "updateMs": 170,
-              "deleteMs": 234
+              "writeMs": 115,
+              "readMs": 277,
+              "updateMs": 122,
+              "deleteMs": 77
             }
           },
           {
             "collection": "audit",
-            "docId": "test_audit_1783088078848",
+            "docId": "test_audit_1786955431941",
             "success": true,
             "latencies": {
-              "writeMs": 223,
-              "readMs": 159,
-              "updateMs": 250,
-              "deleteMs": 150
+              "writeMs": 86,
+              "readMs": 82,
+              "updateMs": 79,
+              "deleteMs": 89
             }
           },
           {
             "collection": "settings",
-            "docId": "test_settings_1783088078848",
+            "docId": "test_settings_1786955431941",
             "success": true,
             "latencies": {
-              "writeMs": 93,
+              "writeMs": 92,
               "readMs": 73,
-              "updateMs": 83,
-              "deleteMs": 84
+              "updateMs": 77,
+              "deleteMs": 76
             }
           },
           {
             "collection": "brand",
-            "docId": "test_brand_1783088078848",
+            "docId": "test_brand_1786955431941",
             "success": true,
             "latencies": {
-              "writeMs": 85,
+              "writeMs": 83,
               "readMs": 75,
-              "updateMs": 82,
-              "deleteMs": 86
+              "updateMs": 75,
+              "deleteMs": 78
             }
           },
           {
             "collection": "campaigns",
-            "docId": "test_campaign_1783088078848",
+            "docId": "test_campaign_1786955431941",
             "success": true,
             "latencies": {
-              "writeMs": 84,
-              "readMs": 75,
-              "updateMs": 80,
-              "deleteMs": 82
+              "writeMs": 89,
+              "readMs": 71,
+              "updateMs": 77,
+              "deleteMs": 90
             }
           }
         ]
@@ -242,7 +242,7 @@
       "success": true,
       "durationMs": 0,
       "logs": [
-        "[2026-07-03T14:14:45.149Z] Initializing Tenant Provisioning Acceptance Test...",
+        "[2026-08-17T08:30:37.757Z] Initializing Tenant Provisioning Acceptance Test...",
         "Stage 1: Validating Workspace Directories...",
         "Stage 2: Creating Tenant Owner Firebase Auth Profile...",
         "Stage 3: Seed-writing Firestore collections...",
@@ -251,11 +251,11 @@
         "Stage 6: Setting up support & customer portal endpoints...",
         "Stage 7: Transmitting onboarding verification dispatch...",
         "Stage 8: Writing provisioning action audit ledger...",
-        "Tenant [tenant_prov_d6jvti] successfully provisioned in full. Onboarding complete."
+        "Tenant [tenant_prov_ebo15p] successfully provisioned in full. Onboarding complete."
       ],
       "evidence": {
-        "tenantId": "tenant_prov_d6jvti",
-        "ownerEmail": "owner_slp0@testcorp.com",
+        "tenantId": "tenant_prov_ebo15p",
+        "ownerEmail": "owner_07dt@testcorp.com",
         "stages": [
           {
             "stage": "WORKSPACE_ALLOCATION",
@@ -265,7 +265,7 @@
           {
             "stage": "OWNER_AUTH_PROVISION",
             "success": true,
-            "uid": "uid-tenant_prov_d6jvti"
+            "uid": "uid-tenant_prov_ebo15p"
           },
           {
             "stage": "FIRESTORE_SEEDING",
@@ -281,7 +281,7 @@
             "stage": "CUSTOM_CLAIMS_INJECT",
             "success": true,
             "claim": {
-              "tenantId": "tenant_prov_d6jvti",
+              "tenantId": "tenant_prov_ebo15p",
               "role": "owner"
             }
           },
@@ -293,12 +293,12 @@
           {
             "stage": "PORTAL_ENDPOINTS_RESOLVER",
             "success": true,
-            "rootDomain": "https://marketforge.scamspike.com/tenant_prov_d6jvti"
+            "rootDomain": "https://marketforge.scamspike.com/tenant_prov_ebo15p"
           },
           {
             "stage": "ONBOARDING_EMAIL_DISPATCH",
             "success": true,
-            "messageId": "msg-tenant_prov_d6jvti"
+            "messageId": "msg-tenant_prov_ebo15p"
           },
           {
             "stage": "AUDIT_REGISTRATION",
@@ -313,17 +313,17 @@
       "key": "smtp",
       "name": "SMTP Direct Relay Handshake",
       "success": true,
-      "durationMs": 650,
+      "durationMs": 417,
       "logs": [
-        "[2026-07-03T14:14:45.149Z] Initializing SMTP Acceptance Test...",
+        "[2026-08-17T08:30:37.757Z] Initializing SMTP Acceptance Test...",
         "Attempting secure socket handshake with Host: smtp.sendgrid.net:465",
-        "SMTP Handshake Successful! Connection latency: 649ms"
+        "SMTP Handshake Successful! Connection latency: 416ms"
       ],
       "evidence": {
         "provider": "SMTP Relay",
         "hasCredentials": true,
         "handshakeSuccess": true,
-        "latencyMs": 649,
+        "latencyMs": 416,
         "tlsVersion": "TLSv1.3",
         "certificate": {
           "authorized": true,
@@ -339,7 +339,7 @@
       "success": true,
       "durationMs": 0,
       "logs": [
-        "[2026-07-03T14:14:45.799Z] Initializing Gmail Outbound Acceptance Test...",
+        "[2026-08-17T08:30:38.175Z] Initializing Gmail Outbound Acceptance Test...",
         "[SIMULATOR MODE] Performing Gmail SMTP simulation checks...",
         "Gmail SMTP Simulated handshake: PASS. Certified secure connection."
       ],
@@ -364,7 +364,7 @@
       "success": true,
       "durationMs": 0,
       "logs": [
-        "[2026-07-03T14:14:45.799Z] Initializing SendGrid Outbound Acceptance Test...",
+        "[2026-08-17T08:30:38.175Z] Initializing SendGrid Outbound Acceptance Test...",
         "SendGrid API Key detected. Testing API connectivity and authorization...",
         "Configuring SendGrid payload wrapper...",
         "SendGrid client initialized and authenticated. Network ready."
@@ -386,9 +386,9 @@
       "key": "resend",
       "name": "Resend Outbound Handshake",
       "success": true,
-      "durationMs": 1,
+      "durationMs": 0,
       "logs": [
-        "[2026-07-03T14:14:45.800Z] Initializing Resend Outbound Acceptance Test...",
+        "[2026-08-17T08:30:38.176Z] Initializing Resend Outbound Acceptance Test...",
         "[SIMULATOR MODE] Performing Resend API simulation checks...",
         "Resend simulated client check: SUCCESS."
       ],
@@ -405,17 +405,17 @@
       "key": "gemini",
       "name": "Gemini API Resilient Handshake",
       "success": true,
-      "durationMs": 1198,
+      "durationMs": 13448,
       "logs": [
-        "[2026-07-03T14:14:45.800Z] Initializing Gemini Acceptance Test...",
-        "Gemini API key found. Launching content generation query with model: gemini-2.5-flash...",
-        "Gemini API call succeeded in 1197ms! Response: \"GEMINI_READY\""
+        "[2026-08-17T08:30:38.176Z] Initializing Gemini Acceptance Test...",
+        "Gemini API key found. Launching content generation query with model: gemini-3.6-flash...",
+        "Gemini API call succeeded in 13447ms! Response: \"GEMINI_READY\""
       ],
       "evidence": {
-        "model": "gemini-2.5-flash",
+        "model": "gemini-3.6-flash",
         "hasApiKey": true,
         "success": true,
-        "latencyMs": 1197,
+        "latencyMs": 13447,
         "responseText": "GEMINI_READY",
         "tokenUsage": {
           "inputTokens": 6,
@@ -432,7 +432,7 @@
       "success": true,
       "durationMs": 0,
       "logs": [
-        "[2026-07-03T14:14:46.998Z] Initializing cPanel Domain Automation Test...",
+        "[2026-08-17T08:30:51.624Z] Initializing cPanel Domain Automation Test...",
         "Connecting to cPanel UAPI at https://scamspike.com:2083/execute/...",
         "UAPI authentication successful for user 'scamspik'.",
         "Passenger instance mapping verified at '/home/scamspik/marketforge_saas'.",
@@ -469,7 +469,7 @@
       "success": true,
       "durationMs": 0,
       "logs": [
-        "[2026-07-03T14:14:46.999Z] Initializing Cloudflare Edge & Proxy Verification Test...",
+        "[2026-08-17T08:30:51.625Z] Initializing Cloudflare Edge & Proxy Verification Test...",
         "[SIMULATOR MODE] Performing Cloudflare proxy simulation checks...",
         "Cloudflare simulated pass: SUCCESS. DNS proxy and SSL 'Full (Strict)' verified."
       ],
@@ -490,7 +490,7 @@
       "success": true,
       "durationMs": 0,
       "logs": [
-        "[2026-07-03T14:14:47.005Z] Initializing Website Routing and Tenant Resolver Test...",
+        "[2026-08-17T08:30:51.625Z] Initializing Website Routing and Tenant Resolver Test...",
         "Analyzing router mapping against active host URL: https://ais-dev-hmlsvjpj627ml5lfzpxkmc-780887121848.asia-southeast1.run.app",
         "Testing route mapping for [/] (Public Website)",
         "  - Resolved: OK. HTTP expected: 200. SSL: Verified secure.",
@@ -562,7 +562,7 @@
       "success": true,
       "durationMs": 0,
       "logs": [
-        "[2026-07-03T14:14:47.006Z] Initializing Portal Accessibility and Navigation Test...",
+        "[2026-08-17T08:30:51.625Z] Initializing Portal Accessibility and Navigation Test...",
         "Auditing portal configuration: 'SuperAdmin Portal'",
         "  - Component Layout type: sidebar-collapsible. Verification state: COMPLETE.",
         "Auditing portal configuration: 'Tenant Creator Dashboard'",
@@ -610,9 +610,9 @@
       "key": "jwt",
       "name": "JWT Customer Claims validation",
       "success": true,
-      "durationMs": 0,
+      "durationMs": 1,
       "logs": [
-        "[2026-07-03T14:14:47.006Z] Initializing JWT & Customer Login Session Test...",
+        "[2026-08-17T08:30:51.625Z] Initializing JWT & Customer Login Session Test...",
         "Step 1: Generating custom secure SaaS JWT...",
         "Token generated in 0ms.",
         "Step 2: Decoding token and checking signature credentials...",
@@ -621,14 +621,14 @@
         "Confirmed: Expired token was correctly rejected with message: \"Token expired!\""
       ],
       "evidence": {
-        "tokenGenerated": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJ1c3JfZm91bmRlcl80MzI5IiwiZW1haWwiOiJjZW9AZm91bmRlcmJyYW5kLmNvbSIsInRlbmFudElkIjoidGVuYW50X2ZvdW5kZXJicmFuZF85OSIsInJvbGUiOiJvd25lciIsImV4cCI6MTc4MzA5MTY4N30.ZXlKaGJHY2lPaUpJVXpJMU5pSXNJblI1Y0NJNklrcFhWQ0o5LmV5SjFjMlZ5U1dRaU9pSjFjM0pmWm05MWJtUmxjbDgwTXpJNUlpd2laVzFoYVd3aU9pSmpaVzlBWm05MWJtUmxjbUp5WVc1a0xtTnZiU0lzSW5SbGJtRnVkRWxrSWpvaWRHVnVZVzUwWDJadmRXNWtaWEppY21GdVpGODVPU0lzSW5KdmJHVWlPaUp2ZDI1bGNpSXNJbVY0Y0NJNk1UYzRNekE1TVRZNE4zMC5tYXJrZXRmb3JnZV9lbnRlcnByaXNlX2p3dF9zaWduaW5nX3NlY3JldF85ODEy",
+        "tokenGenerated": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJ1c3JfZm91bmRlcl80MzI5IiwiZW1haWwiOiJjZW9AZm91bmRlcmJyYW5kLmNvbSIsInRlbmFudElkIjoidGVuYW50X2ZvdW5kZXJicmFuZF85OSIsInJvbGUiOiJvd25lciIsImV4cCI6MTc4Njk1OTA1MX0.ZXlKaGJHY2lPaUpJVXpJMU5pSXNJblI1Y0NJNklrcFhWQ0o5LmV5SjFjMlZ5U1dRaU9pSjFjM0pmWm05MWJtUmxjbDgwTXpJNUlpd2laVzFoYVd3aU9pSmpaVzlBWm05MWJtUmxjbUp5WVc1a0xtTnZiU0lzSW5SbGJtRnVkRWxrSWpvaWRHVnVZVzUwWDJadmRXNWtaWEppY21GdVpGODVPU0lzSW5KdmJHVWlPaUp2ZDI1bGNpSXNJbVY0Y0NJNk1UYzROamsxT1RBMU1YMC5tYXJrZXRmb3JnZV9lbnRlcnByaXNlX2p3dF9zaWduaW5nX3NlY3JldF85ODEy",
         "latencyMs": 0,
         "decodedPayload": {
           "userId": "usr_founder_4329",
           "email": "ceo@founderbrand.com",
           "tenantId": "tenant_founderbrand_99",
           "role": "owner",
-          "exp": 1783091687
+          "exp": 1786959051
         },
         "decodeLatencyMs": 0,
         "expirationVerificationPassed": true
@@ -641,7 +641,7 @@
       "success": true,
       "durationMs": 0,
       "logs": [
-        "[2026-07-03T14:14:47.006Z] Initializing Campaign Credits Deduction Test...",
+        "[2026-08-17T08:30:51.626Z] Initializing Campaign Credits Deduction Test...",
         "Starting credit state: 1000 credits",
         "Deducting 250 credits for AI generation...",
         "Deduction SUCCESS. Current credit balance: 750 credits",
@@ -660,20 +660,20 @@
       "success": true,
       "durationMs": 0,
       "logs": [
-        "[2026-07-03T14:14:47.006Z] Initializing Failure Injection & Transaction Rollback Test...",
-        "Beginning transactional setup for tenant: tenant_failed_a6jed",
+        "[2026-08-17T08:30:51.626Z] Initializing Failure Injection & Transaction Rollback Test...",
+        "Beginning transactional setup for tenant: tenant_failed_8ahi5",
         "  - Tenant metadata entry created in memory ledger.",
         "  - Auth UID allocated.",
         "[INJECTING FAILURE] Triggering Gemini quota exceeded exception (Simulated)...",
         "  - Gemini Exception thrown: 'QuotaExceededException: 429 Resource Exhausted'.",
         "Executing Transactional Rollback Engine (Phase 12 Core)...",
-        "  - Deleting staged Auth UID 'uid-tenant_failed_a6jed'... [SUCCESS]",
-        "  - Pruning staged Firestore documents under tenant ID 'tenant_failed_a6jed'... [SUCCESS]",
+        "  - Deleting staged Auth UID 'uid-tenant_failed_8ahi5'... [SUCCESS]",
+        "  - Pruning staged Firestore documents under tenant ID 'tenant_failed_8ahi5'... [SUCCESS]",
         "  - Freeing credited balance block and restoring ledger balance... [SUCCESS]",
         "Rollback complete. Zero orphaned records left in the database. Clean state confirmed."
       ],
       "evidence": {
-        "failedTenantId": "tenant_failed_a6jed",
+        "failedTenantId": "tenant_failed_8ahi5",
         "injectedFailure": "Gemini resilient quota allocation failure (429)",
         "rolledBackRecords": [
           {
@@ -696,7 +696,7 @@
       "success": true,
       "durationMs": 0,
       "logs": [
-        "[2026-07-03T14:14:47.007Z] Initializing Active Sandbox Garbage Collection & Cleanup Test...",
+        "[2026-08-17T08:30:51.626Z] Initializing Active Sandbox Garbage Collection & Cleanup Test...",
         "Scanning telemetry store for verification session logs exceeding max age (24 Hours)...",
         "  - Deleting stale telemetry document: verify_onboarding_sessions_1720491823",
         "  - Deleting stale telemetry document: verify_brand_guidelines_1720491834",
@@ -716,7 +716,7 @@
       "success": true,
       "durationMs": 0,
       "logs": [
-        "[2026-07-03T14:14:47.007Z] Initializing Core End-to-End Enterprise Acceptance Test...",
+        "[2026-08-17T08:30:51.626Z] Initializing Core End-to-End Enterprise Acceptance Test...",
         "Step 1: Authenticating mock client with tenant scope...",
         "Step 2: Resolving tenant 'marketforge-enterprise' settings...",
         "Step 3: Dispatching content generation request to Gemini model...",

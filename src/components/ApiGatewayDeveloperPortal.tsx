@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { getPlatformUrl } from '../lib/platformConfig';
 import { 
   Key, 
   Plus, 
@@ -196,7 +197,7 @@ export default function ApiGatewayDeveloperPortal({
   const activeKey = apiKeys.find(k => k.status === 'ACTIVE')?.keySecret || 'mk_live_your_api_key_here';
   
   const generateSnippet = () => {
-    const baseUrl = 'https://marketforge.scamspike.com';
+    const baseUrl = getPlatformUrl();
     if (selectedLang === 'curl') {
       return `curl -X POST "${baseUrl}${selectedEndpoint}" \\
   -H "Authorization: Bearer ${activeKey}" \\

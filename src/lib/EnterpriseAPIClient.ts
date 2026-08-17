@@ -4,6 +4,7 @@
  */
 
 import { telemetry } from './telemetry/index.ts';
+import { getApiBaseUrl, getApiRoutingMode } from './platformConfig.ts';
 import {
   ValidationError,
   AuthenticationError,
@@ -38,6 +39,21 @@ class EnterpriseAPIClient {
     return EnterpriseAPIClient.instance;
   }
 
+  private getBaseUrl(): string {
+    const routingMode = getApiRoutingMode();
+    if (routingMode === 'SAME_ORIGIN_API') {
+      return '';
+    }
+    const configuredApiUrl = getApiBaseUrl();
+    if (typeof window !== 'undefined' && window.location) {
+      if (configuredApiUrl && configuredApiUrl !== window.location.origin) {
+        return configuredApiUrl.replace(/\/+$/, '');
+      }
+      return '';
+    }
+    return configuredApiUrl ? configuredApiUrl.replace(/\/+$/, '') : '';
+  }
+
   /**
    * Health probe helper with fast timeout for cold start detection
    */
@@ -45,7 +61,8 @@ class EnterpriseAPIClient {
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-      const res = await fetch('/api/health', {
+      const baseUrl = this.getBaseUrl();
+      const res = await fetch(`${baseUrl}/api/health`, {
         method: 'GET',
         headers: { 'Cache-Control': 'no-cache, no-store' },
         signal: controller.signal
@@ -120,7 +137,9 @@ class EnterpriseAPIClient {
       };
 
       try {
-        const response = await fetch(path, requestConfig);
+        const baseUrl = this.getBaseUrl();
+        const fullUrl = path.startsWith('http://') || path.startsWith('https://') ? path : `${baseUrl}${path}`;
+        const response = await fetch(fullUrl, requestConfig);
         clearTimeout(timeoutId);
 
         if (!response.ok) {

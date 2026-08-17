@@ -32,6 +32,7 @@ import {
   Image as ImageIcon
 } from 'lucide-react';
 import { getTenantBranding, saveTenantBranding, TenantBranding } from '../lib/tenantBranding';
+import { getPlatformUrl, formatTenantPlatformUrl } from '../lib/platformConfig';
 import PlatformLogoManager from './PlatformLogoManager';
 
 interface FrontCustomizerCenterProps {
@@ -488,8 +489,11 @@ export default function FrontCustomizerCenter({
                 <tbody className="divide-y divide-slate-100 text-xs">
                   {filteredTenantsList.map((tenant) => {
                     const branding = getTenantBranding(tenant.id);
-                    const origin = typeof window !== 'undefined' ? window.location.origin : 'https://marketforge.scamspike.com';
-                    const slugUrl = `${origin}/${tenant.id}`;
+                    const slugUrl = formatTenantPlatformUrl(tenant.id);
+                    let displayHost = 'marketforge.scamspike.com';
+                    try {
+                      displayHost = new URL(slugUrl).hostname;
+                    } catch {}
 
                     return (
                       <tr key={tenant.id} className="hover:bg-slate-50/80 transition">
@@ -518,7 +522,7 @@ export default function FrontCustomizerCenter({
                         <td className="py-3 px-4">
                           <div className="flex items-center gap-1.5">
                             <code className="text-[11px] font-mono text-indigo-700 bg-indigo-50/80 border border-indigo-200/60 px-2 py-1 rounded-lg">
-                              marketforge.scamspike.com/{tenant.id}
+                              {displayHost}/{tenant.id}
                             </code>
                             <button
                               onClick={() => handleCopySlugUrl(tenant.id)}

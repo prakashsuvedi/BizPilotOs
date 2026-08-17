@@ -33,6 +33,7 @@ import {
   Building2, 
   Users, 
   DollarSign, 
+  Shield,
   ShieldAlert, 
   Zap, 
   Database, 
@@ -104,6 +105,7 @@ import AutonomousIntelligencePortal from './AutonomousIntelligencePortal';
 import EnterpriseAIOSPortal from './EnterpriseAIOSPortal';
 import CustomDomainCenter from './CustomDomainCenter';
 import FrontCustomizerCenter from './FrontCustomizerCenter';
+import PlatformDomainSettings from './PlatformDomainSettings';
 import RestaurantManagement from './RestaurantManagement';
 import ToursAndTravelsManagement from './ToursAndTravelsManagement';
 import WebsiteBuilderOS from './WebsiteBuilderOS';
@@ -347,7 +349,7 @@ export default function SuperAdminPortal({
   };
 
   // Current sub-view tabs
-  const [saTab, setSaTab] = useState<'analytics' | 'tenants' | 'users' | 'flags' | 'security' | 'secrets_vault' | 'commerce' | 'module_pricing' | 'front_customizer' | 'success_center' | 'integrations' | 'workflow_automation' | 'api_gateway' | 'webhook_engine' | 'health' | 'diagnostics' | 'verification' | 'enterprise_knowledge' | 'orchestration' | 'autonomous_intelligence' | 'enterprise_ai_os' | 'smtp_connectivity' | 'restaurant_os' | 'tours_os' | 'website_builder' | 'business_ops' | 'platform_tester' | 'hotel_os' | 'social_studio' | 'email_studio' | 'ad_studio' | 'campaign_planner' | 'domains'>('analytics');
+  const [saTab, setSaTab] = useState<'analytics' | 'tenants' | 'users' | 'flags' | 'security' | 'secrets_vault' | 'commerce' | 'module_pricing' | 'front_customizer' | 'platform_deployment' | 'success_center' | 'integrations' | 'workflow_automation' | 'api_gateway' | 'webhook_engine' | 'health' | 'diagnostics' | 'verification' | 'enterprise_knowledge' | 'orchestration' | 'autonomous_intelligence' | 'enterprise_ai_os' | 'smtp_connectivity' | 'restaurant_os' | 'tours_os' | 'website_builder' | 'business_ops' | 'platform_tester' | 'hotel_os' | 'social_studio' | 'email_studio' | 'ad_studio' | 'campaign_planner' | 'domains'>('analytics');
   const [activeSaCategory, setActiveSaCategory] = useState<'all' | 'governance' | 'industry' | 'marketing' | 'ai' | 'infra'>('all');
 
   // Module Dynamic Pricing State
@@ -394,8 +396,9 @@ export default function SuperAdminPortal({
   });
 
   const handleUpdateModulePrice = async (modId: string, newNpr: number) => {
-    const newUsd = Number((newNpr / 133.5).toFixed(2));
-    const updated = modulePricing.map(m => m.id === modId ? { ...m, priceNpr: newNpr, priceUsd: newUsd } : m);
+    const safeNpr = typeof newNpr === 'number' && !isNaN(newNpr) ? newNpr : 0;
+    const newUsd = Number((safeNpr / 133.5).toFixed(2));
+    const updated = modulePricing.map(m => m.id === modId ? { ...m, priceNpr: safeNpr, priceUsd: newUsd } : m);
     setModulePricing(updated);
     try {
       await fetch('/api/superadmin/pricing', {
@@ -441,7 +444,7 @@ export default function SuperAdminPortal({
         body: JSON.stringify({
           ...newModuleData,
           id: cleanId,
-          priceUsd: Number((newModuleData.priceNpr / 133.5).toFixed(2))
+          priceUsd: Number(((Number(newModuleData.priceNpr) || 0) / 133.5).toFixed(2))
         })
       });
       const data = await res.json();
@@ -697,8 +700,15 @@ export default function SuperAdminPortal({
   useEffect(() => {
     if (saTab === 'verification') {
       fetch("/api/admin/verification/readiness-report")
-        .then(res => res.json())
-        .then(data => setReportDiag(data))
+        .then(async res => {
+          if (!res.ok) return null;
+          const contentType = res.headers.get("content-type") || "";
+          if (!contentType.includes("application/json")) return null;
+          return res.json();
+        })
+        .then(data => {
+          if (data) setReportDiag(data);
+        })
         .catch(err => console.error("Error loading readiness report:", err));
     }
   }, [saTab]);
@@ -1344,16 +1354,16 @@ export default function SuperAdminPortal({
   };
 
   // KPI Calculations
-  const activeTenantsCount = tenants.filter(t => t.status === 'active').length;
-  const suspendedTenantsCount = tenants.filter(t => t.status === 'suspended').length;
-  const totalUsersCount = users.filter(u => u.status === 'active').length;
-  const totalMrr = tenants.reduce((acc, t) => acc + (t.status === 'active' ? t.mrr : 0), 0);
+  const activeTenantsCount = (tenants || []).filter(t => t?.status === 'active').length;
+  const suspendedTenantsCount = (tenants || []).filter(t => t?.status === 'suspended').length;
+  const totalUsersCount = (users || []).filter(u => u?.status === 'active').length;
+  const totalMrr = (tenants || []).reduce((acc, t) => acc + (t?.status === 'active' ? (Number(t.mrr) || 0) : 0), 0);
   
-  const totalApiRequests = tenants.reduce((acc, t) => acc + t.apiRequests, 0);
-  const totalStorageMb = tenants.reduce((acc, t) => acc + t.storageMb, 0);
-  const totalPdfExports = tenants.reduce((acc, t) => acc + t.pdfExports, 0);
-  const totalImageGen = tenants.reduce((acc, t) => acc + t.imageGenerations, 0);
-  const totalKnowledgeCount = tenants.reduce((acc, t) => acc + t.knowledgeAssets, 0);
+  const totalApiRequests = (tenants || []).reduce((acc, t) => acc + (Number(t?.apiRequests) || 0), 0);
+  const totalStorageMb = (tenants || []).reduce((acc, t) => acc + (Number(t?.storageMb) || 0), 0);
+  const totalPdfExports = (tenants || []).reduce((acc, t) => acc + (Number(t?.pdfExports) || 0), 0);
+  const totalImageGen = (tenants || []).reduce((acc, t) => acc + (Number(t?.imageGenerations) || 0), 0);
+  const totalKnowledgeCount = (tenants || []).reduce((acc, t) => acc + (Number(t?.knowledgeAssets) || 0), 0);
 
   // Tenant Handler: Create (Asynchronous Real Provisioning)
   const handleCreateTenant = async (e: React.FormEvent) => {
@@ -2187,6 +2197,18 @@ export default function SuperAdminPortal({
               <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
               Front Customizer & Branding
             </button>
+            <button
+              id="sa-tab-platform-deployment"
+              onClick={() => setSaTab('platform_deployment')}
+              className={`py-2 px-3.5 text-xs font-semibold rounded-xl flex items-center gap-1.5 cursor-pointer transition whitespace-nowrap ${
+                saTab === 'platform_deployment'
+                  ? 'bg-gradient-to-r from-indigo-900 to-slate-900 text-white font-bold border border-indigo-500 shadow-md'
+                  : 'text-slate-800 bg-slate-100/90 hover:bg-slate-200 border border-slate-200'
+              }`}
+            >
+              <Globe className="w-3.5 h-3.5 text-indigo-500" />
+              Platform Domain & Deployment
+            </button>
           </>
         )}
 
@@ -2539,7 +2561,7 @@ export default function SuperAdminPortal({
             <div className="bg-white border border-slate-200 p-5 rounded-2xl shadow-sm space-y-1 text-slate-900">
               <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Total Storage Utilized</span>
               <div className="flex items-baseline gap-2">
-                <span className="text-2xl font-bold tracking-tight text-slate-900">{totalStorageMb.toFixed(1)} <span className="text-sm font-normal text-slate-400">MB</span></span>
+                <span className="text-2xl font-bold tracking-tight text-slate-900">{(totalStorageMb || 0).toFixed(1)} <span className="text-sm font-normal text-slate-400">MB</span></span>
                 <span className="text-xs text-slate-400">of 10 GB cluster</span>
               </div>
               <span className="text-[10px] text-slate-500 block pt-1">Elastic asset pool metrics</span>
@@ -2902,7 +2924,7 @@ export default function SuperAdminPortal({
                   <div className="flex-1">
                     <label className="text-[10px] uppercase font-mono font-bold text-slate-400 block">Converted Rate (USD)</label>
                     <span className="text-xs font-mono font-bold text-indigo-600 block pt-2 border border-slate-200 bg-slate-100 px-3 py-1.5 rounded-lg">
-                      ${mod.priceUsd || (mod.priceNpr / 133.5).toFixed(2)} USD
+                      ${mod.priceUsd || (((Number(mod.priceNpr) || 0)) / 133.5).toFixed(2)} USD
                     </span>
                   </div>
                 </div>
@@ -2977,7 +2999,7 @@ export default function SuperAdminPortal({
                     <div>
                       <label className="text-xs font-bold text-slate-700 block mb-1">Converted USD</label>
                       <div className="text-xs font-mono font-bold text-indigo-600 bg-slate-100 border border-slate-200 px-3 py-2 rounded-xl">
-                        ${(newModuleData.priceNpr / 133.5).toFixed(2)} USD
+                        ${(((Number(newModuleData.priceNpr) || 0)) / 133.5).toFixed(2)} USD
                       </div>
                     </div>
                   </div>
@@ -3032,6 +3054,13 @@ export default function SuperAdminPortal({
           tenants={tenants} 
           onTenantsUpdated={setTenants} 
         />
+      )}
+
+      {/* TAB VIEW: PLATFORM DOMAIN & DEPLOYMENT CONFIGURATION */}
+      {saTab === 'platform_deployment' && (
+        <div className="space-y-6 animate-fade-in">
+          <PlatformDomainSettings />
+        </div>
       )}
 
       {/* TAB VIEW 2: TENANT & SUBSCRIPTION MANAGEMENT */}
@@ -3361,9 +3390,9 @@ export default function SuperAdminPortal({
 
                         <td className="p-4">
                           <div className="space-y-1 text-slate-500 text-[11px]">
-                            <div>Users: <span className="text-slate-800 font-medium">{t.activeUsers} slots</span></div>
-                            <div>Storage: <span className="text-slate-800 font-medium">{t.storageMb.toFixed(1)} MB</span></div>
-                            <div>Gemini: <span className="text-slate-800 font-medium">{t.apiRequests} reqs</span></div>
+                            <div>Users: <span className="text-slate-800 font-medium">{t.activeUsers ?? 0} slots</span></div>
+                            <div>Storage: <span className="text-slate-800 font-medium">{(t.storageMb != null ? Number(t.storageMb) : 0).toFixed(1)} MB</span></div>
+                            <div>Gemini: <span className="text-slate-800 font-medium">{t.apiRequests ?? 0} reqs</span></div>
                           </div>
                         </td>
 
@@ -5370,7 +5399,7 @@ export default function SuperAdminPortal({
                           </div>
                           <div className="text-right space-y-1">
                             <span className="text-xs font-mono font-bold text-slate-900 bg-white border border-slate-200 px-1.5 py-0.5 rounded shadow-2xs">
-                              1 USD = {rateObj.rate.toFixed(2)} {curr.code}
+                              1 USD = {(rateObj?.rate != null ? Number(rateObj.rate) : 1.0).toFixed(2)} {curr.code}
                             </span>
                             <button
                               onClick={() => {
@@ -5441,7 +5470,7 @@ export default function SuperAdminPortal({
                       <div className="space-y-1">
                         <label className="text-[10px] uppercase font-bold text-slate-400">Index Match Rate</label>
                         <div className="px-2 py-1.8 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono text-slate-600">
-                          {(exchangeState.find(e => e.to === calcTo)?.rate || 1.0).toFixed(2)}
+                          {(Number(exchangeState.find(e => e.to === calcTo)?.rate) || 1.0).toFixed(2)}
                         </div>
                       </div>
                     </div>

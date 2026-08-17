@@ -54,7 +54,8 @@ import {
   SlidersHorizontal,
   Layout,
   Receipt,
-  KeyRound
+  KeyRound,
+  X
 } from 'lucide-react';
 
 export const MarketForgeEmblemIcon = ({ className = "w-8 h-8", glow = true }: { className?: string; glow?: boolean }) => {
@@ -742,6 +743,7 @@ export default function LoginPortal({ onLogin, tenantsList, onActivateTenant }: 
 
     try {
       let finalTenantId = targetTenantId;
+      let userSession: any = null;
       if (isGoogle) {
         finalTenantId = targetTenantId !== 'auto' ? targetTenantId : 'demo-tenant';
         await clientAuth.signInWithEmailAndPassword(email, 'google_oauth_pass', finalTenantId);
@@ -761,8 +763,8 @@ export default function LoginPortal({ onLogin, tenantsList, onActivateTenant }: 
           throw new Error(errJson.error || "Workspace authentication failed. Check credentials or password!");
         }
 
-        const userSession = await resp.json();
-        finalTenantId = userSession.tenantId || targetTenantId;
+        userSession = await resp.json();
+        finalTenantId = userSession?.tenantId || targetTenantId;
 
         try {
           await clientAuth.signInWithEmailAndPassword(email, pass, finalTenantId);
@@ -877,9 +879,12 @@ export default function LoginPortal({ onLogin, tenantsList, onActivateTenant }: 
       }
 
       const adminSession = await resp.json();
+      if (!adminSession || adminSession.role !== 'super_admin') {
+        throw new Error("Access Denied: Designated Super Administrator privileges required.");
+      }
       await clientAuth.signInWithEmailAndPassword(adminEmail, adminPassword, adminSession.tenantId || "demo-tenant");
 
-      onLogin('super_admin', adminSession.tenantId || 'demo-tenant', adminEmail, 'Super Administrator', 'System Administrator');
+      onLogin(adminSession.role, adminSession.tenantId || 'demo-tenant', adminSession.email || adminEmail, adminSession.name || 'Super Administrator', 'System Administrator');
     } catch (err: any) {
       setAdminError(`⛔ Superadmin Auth Security Lock: ${err.message}`);
     } finally {

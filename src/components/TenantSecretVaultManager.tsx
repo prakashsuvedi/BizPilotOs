@@ -16,7 +16,8 @@ import {
   Sparkles,
   ShieldAlert,
   Terminal,
-  Key
+  Key,
+  X
 } from 'lucide-react';
 import {
   SecretEntry,

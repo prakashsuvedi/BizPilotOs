@@ -1,4 +1,7 @@
 import http from "http";
+import https from "https";
+
+const apiBase = process.env.VITE_API_URL || process.env.API_BASE_URL || "http://localhost:3000";
 
 const endpoints = [
   { path: "/api/admin/verification/firebase", method: "POST" },
@@ -20,8 +23,10 @@ const endpoints = [
 
 async function runRequest(endpoint: typeof endpoints[0]): Promise<any> {
   return new Promise((resolve) => {
-    const req = http.request(
-      `http://localhost:3000${endpoint.path}`,
+    const url = new URL(endpoint.path, apiBase);
+    const client = url.protocol === "https:" ? https : http;
+    const req = client.request(
+      url.toString(),
       {
         method: endpoint.method,
         headers: {

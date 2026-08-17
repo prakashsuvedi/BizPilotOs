@@ -63,7 +63,7 @@ export async function runTest() {
   }
 }
 
-if (require.main === module) {
+if (typeof require !== "undefined" && require.main === module) {
   runTest().then(res => {
     console.log(JSON.stringify(res, null, 2));
     process.exit(res.success ? 0 : 1);

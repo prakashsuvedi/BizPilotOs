@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { getPlatformUrl } from '../lib/platformConfig';
 import { 
   Webhook, 
   Plus, 
@@ -17,7 +18,8 @@ import {
   Layers,
   ArrowUpRight,
   ArrowDownLeft,
-  Settings
+  Settings,
+  X
 } from 'lucide-react';
 
 export interface OutgoingWebhookSubscription {
@@ -288,7 +290,7 @@ export default function AdvancedWebhookEngine({
     }
   };
 
-  const incomingWebhookUrl = `https://marketforge.scamspike.com/api/webhooks/v1/ingest/${tenantId}/sec_wh_${tenantId.slice(0, 8)}`;
+  const incomingWebhookUrl = `${getPlatformUrl()}/api/webhooks/v1/ingest/${tenantId}/sec_wh_${tenantId.slice(0, 8)}`;
 
   return (
     <div id="advanced-webhook-engine" className="space-y-6 font-sans">

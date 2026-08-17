@@ -22,7 +22,8 @@ import {
   Zap,
   HardDrive,
   BarChart3,
-  ListOrdered
+  ListOrdered,
+  X
 } from "lucide-react";
 
 interface StageResult {

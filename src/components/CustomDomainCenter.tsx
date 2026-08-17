@@ -19,6 +19,7 @@ import {
   Layers
 } from 'lucide-react';
 import { clientDb } from '../lib/firebase';
+import { getPlatformUrl } from '../lib/platformConfig';
 import TenantCustomDomainPanel from './TenantCustomDomainPanel';
 
 interface DomainRecord {
@@ -83,11 +84,16 @@ export default function CustomDomainCenter() {
   };
 
   const bootstrapDefaultDomains = (tenants: any[]) => {
+    let platformHost = 'marketforge.scamspike.com';
+    try {
+      platformHost = new URL(getPlatformUrl()).hostname;
+    } catch {}
+
     const defaults: DomainRecord[] = [
       {
         id: 'dom-1',
         tenantId: 'demo-tenant',
-        domain: 'marketforge.scamspike.com/demo-tenant',
+        domain: `${platformHost}/demo-tenant`,
         routingMode: 'A',
         dnsStatus: 'verified',
         sslStatus: 'active',
@@ -102,7 +108,7 @@ export default function CustomDomainCenter() {
       {
         id: 'dom-2',
         tenantId: 'suskriti',
-        domain: 'suskriti.marketforge.scamspike.com',
+        domain: `suskriti.${platformHost}`,
         routingMode: 'B',
         dnsStatus: 'verified',
         sslStatus: 'active',
@@ -138,8 +144,8 @@ export default function CustomDomainCenter() {
         defaults.push({
           id: `dom_${t.id}`,
           tenantId: t.id,
-          domain: t.domain || `${t.id}.marketforge.scamspike.com`,
-          routingMode: t.domain?.includes('/') ? 'A' : (t.domain?.includes('marketforge') ? 'B' : 'C'),
+          domain: t.domain || `${t.id}.${platformHost}`,
+          routingMode: t.domain?.includes('/') ? 'A' : (t.domain?.includes(platformHost) ? 'B' : 'C'),
           dnsStatus: 'verified',
           sslStatus: 'active',
           cloudflareState: 'proxied',
@@ -164,6 +170,11 @@ export default function CustomDomainCenter() {
 
   // Switch routing mode for a domain record
   const handleSwitchRoutingMode = (id: string, mode: 'A' | 'B' | 'C') => {
+    let platformHost = 'marketforge.scamspike.com';
+    try {
+      platformHost = new URL(getPlatformUrl()).hostname;
+    } catch {}
+
     const updated = domains.map(d => {
       if (d.id === id) {
         let domainStr = d.domain;
@@ -171,11 +182,11 @@ export default function CustomDomainCenter() {
         const slug = d.tenantId;
 
         if (mode === 'A') {
-          domainStr = `marketforge.scamspike.com/${slug}`;
+          domainStr = `${platformHost}/${slug}`;
         } else if (mode === 'B') {
-          domainStr = `${slug}.marketforge.scamspike.com`;
+          domainStr = `${slug}.${platformHost}`;
         } else {
-          domainStr = tenant?.domain && !tenant.domain.includes('marketforge') ? tenant.domain : `${slug}.com`;
+          domainStr = tenant?.domain && !tenant.domain.includes(platformHost) ? tenant.domain : `${slug}.com`;
         }
 
         return {

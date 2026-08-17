@@ -23,6 +23,7 @@ import {
   ArrowLeft,
   ArrowRight,
   ShieldCheck,
+  ShieldAlert,
   Building2,
   Bed,
   ChevronRight,
@@ -983,7 +984,44 @@ export default function App() {
     );
   }
 
-  // 5. Authenticated Workspace Access -> Guard against waking/offline backend for live operations
+  // 5. Super Admin Route Authorization Guard (Must hold verified server role === 'super_admin')
+  if (routeState.type === 'super_admin' && user.role !== 'super_admin') {
+    return (
+      <div className="min-h-screen bg-[#0C0D14] text-slate-100 flex flex-col items-center justify-center p-6 text-center">
+        <div className="max-w-md w-full bg-[#121420] border border-rose-500/30 rounded-2xl p-8 shadow-2xl space-y-6">
+          <div className="w-16 h-16 rounded-2xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-center mx-auto text-rose-400">
+            <ShieldAlert className="w-8 h-8" />
+          </div>
+          <div>
+            <h2 className="text-xl font-bold text-white tracking-wide">403 — Super Admin Access Denied</h2>
+            <p className="text-xs text-slate-400 mt-2 leading-relaxed">
+              Your session is authenticated as <strong className="text-rose-300">{user.email}</strong> with role <strong className="text-white uppercase">{user.role}</strong> bound to workspace <strong className="text-indigo-300">{user.tenantId}</strong>.
+            </p>
+            <p className="text-xs text-slate-400 mt-1">
+              Super Admin operations require verified platform root authority.
+            </p>
+          </div>
+          <div className="space-y-3 pt-2">
+            <button
+              onClick={() => navigateToTenant(user.tenantId, 'workspace')}
+              className="w-full py-2.5 px-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold text-xs transition cursor-pointer flex items-center justify-center gap-2 shadow"
+            >
+              <span>Return to My Workspace ({user.tenantId})</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
+            <button
+              onClick={handleLogout}
+              className="w-full py-2 px-4 bg-white/5 hover:bg-white/10 text-slate-300 rounded-xl font-semibold text-xs transition cursor-pointer border border-white/10"
+            >
+              Log Out / Switch Account
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 6. Authenticated Workspace Access -> Guard against waking/offline backend for live operations
   if (backendStatus === 'waking') {
     const currentSlug = routeState.slug || urlParams.get('tenant') || urlParams.get('slug') || (user?.tenantId || (routeState.tenant ? routeState.tenant.name : ''));
     return (
