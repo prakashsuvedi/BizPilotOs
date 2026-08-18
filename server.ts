@@ -1955,6 +1955,25 @@ app.post("/api/superadmin/platform-email/test", requireAuth, requireRole(["super
 // GET /api/superadmin/tenants (List all tenants with activated modules)
 app.get("/api/superadmin/tenants", requireAuth, requireRole(["super_admin"]), async (req: express.Request, res: express.Response) => {
   try {
+    const isReal = getIsRealAdminReady();
+    if (isReal) {
+      const db = getAdminDb();
+      const snapshot = await db.collection("tenants").get();
+      const list: any[] = [];
+      snapshot.forEach((doc: any) => {
+        list.push({ id: doc.id, ...doc.data() });
+      });
+      const memList = Object.values(serverMemoryStore.tenants || {});
+      for (const mem of memList as any[]) {
+        const idx = list.findIndex((t: any) => t.id === mem.id);
+        if (idx === -1) {
+          list.push(mem);
+        } else {
+          list[idx] = { ...list[idx], ...mem };
+        }
+      }
+      return res.json({ success: true, tenants: list });
+    }
     const tenantsList = Object.values(serverMemoryStore.tenants || {});
     return res.json({ success: true, tenants: tenantsList });
   } catch (err: any) {
@@ -2030,6 +2049,7 @@ app.post("/api/superadmin/tenants", requireAuth, requireRole(["super_admin"]), a
       status: 'active',
       lastActive: 'Just registered',
       password: tempPass,
+      permittedModules: selModules,
       createdAt: new Date().toISOString()
     };
 
@@ -11277,7 +11297,7 @@ app.post("/api/admin/validate-byok-key", async (req, res) => {
 
 // Endpoint to trigger fully transactional tenant provisioning, cPanel integration and SMTP outbound invitation email
 app.post("/api/admin/create-tenant", async (req, res) => {
-  const { id, name, domain, ownerEmail, plan } = req.body;
+  const { id, name, domain, ownerEmail, plan, activatedModules, disabledModules, currency, subscriptionPrice } = req.body;
 
   if (!id || !name || !ownerEmail) {
     return res.status(400).json({ error: "Parameters 'id', 'name' and 'ownerEmail' are required." });
@@ -11376,6 +11396,8 @@ app.post("/api/admin/create-tenant", async (req, res) => {
       status: 'provisioning',
       plan: currentPlan,
       mrr: planMrrMap[currentPlan] || 249,
+      currency: currency || 'USD',
+      subscriptionPrice: subscriptionPrice || planMrrMap[currentPlan] || 249,
       trialDaysLeft: 14,
       activeUsers: 1,
       storageMb: 10.0,
@@ -11384,7 +11406,8 @@ app.post("/api/admin/create-tenant", async (req, res) => {
       pdfExports: 0,
       imageGenerations: 0,
       knowledgeAssets: 0,
-      disabledModules: [],
+      disabledModules: disabledModules || [],
+      activatedModules: (activatedModules && Array.isArray(activatedModules) && activatedModules.length > 0) ? activatedModules : ['office_hr', 'restaurant', 'hotel', 'website', 'marketing', 'finance'],
       lifecycleState: "VALIDATING"
     };
 
@@ -11547,6 +11570,7 @@ app.post("/api/admin/create-tenant", async (req, res) => {
         name: `${name} Owner`,
         status: 'active',
         password: tempPassword,
+        permittedModules: freshTenant.activatedModules,
         createdAt: new Date().toISOString()
       };
       await saveToSaaSStore("users", createdUid, userPayload, tenantId, "system@marketforge.scamspike.com");

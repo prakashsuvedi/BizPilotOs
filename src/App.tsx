@@ -589,6 +589,28 @@ export default function App() {
       .catch(err => {
         console.warn("Network error during session verification:", err);
       });
+
+      if (user?.tenantId) {
+        fetch(`/api/tenant/details?tenantId=${encodeURIComponent(user.tenantId)}`)
+          .then(res => res.json())
+          .then(data => {
+            if (data && data.success && data.tenant) {
+              setTenantsList(prev => {
+                const idx = prev.findIndex(t => t.id === data.tenant.id);
+                let next;
+                if (idx >= 0) {
+                  next = [...prev];
+                  next[idx] = { ...next[idx], ...data.tenant };
+                } else {
+                  next = [...prev, data.tenant];
+                }
+                localStorage.setItem('marketforge_sa_tenants', JSON.stringify(next));
+                return next;
+              });
+            }
+          })
+          .catch(() => {});
+      }
     }
 
     if (urlParams.get('payment_success')) {
@@ -774,6 +796,29 @@ export default function App() {
     setDashboardTab('command');
     setIsHeaderFolded(true);
     navigateToTenant(tenantId, 'workspace');
+
+    // Hydrate tenant details to load activated modules immediately
+    if (tenantId && role !== 'super_admin') {
+      fetch(`/api/tenant/details?tenantId=${encodeURIComponent(tenantId)}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data && data.success && data.tenant) {
+            setTenantsList(prev => {
+              const idx = prev.findIndex(t => t.id === data.tenant.id);
+              let next;
+              if (idx >= 0) {
+                next = [...prev];
+                next[idx] = { ...next[idx], ...data.tenant };
+              } else {
+                next = [...prev, data.tenant];
+              }
+              localStorage.setItem('marketforge_sa_tenants', JSON.stringify(next));
+              return next;
+            });
+          }
+        })
+        .catch(() => {});
+    }
 
     // Trigger First-Visit Security Password Change recommendation if not previously dismissed
     if (email && !localStorage.getItem(`marketforge_security_notice_dismissed_${email}`)) {
@@ -1173,15 +1218,15 @@ export default function App() {
   // Dynamic module mapping and aliases
   const moduleAliasesMap: Record<string, string[]> = {
     planner: ['planner', 'marketing_planner', 'marketing'],
-    ad_studio: ['ad_studio', 'adstudio', 'ads', 'ad'],
-    email_studio: ['email_studio', 'email', 'emailstudio'],
-    social_studio: ['social_studio', 'social', 'social_engine', 'socialstudio'],
-    revenue_intelligence: ['revenue_intelligence', 'revenue', 'commerce', 'revenue_os'],
+    ad_studio: ['ad_studio', 'adstudio', 'ads', 'ad', 'marketing'],
+    email_studio: ['email_studio', 'email', 'emailstudio', 'marketing'],
+    social_studio: ['social_studio', 'social', 'social_engine', 'socialstudio', 'marketing'],
+    revenue_intelligence: ['revenue_intelligence', 'revenue', 'commerce', 'revenue_os', 'finance', 'ecommerce'],
     restaurant_os: ['restaurant_os', 'restaurant', 'pos'],
     hotel_os: ['hotel_os', 'hotel', 'hospitality'],
     tours_os: ['tours_os', 'tours', 'travel', 'tours_and_travels'],
     website_builder: ['website_builder', 'website', 'web_builder'],
-    business_ops: ['business_ops', 'hr', 'operations', 'team'],
+    business_ops: ['business_ops', 'hr', 'operations', 'team', 'office_hr'],
     omnicore_labs: ['omnicore_labs', 'omnicore', 'ai_labs'],
     domains: ['domains', 'custom_domains', 'dns'],
     whitelabel: ['whitelabel', 'branding', 'white_label'],

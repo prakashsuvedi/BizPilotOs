@@ -263,6 +263,32 @@ export default function SuperAdminPortal({
     return saved ? JSON.parse(saved) : INITIAL_AUDITS;
   });
 
+  // Sync live tenants from SuperAdmin API on mount
+  useEffect(() => {
+    const loadLiveTenants = async () => {
+      try {
+        const token = localStorage.getItem("marketforge_superadmin_token") || "MOCK_ENTERPRISE_JWT_TOKEN_123";
+        const resp = await fetch("/api/superadmin/tenants", {
+          headers: {
+            "Authorization": `Bearer ${token}`,
+            "x-simulated-role": "super_admin"
+          }
+        });
+        if (resp.ok) {
+          const data = await resp.json();
+          if (data && data.success && Array.isArray(data.tenants)) {
+            setTenants(data.tenants);
+            localStorage.setItem('marketforge_sa_tenants', JSON.stringify(data.tenants));
+            if (onTenantsUpdated) onTenantsUpdated(data.tenants);
+          }
+        }
+      } catch (err) {
+        console.warn("Failed to fetch superadmin live tenants:", err);
+      }
+    };
+    loadLiveTenants();
+  }, []);
+
   // Export utility for tenant configurations and settings (One-Click JSON Dump)
   const handleExportTenantBackupJSON = async (tenant: TenantConfig) => {
     try {
@@ -1467,7 +1493,12 @@ export default function SuperAdminPortal({
         activatedModules: newTenantModules
       };
 
-      setTenants(prev => [...prev, freshTenant]);
+      setTenants(prev => {
+        const next = [...prev, freshTenant];
+        localStorage.setItem('marketforge_sa_tenants', JSON.stringify(next));
+        if (onTenantsUpdated) onTenantsUpdated(next);
+        return next;
+      });
 
       const freshUser: PlatformUserSim = {
         id: `usr-${Math.floor(Math.random() * 900) + 100}`,
@@ -1783,6 +1814,16 @@ export default function SuperAdminPortal({
   const handleDeleteTenant = async (id: string, name: string) => {
     const confirmed = window.confirm(`CRITICAL SECURITY ACTION: Are you absolutely certain you want to purge and delete the "${name}" (ID: ${id}) multi-tenant repository? All Firestore documents, Firebase Auth user accounts, and SuperAdmin records will be permanently vaporized.`);
     if (confirmed) {
+      // 1. Immediately update UI state in SuperAdminPortal, localStorage and inform parent
+      setTenants(prev => {
+        const next = prev.filter(t => t.id !== id);
+        localStorage.setItem('marketforge_sa_tenants', JSON.stringify(next));
+        if (onTenantsUpdated) onTenantsUpdated(next);
+        return next;
+      });
+      setUsers(prev => prev.filter(u => u.tenantId !== id));
+
+      // 2. Call backend to delete from Firestore and Firebase Auth
       try {
         const token = localStorage.getItem("marketforge_superadmin_token") || "MOCK_ENTERPRISE_JWT_TOKEN_123";
         await fetch("/api/admin/database/clean-tenant-data", {
@@ -1808,8 +1849,7 @@ export default function SuperAdminPortal({
       } catch (e) {
         console.warn("Error calling delete endpoint:", e);
       }
-      setTenants(prev => prev.filter(t => t.id !== id));
-      setUsers(prev => prev.filter(u => u.tenantId !== id));
+
       addAuditEntry('tenant_mutation', 'high', `VAPORIZED tenant workspace database sandbox, Firestore documents, Firebase Auth accounts, and purged cache vectors.`, id);
       
       // If we deleted the active workspace, fallback
