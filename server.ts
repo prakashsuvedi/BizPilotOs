@@ -832,14 +832,14 @@ const serverMemoryStore: any = {
     updatedBy: "system"
   },
   platform_email_config: {
-    provider: (process.env.EMAIL_PROVIDER as any) || "smtp",
+    provider: (process.env.EMAIL_PROVIDER as any) || (process.env.RESEND_API_KEY && !process.env.RESEND_API_KEY.includes("YOUR") ? "resend" : "smtp"),
     smtpHost: (process.env.SMTP_HOST && !process.env.SMTP_HOST.includes("sendgrid")) ? process.env.SMTP_HOST : "scamspike.com",
     smtpPort: process.env.SMTP_PORT ? parseInt(process.env.SMTP_PORT) : 465,
     smtpUser: process.env.SMTP_USER || "marketforge@scamspike.com",
     smtpPass: process.env.SMTP_PASS || "MkForge_2026_SecurePass!",
     smtpSecurity: "ssl",
     senderName: "MarketForge Operations",
-    senderEmail: process.env.SMTP_FROM_EMAIL || "marketforge@scamspike.com",
+    senderEmail: process.env.RESEND_FROM_EMAIL || process.env.SMTP_FROM_EMAIL || "marketforge@scamspike.com",
     replyToEmail: "support@marketforge.scamspike.com",
     enableProductionEmail: true,
     sendgridApiKey: (process.env.SENDGRID_API_KEY && !process.env.SENDGRID_API_KEY.includes("YOUR")) ? process.env.SENDGRID_API_KEY : "",
@@ -2058,6 +2058,43 @@ app.post("/api/superadmin/tenants", requireAuth, requireRole(["super_admin"]), a
       sentAt: new Date().toISOString()
     };
 
+    const welcomeHtml = `
+      <div style="font-family: 'Helvetica Neue', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px; background: #ffffff;">
+        <div style="text-align: center; margin-bottom: 24px;">
+          <h2 style="color: #4f46e5; margin: 0; font-size: 24px; font-weight: bold;">MarketForge OS</h2>
+          <p style="color: #64748b; font-size: 13px; margin: 4px 0 0 0; text-transform: uppercase; letter-spacing: 0.05em;">Enterprise Workspace Provisioning</p>
+        </div>
+        <div style="color: #1e293b; line-height: 1.6; font-size: 15px;">
+          <p>Dear ${name} Administrator,</p>
+          <p>Congratulations! Your new enterprise tenant workspace <strong>"${name}"</strong> has been successfully provisioned on MarketForge OS.</p>
+          <div style="background-color: #f8fafc; border-left: 4px solid #4f46e5; padding: 14px 18px; margin: 20px 0; border-radius: 0 8px 8px 0;">
+            <strong style="color: #0f172a; font-size: 14px;">WORKSPACE ACCESS CREDENTIALS:</strong><br/>
+            • <strong>Tenant ID:</strong> <code>${tenantId}</code><br/>
+            • <strong>Assigned Plan:</strong> ${plan || 'Growth'}<br/>
+            • <strong>Temporary User / Email:</strong> <code>${ownerEmail}</code><br/>
+            • <strong>Temporary Password:</strong> <code style="background: #e2e8f0; padding: 2px 6px; border-radius: 4px;">${tempPass}</code>
+          </div>
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${landingPageUrl}" style="background-color: #4f46e5; color: #ffffff; padding: 14px 32px; font-size: 15px; font-weight: bold; text-decoration: none; border-radius: 8px; display: inline-block;">
+              Access Workspace Portal
+            </a>
+          </div>
+          <p style="font-size: 13px; color: #64748b;">
+            Direct URL: <a href="${landingPageUrl}" style="color: #4f46e5;">${landingPageUrl}</a>
+          </p>
+        </div>
+        <div style="border-top: 1px solid #e2e8f0; padding-top: 16px; margin-top: 32px; text-align: center; font-size: 11px; color: #94a3b8;">
+          MarketForge Enterprise OS &bull; Automated Platform Operations
+        </div>
+      </div>
+    `;
+
+    try {
+      await sendRealEmail(ownerEmail, emailSubject, welcomeHtml, "MarketForge Operations", tenantId);
+    } catch (mailErr: any) {
+      console.warn("[SuperAdmin Provision Email Notice]:", mailErr.message);
+    }
+
     return res.json({
       success: true,
       message: `Tenant "${name}" provisioned successfully. Welcome onboarding email sent to ${ownerEmail}.`,
@@ -2874,7 +2911,48 @@ app.post("/api/tenants/signup", async (req: express.Request, res: express.Respon
       }
     }
 
-    // 10. Return clean payload without leaking password or sensitive data
+    // 10. Send Live Welcome & Workspace Activation Email
+    const reqOrigin = req.get('origin') || `http://${req.get('host')}` || 'https://marketforge.ai';
+    const workspaceUrl = `${reqOrigin}/${tenantId}`;
+    const signupSubject = `Welcome to MarketForge OS! Your Workspace "${targetName}" is Ready`;
+    const signupHtml = `
+      <div style="font-family: 'Helvetica Neue', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px; background: #ffffff;">
+        <div style="text-align: center; margin-bottom: 24px;">
+          <h2 style="color: #4f46e5; margin: 0; font-size: 24px; font-weight: bold;">MarketForge OS</h2>
+          <p style="color: #64748b; font-size: 13px; margin: 4px 0 0 0; text-transform: uppercase; letter-spacing: 0.05em;">Self-Service Enterprise Registration</p>
+        </div>
+        <div style="color: #1e293b; line-height: 1.6; font-size: 15px;">
+          <p>Hello ${targetOwnerName},</p>
+          <p>Thank you for creating your new workspace <strong>"${targetName}"</strong> on MarketForge OS! Your organization environment has been provisioned and is ready for use.</p>
+          <div style="background-color: #f8fafc; border-left: 4px solid #4f46e5; padding: 14px 18px; margin: 20px 0; border-radius: 0 8px 8px 0;">
+            <strong style="color: #0f172a; font-size: 14px;">WORKSPACE DETAILS:</strong><br/>
+            • <strong>Tenant Identifier:</strong> <code>${tenantId}</code><br/>
+            • <strong>Assigned Plan:</strong> Growth (Self-Service)<br/>
+            • <strong>Owner Email / Username:</strong> <code>${targetEmail}</code><br/>
+            • <strong>Active Modules:</strong> ${activeMods.join(', ')}
+          </div>
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${workspaceUrl}" style="background-color: #4f46e5; color: #ffffff; padding: 14px 32px; font-size: 15px; font-weight: bold; text-decoration: none; border-radius: 8px; display: inline-block;">
+              Open Workspace Portal
+            </a>
+          </div>
+          <p style="font-size: 13px; color: #64748b;">
+            Direct Link: <a href="${workspaceUrl}" style="color: #4f46e5;">${workspaceUrl}</a>
+          </p>
+        </div>
+        <div style="border-top: 1px solid #e2e8f0; padding-top: 16px; margin-top: 32px; text-align: center; font-size: 11px; color: #94a3b8;">
+          MarketForge Enterprise OS &bull; Autonomous SaaS Platform
+        </div>
+      </div>
+    `;
+
+    try {
+      await sendRealEmail(targetEmail, signupSubject, signupHtml, "MarketForge Operations", tenantId);
+    } catch (mailErr: any) {
+      console.warn("[Tenant Signup Welcome Email Warning]:", mailErr.message);
+    }
+
+    // 11. Return clean payload without leaking password or sensitive data
     return res.status(201).json({
       success: true,
       message: `Tenant workspace "${targetName}" registered successfully!`,
@@ -6654,7 +6732,9 @@ async function sendRealEmail(to: string, subject: string, htmlBody: string, from
   const isProductionEnabled = platformCfg.enableProductionEmail !== false && process.env.EMAIL_MODE !== "sandbox";
 
   // Determine active provider
-  const preferredProvider = (customConfig?.provider || platformCfg.provider || process.env.EMAIL_PROVIDER || (process.env.RESEND_API_KEY ? "resend" : "smtp")).toLowerCase();
+  const hasResend = !!(customConfig?.resendApiKey || platformCfg.resendApiKey || (process.env.RESEND_API_KEY && process.env.RESEND_API_KEY !== "YOUR_RESEND_KEY"));
+  const defaultProvider = hasResend ? "resend" : "smtp";
+  const preferredProvider = (customConfig?.provider || platformCfg.provider || process.env.EMAIL_PROVIDER || defaultProvider).toLowerCase();
 
   // Resolve config keys
   const resendKey = customConfig?.resendApiKey || platformCfg.resendApiKey || (process.env.RESEND_API_KEY && process.env.RESEND_API_KEY !== "YOUR_RESEND_KEY" ? process.env.RESEND_API_KEY : undefined);
@@ -11388,28 +11468,48 @@ app.post("/api/admin/create-tenant", async (req, res) => {
       // STEP 15: CONNECT_EMAIL_PROVIDER
       // ==========================================
       await transitionLifecycleState(tenantId, TenantLifecycleState.STEP_15_CONNECT_EMAIL_PROVIDER, "Establishing network socket descriptors with designated mail delivery gateway", async () => {
-        const smtpHost = process.env.SMTP_HOST;
-        const smtpPort = process.env.SMTP_PORT ? parseInt(process.env.SMTP_PORT) : 587;
-        const smtpUser = process.env.SMTP_USER;
-        const smtpPass = process.env.SMTP_PASS;
+        const platformCfg = serverMemoryStore.platform_email_config || {};
+        const activeProvider = (platformCfg.provider || process.env.EMAIL_PROVIDER || (platformCfg.resendApiKey || process.env.RESEND_API_KEY ? "resend" : (process.env.SENDGRID_API_KEY ? "sendgrid" : (process.env.SMTP_HOST ? "smtp" : "simulator")))).toLowerCase();
 
-        if (smtpHost && smtpUser && smtpPass) {
-          try {
-            transporter = nodemailer.createTransport({
-              host: smtpHost,
-              port: smtpPort,
-              secure: smtpPort === 465,
-              auth: { user: smtpUser, pass: smtpPass },
-              connectionTimeout: 8000
-            });
-            if (!transporter) {
-              throw new Error("Nodemailer failed to initialize transporter pool.");
+        if (activeProvider === "resend") {
+          const resendKey = platformCfg.resendApiKey || process.env.RESEND_API_KEY;
+          if (!resendKey || resendKey === "YOUR_RESEND_KEY") {
+            throw new Error("Resend API Key is missing in Platform Email Settings.");
+          }
+          console.info("[Resend Provider] HTTPS gateway descriptors initialized.");
+        } else if (activeProvider === "sendgrid") {
+          const sgKey = platformCfg.sendgridApiKey || process.env.SENDGRID_API_KEY;
+          if (!sgKey || sgKey === "YOUR_SENDGRID_KEY") {
+            throw new Error("SendGrid API Key is missing in Platform Email Settings.");
+          }
+          sgMail.setApiKey(sgKey);
+          console.info("[SendGrid Provider] HTTPS gateway descriptors initialized.");
+        } else if (activeProvider === "smtp") {
+          const smtpHost = platformCfg.smtpHost || process.env.SMTP_HOST;
+          const smtpPort = platformCfg.smtpPort || (process.env.SMTP_PORT ? parseInt(process.env.SMTP_PORT) : 587);
+          const smtpUser = platformCfg.smtpUser || process.env.SMTP_USER;
+          const smtpPass = platformCfg.smtpPass || process.env.SMTP_PASS;
+
+          if (smtpHost && smtpUser && smtpPass) {
+            try {
+              transporter = nodemailer.createTransport({
+                host: smtpHost,
+                port: smtpPort,
+                secure: smtpPort === 465,
+                auth: { user: smtpUser, pass: smtpPass },
+                connectionTimeout: 8000
+              });
+              if (!transporter) {
+                throw new Error("Nodemailer failed to initialize transporter pool.");
+              }
+            } catch (err: any) {
+              throw new Error(`SMTP Driver Connection Failed: ${err.message}`);
             }
-          } catch (err: any) {
-            throw new Error(`SMTP Driver Connection Failed: ${err.message}`);
+          } else {
+            console.info("[Email Connect] Incomplete SMTP credentials; fallback available.");
           }
         } else {
-          console.info("[Email Connect Bypass] No custom SMTP credentials detected. Proceeding using SendGrid / Simulator mode.");
+          console.info("[Email Connect Bypass] Active provider is simulator.");
         }
       });
 
@@ -11417,33 +11517,37 @@ app.post("/api/admin/create-tenant", async (req, res) => {
       // STEP 16: AUTHENTICATE_EMAIL_PROVIDER
       // ==========================================
       await transitionLifecycleState(tenantId, TenantLifecycleState.STEP_16_AUTHENTICATE_EMAIL_PROVIDER, "Running cryptographic authentication handshake verification on mail carrier endpoint", async () => {
-        const smtpHost = process.env.SMTP_HOST;
-        const smtpUser = process.env.SMTP_USER;
-        const smtpPass = process.env.SMTP_PASS;
-        
-        if (transporter && smtpHost && smtpUser && smtpPass) {
-          try {
-            await transporter.verify();
-            console.info("[SMTP Connection] SMTP verification handshake successful.");
-          } catch (err: any) {
-            const analysis = analyzeSmtpError(err, `${smtpUser}@${smtpHost}`);
-            console.error(`[SMTP HANDSHAKE ERROR] Root Cause: ${analysis.rootCause} | Reason: ${analysis.whyItHappened}`);
-            
-            const customErr: any = new Error(`SMTP Authentication Failure: ${err.message}. ${analysis.whyItHappened}`);
-            customErr.httpStatus = 535;
-            customErr.providerResponse = JSON.stringify(analysis);
-            throw customErr;
+        const platformCfg = serverMemoryStore.platform_email_config || {};
+        const activeProvider = (platformCfg.provider || process.env.EMAIL_PROVIDER || (platformCfg.resendApiKey || process.env.RESEND_API_KEY ? "resend" : (process.env.SENDGRID_API_KEY ? "sendgrid" : (process.env.SMTP_HOST ? "smtp" : "simulator")))).toLowerCase();
+
+        if (activeProvider === "resend") {
+          const resendKey = platformCfg.resendApiKey || process.env.RESEND_API_KEY;
+          if (!resendKey || !resendKey.startsWith("re_")) {
+            throw new Error("Invalid Resend API Key format (must start with 're_').");
           }
-        } else if (process.env.SENDGRID_API_KEY) {
-          try {
-            sgMail.setApiKey(process.env.SENDGRID_API_KEY);
-            console.info("[SendGrid Connection] SendGrid connection initiated.");
-          } catch (err: any) {
-            const analysis = analyzeSmtpError(err, "SendGrid SDK Settings");
-            const customErr: any = new Error(`SendGrid Auth Failed: ${err.message}. ${analysis.whyItHappened}`);
-            customErr.httpStatus = 401;
-            customErr.providerResponse = JSON.stringify(analysis);
-            throw customErr;
+          console.info("[Resend Auth] Resend API credential authentication passed.");
+        } else if (activeProvider === "sendgrid") {
+          const sgKey = platformCfg.sendgridApiKey || process.env.SENDGRID_API_KEY;
+          if (!sgKey || !sgKey.startsWith("SG.")) {
+            throw new Error("Invalid SendGrid API Key format (must start with 'SG.').");
+          }
+          console.info("[SendGrid Auth] SendGrid API credential authentication passed.");
+        } else if (activeProvider === "smtp") {
+          const smtpHost = platformCfg.smtpHost || process.env.SMTP_HOST;
+          const smtpUser = platformCfg.smtpUser || process.env.SMTP_USER;
+          if (transporter && smtpHost && smtpUser) {
+            try {
+              await transporter.verify();
+              console.info("[SMTP Connection] SMTP verification handshake successful.");
+            } catch (err: any) {
+              const analysis = analyzeSmtpError(err, `${smtpUser}@${smtpHost}`);
+              console.error(`[SMTP HANDSHAKE ERROR] Root Cause: ${analysis.rootCause} | Reason: ${analysis.whyItHappened}`);
+              
+              const customErr: any = new Error(`SMTP Authentication Failure: ${err.message}. ${analysis.whyItHappened}`);
+              customErr.httpStatus = 535;
+              customErr.providerResponse = JSON.stringify(analysis);
+              throw customErr;
+            }
           }
         } else {
           console.info("[Email Handshake Bypass] Defaulting to active simulator relay.");
