@@ -1599,43 +1599,35 @@ app.post("/api/superadmin/platform-email", requireAuth, requireRole(["super_admi
   }
 });
 
-// POST /api/superadmin/platform-email/test (Diagnostic Test Email Dispatcher)
+// POST /api/superadmin/platform-email/test (Dedicated Standalone Diagnostic Test Email Dispatcher)
 app.post("/api/superadmin/platform-email/test", requireAuth, requireRole(["super_admin"]), async (req: express.Request, res: express.Response) => {
   const startTime = Date.now();
   try {
-    const { recipientEmail, inlineConfig } = req.body;
+    const { recipientEmail, testSubject, testMessage, subject, message } = req.body || {};
     if (!recipientEmail || typeof recipientEmail !== "string" || !recipientEmail.includes("@")) {
-      return res.status(400).json({ success: false, error: "A valid recipient email address is required for the diagnostic test." });
+      return res.status(400).json({
+        success: false,
+        stage: "VALIDATION",
+        error: "A valid recipient email address is required for the diagnostic test."
+      });
     }
 
     const targetRecipient = recipientEmail.trim();
 
-    // Use current stored configuration or merge with inline test inputs
+    // Use saved platform email configuration from server store
     const current = serverMemoryStore.platform_email_config || {};
-    const cfg = {
-      provider: inlineConfig?.provider || current.provider || "smtp",
-      smtpHost: inlineConfig?.smtpHost || current.smtpHost || (process.env.SMTP_HOST && !process.env.SMTP_HOST.includes("sendgrid") ? process.env.SMTP_HOST : "scamspike.com"),
-      smtpPort: inlineConfig?.smtpPort ? parseInt(inlineConfig.smtpPort) : (current.smtpPort || 465),
-      smtpUser: inlineConfig?.smtpUser || current.smtpUser || process.env.SMTP_USER || "marketforge@scamspike.com",
-      smtpPass: (inlineConfig?.smtpPassword && inlineConfig.smtpPassword.trim() && !inlineConfig.smtpPassword.includes("••••")) 
-        ? inlineConfig.smtpPassword.trim() 
-        : (current.smtpPass || process.env.SMTP_PASS || "MkForge_2026_SecurePass!"),
-      smtpSecurity: inlineConfig?.smtpSecurity || current.smtpSecurity || "ssl",
-      senderName: inlineConfig?.senderName || current.senderName || "MarketForge Operations",
-      senderEmail: inlineConfig?.senderEmail || current.senderEmail || process.env.SMTP_FROM_EMAIL || "marketforge@scamspike.com",
-      replyToEmail: inlineConfig?.replyToEmail || current.replyToEmail || "support@marketforge.scamspike.com",
-      sendgridApiKey: (inlineConfig?.sendgridApiKey && inlineConfig.sendgridApiKey.trim() && !inlineConfig.sendgridApiKey.includes("••••"))
-        ? inlineConfig.sendgridApiKey.trim()
-        : (current.sendgridApiKey || process.env.SENDGRID_API_KEY || ""),
-      resendApiKey: (inlineConfig?.resendApiKey && inlineConfig.resendApiKey.trim() && !inlineConfig.resendApiKey.includes("••••"))
-        ? inlineConfig.resendApiKey.trim()
-        : (current.resendApiKey || process.env.RESEND_API_KEY || ""),
-      enableProductionEmail: inlineConfig?.enableProductionEmail !== undefined ? Boolean(inlineConfig.enableProductionEmail) : (current.enableProductionEmail !== false)
-    };
+    const provider = (current.provider || "smtp").toLowerCase();
+    const senderName = current.senderName || "MarketForge Operations";
+    const senderEmail = current.senderEmail || process.env.SMTP_FROM_EMAIL || "marketforge@scamspike.com";
+    const replyToEmail = current.replyToEmail || "support@marketforge.scamspike.com";
+    const enableProductionEmail = current.enableProductionEmail !== false;
 
-    const isSecure = cfg.smtpSecurity === "ssl" || cfg.smtpPort === 465;
+    // Formatting subject & content
+    const finalSubject = (testSubject || subject || "").trim() || "⚡ [MarketForge Diagnostics] Transactional Mail Relay Verification";
+    const userCustomMessage = (testMessage || message || "").trim();
 
-    const emailSubject = `⚡ [MarketForge Diagnostics] Transactional Mail Relay Verification`;
+    const isSecure = (current.smtpSecurity || "ssl") === "ssl" || (current.smtpPort || 465) === 465;
+
     const emailHtml = `
       <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; padding: 40px 20px; background-color: #f8fafc; margin: 0 auto; color: #1e293b;">
         <div style="max-width: 580px; margin: 0 auto; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
@@ -1644,39 +1636,49 @@ app.post("/api/superadmin/platform-email/test", requireAuth, requireRole(["super
               ⚡ MarketForge OS
             </h1>
             <p style="color: #94a3b8; margin: 6px 0 0 0; font-size: 12px; font-weight: 500;">
-              Platform Outbound Email Diagnostic Handshake
+              Super Admin Standalone Diagnostic Email Verification
             </p>
           </div>
           
           <div style="padding: 32px;">
             <div style="display: inline-block; padding: 6px 12px; background-color: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 9999px; color: #065f46; font-size: 12px; font-weight: 600; margin-bottom: 16px;">
-              ✓ Diagnostic Connection Verified
+              ✓ Diagnostic Transport Verified
             </div>
             
             <h2 style="color: #0f172a; margin: 0 0 12px 0; font-size: 18px; font-weight: 700;">
-              Your Platform Mail Relay is Active!
+              ${finalSubject}
             </h2>
-            <p style="font-size: 14px; color: #475569; line-height: 1.6; margin: 0 0 20px 0;">
-              This diagnostic message confirms that your platform transactional email transport is correctly configured and successfully delivering outbound system notifications, tenant onboarding invitations, and security reset links.
-            </p>
+            
+            ${userCustomMessage ? `
+              <div style="background-color: #f8fafc; border-left: 4px solid #4f46e5; padding: 14px 18px; margin: 16px 0 20px 0; border-radius: 4px; font-size: 14px; color: #334155; line-height: 1.6;">
+                <p style="margin: 0; font-weight: 600; color: #0f172a; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Test Message Body:</p>
+                <div style="white-space: pre-wrap;">${userCustomMessage.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</div>
+              </div>
+            ` : `
+              <p style="font-size: 14px; color: #475569; line-height: 1.6; margin: 0 0 20px 0;">
+                This standalone diagnostic message confirms that your saved platform transactional email gateway is operating properly and accepting outbound system transmissions.
+              </p>
+            `}
             
             <div style="background-color: #f1f5f9; border-radius: 10px; padding: 16px; font-size: 13px; color: #334155; line-height: 1.8; margin-bottom: 24px;">
-              <div><strong>Email Provider:</strong> <span style="font-family: monospace; text-transform: uppercase;">${cfg.provider}</span></div>
-              <div><strong>Host / Endpoint:</strong> <span style="font-family: monospace;">${cfg.smtpHost}:${cfg.smtpPort}</span></div>
-              <div><strong>Security Protocol:</strong> <span style="font-family: monospace;">${cfg.smtpSecurity.toUpperCase()} (${isSecure ? 'Implicit SSL' : 'Explicit STARTTLS'})</span></div>
-              <div><strong>Sender Identity:</strong> ${cfg.senderName} &lt;${cfg.senderEmail}&gt;</div>
+              <div><strong>Gateway Provider:</strong> <span style="font-family: monospace; text-transform: uppercase; font-weight: 700;">${provider}</span></div>
+              ${provider === "smtp" ? `
+                <div><strong>SMTP Host / Port:</strong> <span style="font-family: monospace;">${current.smtpHost || "scamspike.com"}:${current.smtpPort || 465}</span></div>
+                <div><strong>Security Protocol:</strong> <span style="font-family: monospace;">${(current.smtpSecurity || "ssl").toUpperCase()} (${isSecure ? 'Implicit SSL' : 'Explicit STARTTLS'})</span></div>
+              ` : ''}
+              <div><strong>Sender Identity:</strong> ${senderName} &lt;${senderEmail}&gt;</div>
               <div><strong>Target Recipient:</strong> ${targetRecipient}</div>
-              <div><strong>Handshake Timestamp:</strong> ${new Date().toISOString()}</div>
+              <div><strong>Dispatched At:</strong> ${new Date().toISOString()}</div>
             </div>
 
             <p style="font-size: 12px; color: #64748b; line-height: 1.5; margin: 0;">
-              If you received this message, no further configuration is required for tenant onboarding or system notifications.
+              Note: This test was initiated as an isolated diagnostic operation by Super Admin. No tenant or account records were modified.
             </p>
           </div>
           
           <div style="background-color: #f8fafc; padding: 16px 32px; border-top: 1px solid #e2e8f0; text-align: center;">
             <p style="color: #94a3b8; font-size: 11px; margin: 0;">
-              MarketForge Operating System • Platform Governance &amp; Telemetry
+              MarketForge Operating System • Platform Governance &amp; Diagnostic Telemetry
             </p>
           </div>
         </div>
@@ -1685,89 +1687,117 @@ app.post("/api/superadmin/platform-email/test", requireAuth, requireRole(["super
 
     let testResult: any = null;
 
-    if (!cfg.enableProductionEmail || cfg.provider === "simulator") {
-      // Simulator dispatch
+    if (!enableProductionEmail || provider === "simulator") {
+      // Simulator Dispatch
       const simProvider = new SimulatorEmailProvider();
-      await simProvider.send(targetRecipient, emailSubject, emailHtml, cfg.senderName);
+      const simRes = await simProvider.send(targetRecipient, finalSubject, emailHtml, senderName);
       testResult = {
         success: true,
         provider: "simulator",
+        recipient: targetRecipient,
+        messageAccepted: true,
+        timestamp: new Date().toISOString(),
+        messageId: simRes.messageId,
         latencyMs: Date.now() - startTime,
-        message: `Simulated diagnostic email successfully logged for ${targetRecipient}. (Sandbox / Simulator Mode active)`,
+        message: `Simulated diagnostic email successfully captured in Sandbox store for ${targetRecipient}.`,
         details: {
           provider: "Sandbox Simulator",
           recipient: targetRecipient,
-          sender: `${cfg.senderName} <${cfg.senderEmail}>`,
+          sender: `${senderName} <${senderEmail}>`,
+          messageId: simRes.messageId,
           timestamp: new Date().toISOString()
         }
       };
-    } else if (cfg.provider === "sendgrid") {
-      if (!cfg.sendgridApiKey || !cfg.sendgridApiKey.startsWith("SG.")) {
+    } else if (provider === "resend") {
+      const apiKey = current.resendApiKey || process.env.RESEND_API_KEY;
+      if (!apiKey || !apiKey.startsWith("re_")) {
         return res.status(400).json({
           success: false,
-          stage: "SENDGRID_CONFIG",
-          latencyMs: Date.now() - startTime,
-          error: "Invalid SendGrid API Key. Keys must start with 'SG.'",
-          recommendation: "Generate a valid SendGrid Full Access or Mail Send API key in your SendGrid console."
-        });
-      }
-      const sgProvider = new SendGridEmailProvider(cfg.sendgridApiKey, cfg.senderEmail);
-      await sgProvider.send(targetRecipient, emailSubject, emailHtml, cfg.senderName);
-      testResult = {
-        success: true,
-        provider: "sendgrid",
-        latencyMs: Date.now() - startTime,
-        message: `Successfully relayed diagnostic email via SendGrid Cloud API to ${targetRecipient}!`,
-        details: {
-          provider: "SendGrid Web API",
+          provider: "resend",
           recipient: targetRecipient,
-          sender: `${cfg.senderName} <${cfg.senderEmail}>`,
-          timestamp: new Date().toISOString()
-        }
-      };
-    } else if (cfg.provider === "resend") {
-      if (!cfg.resendApiKey || !cfg.resendApiKey.startsWith("re_")) {
-        return res.status(400).json({
-          success: false,
           stage: "RESEND_CONFIG",
           latencyMs: Date.now() - startTime,
-          error: "Invalid Resend API Key. Keys must start with 're_'",
-          recommendation: "Provide a valid Resend API key from your Resend dashboard."
+          error: "Resend API Key is missing or invalid in the saved platform configuration. Keys must start with 're_'.",
+          recommendation: "Save a valid Resend API key in Super Admin Email & SMTP Configuration before testing."
         });
       }
-      const resendProvider = new ResendEmailProvider(cfg.resendApiKey, cfg.senderEmail);
-      await resendProvider.send(targetRecipient, emailSubject, emailHtml, cfg.senderName);
+      const resendProvider = new ResendEmailProvider(apiKey, senderEmail);
+      const resendRes = await resendProvider.send(targetRecipient, finalSubject, emailHtml, senderName);
       testResult = {
         success: true,
         provider: "resend",
+        recipient: targetRecipient,
+        messageAccepted: true,
+        timestamp: new Date().toISOString(),
+        messageId: resendRes.messageId,
         latencyMs: Date.now() - startTime,
-        message: `Successfully relayed diagnostic email via Resend API to ${targetRecipient}!`,
+        message: `Successfully accepted and dispatched by Resend HTTPS API to ${targetRecipient}!`,
         details: {
           provider: "Resend REST API",
           recipient: targetRecipient,
-          sender: `${cfg.senderName} <${cfg.senderEmail}>`,
+          sender: `${senderName} <${senderEmail}>`,
+          messageId: resendRes.messageId,
+          timestamp: new Date().toISOString()
+        }
+      };
+    } else if (provider === "sendgrid") {
+      const apiKey = current.sendgridApiKey || process.env.SENDGRID_API_KEY;
+      if (!apiKey || !apiKey.startsWith("SG.")) {
+        return res.status(400).json({
+          success: false,
+          provider: "sendgrid",
+          recipient: targetRecipient,
+          stage: "SENDGRID_CONFIG",
+          latencyMs: Date.now() - startTime,
+          error: "SendGrid API Key is missing or invalid in the saved platform configuration. Keys must start with 'SG.'.",
+          recommendation: "Save a valid SendGrid API key in Super Admin Email & SMTP Configuration before testing."
+        });
+      }
+      const sgProvider = new SendGridEmailProvider(apiKey, senderEmail);
+      const sgRes = await sgProvider.send(targetRecipient, finalSubject, emailHtml, senderName);
+      testResult = {
+        success: true,
+        provider: "sendgrid",
+        recipient: targetRecipient,
+        messageAccepted: true,
+        timestamp: new Date().toISOString(),
+        messageId: (sgRes as any).messageId || `sg_${Date.now()}`,
+        latencyMs: Date.now() - startTime,
+        message: `Successfully accepted and dispatched by SendGrid Cloud API to ${targetRecipient}!`,
+        details: {
+          provider: "SendGrid Web API",
+          recipient: targetRecipient,
+          sender: `${senderName} <${senderEmail}>`,
+          messageId: (sgRes as any).messageId,
           timestamp: new Date().toISOString()
         }
       };
     } else {
-      // SMTP Relay Provider
-      if (!cfg.smtpHost || !cfg.smtpUser || !cfg.smtpPass) {
+      // SMTP Provider
+      const smtpHost = current.smtpHost || (process.env.SMTP_HOST && !process.env.SMTP_HOST.includes("sendgrid") ? process.env.SMTP_HOST : "scamspike.com");
+      const smtpPort = current.smtpPort || 465;
+      const smtpUser = current.smtpUser || process.env.SMTP_USER || "marketforge@scamspike.com";
+      const smtpPass = current.smtpPass || process.env.SMTP_PASS || "MkForge_2026_SecurePass!";
+
+      if (!smtpHost || !smtpUser || !smtpPass) {
         return res.status(400).json({
           success: false,
-          stage: "SMTP_RESOLVE",
+          provider: "smtp",
+          recipient: targetRecipient,
+          stage: "SMTP_CONFIG",
           latencyMs: Date.now() - startTime,
-          error: "Incomplete SMTP configuration. Host, Username, and Password are required.",
-          recommendation: "Fill out the SMTP Host, Username, and Password before running the test."
+          error: "Incomplete saved SMTP configuration. Host, Username, and Password are required.",
+          recommendation: "Fill out and save the SMTP Host, Username, and Password in Platform Email Settings."
         });
       }
 
       const transporter = nodemailer.createTransport({
-        host: cfg.smtpHost,
-        port: cfg.smtpPort,
+        host: smtpHost,
+        port: smtpPort,
         secure: isSecure,
         auth: {
-          user: cfg.smtpUser,
-          pass: cfg.smtpPass
+          user: smtpUser,
+          pass: smtpPass
         },
         tls: { rejectUnauthorized: false },
         connectionTimeout: 9000,
@@ -1780,23 +1810,28 @@ app.post("/api/superadmin/platform-email/test", requireAuth, requireRole(["super
 
       // Dispatch mail
       const mailInfo = await transporter.sendMail({
-        from: `"${cfg.senderName}" <${cfg.senderEmail}>`,
+        from: `"${senderName}" <${senderEmail}>`,
         to: targetRecipient,
-        replyTo: cfg.replyToEmail || undefined,
-        subject: emailSubject,
+        replyTo: replyToEmail || undefined,
+        subject: finalSubject,
         html: emailHtml
       });
 
       testResult = {
         success: true,
         provider: "smtp",
+        recipient: targetRecipient,
+        messageAccepted: true,
+        timestamp: new Date().toISOString(),
+        messageId: mailInfo.messageId,
+        response: mailInfo.response,
         latencyMs: Date.now() - startTime,
         message: `Successfully relayed live SMTP diagnostic email to ${targetRecipient}!`,
         details: {
-          provider: `SMTP (${cfg.smtpHost}:${cfg.smtpPort})`,
-          security: cfg.smtpSecurity.toUpperCase(),
+          provider: `SMTP (${smtpHost}:${smtpPort})`,
+          security: (current.smtpSecurity || "ssl").toUpperCase(),
           recipient: targetRecipient,
-          sender: `"${cfg.senderName}" <${cfg.senderEmail}>`,
+          sender: `"${senderName}" <${senderEmail}>`,
           messageId: mailInfo.messageId,
           response: mailInfo.response,
           timestamp: new Date().toISOString()
@@ -1804,7 +1839,7 @@ app.post("/api/superadmin/platform-email/test", requireAuth, requireRole(["super
       };
     }
 
-    // Update memory status
+    // Update memory status tracking
     if (serverMemoryStore.platform_email_config) {
       serverMemoryStore.platform_email_config.lastTestStatus = "SUCCESS";
       serverMemoryStore.platform_email_config.lastTestedAt = new Date().toISOString();
@@ -1816,15 +1851,19 @@ app.post("/api/superadmin/platform-email/test", requireAuth, requireRole(["super
   } catch (err: any) {
     const elapsed = Date.now() - startTime;
     // Map sanitized error for user feedback - never leak credentials
-    const cleanErrMsg = (err.message || "Connection refused").replace(/password=[^&\s]+/gi, "password=***");
+    const cleanErrMsg = (err.message || "Connection refused").replace(/password=[^&\s]+/gi, "password=***").replace(/key=[^&\s]+/gi, "key=***");
     let rec = "Ensure host and credentials are valid and port is accessible.";
     if (cleanErrMsg.includes("535") || cleanErrMsg.includes("EAUTH") || cleanErrMsg.includes("authentication")) {
       rec = "Authentication failed: Please check your SMTP Username and Password.";
-    } else if (cleanErrMsg.includes("ECONNREFUSED") || cleanErrMsg.includes("ETIMEDOUT")) {
-      rec = "Connection timed out or was refused. Check your SMTP host, port, and security settings (SSL on 465, TLS on 587).";
-    } else if (cleanErrMsg.includes("sender") || cleanErrMsg.includes("550")) {
-      rec = "Sender address verification failed: Ensure the Sender Email is verified with your mail provider.";
+    } else if (cleanErrMsg.includes("ECONNREFUSED") || cleanErrMsg.includes("ETIMEDOUT") || cleanErrMsg.includes("ENETUNREACH")) {
+      rec = "Connection timed out or network was unreachable. If using Cloudflare, ensure DNS proxy is set to DNS-only (Gray Cloud).";
+    } else if (cleanErrMsg.includes("sender") || cleanErrMsg.includes("550") || cleanErrMsg.includes("domain")) {
+      rec = "Sender address verification failed: Ensure the Sender Email domain is verified with your mail provider.";
+    } else if (cleanErrMsg.includes("Resend API")) {
+      rec = "Resend API rejected the request. Ensure your API key has send permissions and your sending domain is verified in Resend.";
     }
+
+    const currentProvider = serverMemoryStore.platform_email_config?.provider || "smtp";
 
     if (serverMemoryStore.platform_email_config) {
       serverMemoryStore.platform_email_config.lastTestStatus = "FAILED";
@@ -1835,6 +1874,8 @@ app.post("/api/superadmin/platform-email/test", requireAuth, requireRole(["super
 
     return res.json({
       success: false,
+      provider: currentProvider,
+      recipient: req.body?.recipientEmail || "",
       stage: "DISPATCH_HANDSHAKE",
       latencyMs: elapsed,
       error: cleanErrMsg,
@@ -6726,9 +6767,19 @@ app.post("/api/admin/email/test-dispatch", async (req, res) => {
 
     const dispatchResult = await sendRealEmail(targetRecipient, emailSubject, htmlBody, fromName || "MarketForge System Diagnostics", "admin-diagnostic");
 
+    if (dispatchResult.failoverOccurred || dispatchResult.provider === "sandbox-simulator") {
+      const lastErr = (global as any).emailSmtpErrors?.[0]?.error || "Live SMTP socket connection timed out or was unreachable (Cloudflare HTTP proxy blocking raw port 465/587).";
+      return res.json({
+        success: false,
+        message: `Live SMTP delivery failed: ${lastErr}. Message was redirected to Sandbox Simulator.`,
+        error: `Live SMTP Socket Error: ${lastErr}. If using Cloudflare, switch the mail DNS record to 'DNS Only' (Gray Cloud).`,
+        result: dispatchResult
+      });
+    }
+
     res.json({
       success: true,
-      message: "Diagnostic email dispatched through active routing pipeline.",
+      message: `Diagnostic email successfully dispatched to live inbox (${targetRecipient}) via ${dispatchResult.provider}.`,
       result: dispatchResult
     });
   } catch (err: any) {

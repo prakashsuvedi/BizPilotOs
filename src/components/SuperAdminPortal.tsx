@@ -478,6 +478,15 @@ export default function SuperAdminPortal({
   const [saDomainVerified, setSaDomainVerified] = useState<boolean>(true);
   const [saDomainVerificationMsg, setSaDomainVerificationMsg] = useState<string | null>(null);
   const [saIsSavingSettings, setSaIsSavingSettings] = useState<boolean>(false);
+  const [saIsDispatchingTest, setSaIsDispatchingTest] = useState<boolean>(false);
+  const [saTestDispatchResult, setSaTestDispatchResult] = useState<{
+    success: boolean;
+    message?: string;
+    error?: string;
+    provider?: string;
+    latencyMs?: number;
+    timestamp?: string;
+  } | null>(null);
 
   const handleSaveSmtpSettings = async () => {
     setSaIsSavingSettings(true);
@@ -500,7 +509,7 @@ export default function SuperAdminPortal({
         setSaDomainVerificationMsg(`✅ Saved SMTP credentials & verified domain identity [${saSenderDomain}]!`);
         addAuditEntry('system', 'low', `Updated SMTP mail settings & verified sender domain [${saSenderDomain}]`);
       } else {
-        setSaDomainVerificationMsg(`⚠️ Failed to save settings: ${data.error}`);
+        setSaDomainVerificationMsg(`⚠️ Failed to save settings: ${data.error || 'Server error'}`);
       }
     } catch (err: any) {
       setSaDomainVerificationMsg(`Error: ${err.message}`);
@@ -524,6 +533,8 @@ export default function SuperAdminPortal({
       if (data.success) {
         setSaDomainVerified(true);
         setSaDomainVerificationMsg(`🟢 Domain [${data.domain}] DNS Verified! MX, SPF, & DKIM records active.`);
+      } else {
+        setSaDomainVerificationMsg(`Domain verification notice: ${data.error || 'Check DNS records'}`);
       }
     } catch (err: any) {
       setSaDomainVerificationMsg(`Domain verification error: ${err.message}`);
@@ -533,25 +544,56 @@ export default function SuperAdminPortal({
   };
 
   const handleTestDispatchEmail = async () => {
-    if (!saTestRecipient) return;
+    const target = saTestRecipient.trim();
+    if (!target) {
+      setSaTestDispatchResult({
+        success: false,
+        error: "Please enter a valid recipient email address before dispatching."
+      });
+      return;
+    }
+
+    setSaIsDispatchingTest(true);
+    setSaTestDispatchResult(null);
+
+    const startTime = Date.now();
     try {
       const resp = await fetch('/api/admin/email/test-dispatch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          recipient: saTestRecipient,
+          recipient: target,
           subject: `MarketForge Custom Domain Verification - ${saSenderDomain}`,
           fromName: `MarketForge (${saSenderDomain})`
         })
       });
+
       const data = await resp.json();
-      if (data.success) {
-        alert(`✉️ Test invitation email dispatched to ${saTestRecipient}!\nProvider: ${data.result?.provider || 'SMTP Relay'}\nLatency: ${data.result?.latencyMs || 150}ms`);
+      const latencyMs = Date.now() - startTime;
+
+      if (resp.ok && data.success) {
+        setSaTestDispatchResult({
+          success: true,
+          message: `✉️ Test email dispatched successfully to ${target}!`,
+          provider: data.result?.provider || 'SMTP Relay Engine',
+          latencyMs: data.result?.latencyMs || latencyMs,
+          timestamp: new Date().toLocaleTimeString()
+        });
+        addAuditEntry('system', 'low', `Dispatched test email to [${target}] via ${data.result?.provider || 'SMTP'}`);
       } else {
-        alert(`Failed to dispatch email: ${data.error}`);
+        setSaTestDispatchResult({
+          success: false,
+          error: data.error || data.message || "Failed to dispatch test email. Please check SMTP host/credentials or DNS routing.",
+          latencyMs
+        });
       }
     } catch (err: any) {
-      alert(`Error dispatching test email: ${err.message}`);
+      setSaTestDispatchResult({
+        success: false,
+        error: err.message || "Network error dispatching test email."
+      });
+    } finally {
+      setSaIsDispatchingTest(false);
     }
   };
 
@@ -6500,19 +6542,60 @@ async function shareBriefToLinkedIn(clientId, briefUrl, textPayload) {
                     <input 
                       type="email" 
                       value={saTestRecipient}
-                      onChange={(e) => setSaTestRecipient(e.target.value)}
-                      placeholder="e.g. sidad44178@applamos.com"
+                      onChange={(e) => {
+                        setSaTestRecipient(e.target.value);
+                        if (saTestDispatchResult) setSaTestDispatchResult(null);
+                      }}
+                      placeholder="e.g. prakashsuvedi@gmail.com"
                       className="w-full bg-white border border-slate-300 px-3 py-2 text-xs rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
                     />
                   </div>
 
                   <button 
+                    type="button"
                     onClick={handleTestDispatchEmail}
-                    className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl cursor-pointer transition flex items-center justify-center gap-2 shadow-sm"
+                    disabled={saIsDispatchingTest}
+                    className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 active:scale-[0.99] text-white font-bold text-xs rounded-xl cursor-pointer transition flex items-center justify-center gap-2 shadow-sm hover:shadow-md disabled:opacity-50"
                   >
-                    <Send className="w-3.5 h-3.5 text-indigo-400" />
-                    <span>Dispatch Test Email to Verified Domain</span>
+                    {saIsDispatchingTest ? (
+                      <RotateCw className="w-3.5 h-3.5 text-indigo-400 animate-spin" />
+                    ) : (
+                      <Send className="w-3.5 h-3.5 text-indigo-400" />
+                    )}
+                    <span>{saIsDispatchingTest ? 'Dispatching Test Email...' : 'Dispatch Test Email to Verified Domain'}</span>
                   </button>
+
+                  {/* Inline Test Result Feedback */}
+                  {saTestDispatchResult && (
+                    <div className={`p-3 rounded-xl border text-xs space-y-1.5 animate-fade-in ${
+                      saTestDispatchResult.success 
+                        ? 'bg-emerald-50 border-emerald-200 text-emerald-900' 
+                        : 'bg-rose-50 border-rose-200 text-rose-950'
+                    }`}>
+                      <div className="flex items-center gap-2 font-bold text-xs">
+                        {saTestDispatchResult.success ? (
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                        ) : (
+                          <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+                        )}
+                        <span>{saTestDispatchResult.success ? 'Test Email Accepted & Dispatched' : 'Test Email Dispatch Failed'}</span>
+                        {saTestDispatchResult.latencyMs !== undefined && (
+                          <span className="ml-auto font-mono text-[10px] bg-white/80 border px-1.5 py-0.5 rounded">
+                            {saTestDispatchResult.latencyMs}ms
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] leading-relaxed">
+                        {saTestDispatchResult.message || saTestDispatchResult.error}
+                      </p>
+                      {saTestDispatchResult.provider && (
+                        <div className="text-[10px] font-mono text-slate-600 pt-0.5 border-t border-slate-200/60 flex items-center justify-between">
+                          <span>Driver: {saTestDispatchResult.provider}</span>
+                          <span>Timestamp: {saTestDispatchResult.timestamp}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
               </div>
