@@ -59,8 +59,193 @@ import {
   KeyRound,
   Eye,
   EyeOff,
-  X
+  X,
+  Fingerprint,
+  Activity,
+  Cpu,
+  Shield,
+  Workflow
 } from 'lucide-react';
+
+// ==========================================
+// BESPOKE AI & HUMAN PARTNERSHIP ILLUSTRATION
+// ==========================================
+export const AiHumanPartnershipVector = ({ className = "w-full h-auto" }: { className?: string }) => (
+  <svg viewBox="0 0 520 180" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
+    <defs>
+      {/* Background Gradients */}
+      <linearGradient id="humanArmGrad" x1="0%" y1="50%" x2="100%" y2="50%">
+        <stop offset="0%" stopColor="#3B82F6" stopOpacity="0.1" />
+        <stop offset="50%" stopColor="#6366F1" stopOpacity="0.8" />
+        <stop offset="100%" stopColor="#EC4899" stopOpacity="0.9" />
+      </linearGradient>
+      <linearGradient id="aiArmGrad" x1="100%" y1="50%" x2="0%" y2="50%">
+        <stop offset="0%" stopColor="#8B5CF6" stopOpacity="0.1" />
+        <stop offset="50%" stopColor="#06B6D4" stopOpacity="0.85" />
+        <stop offset="100%" stopColor="#38BDF8" stopOpacity="1" />
+      </linearGradient>
+      <radialGradient id="nexusGlow" cx="50%" cy="50%" r="50%">
+        <stop offset="0%" stopColor="#38BDF8" stopOpacity="1" />
+        <stop offset="30%" stopColor="#818CF8" stopOpacity="0.7" />
+        <stop offset="70%" stopColor="#A855F7" stopOpacity="0.2" />
+        <stop offset="100%" stopColor="transparent" stopOpacity="0" />
+      </radialGradient>
+      <filter id="glowEffect" x="-30%" y="-30%" width="160%" height="160%">
+        <feGaussianBlur stdDeviation="6" result="blur" />
+        <feComposite in="SourceGraphic" in2="blur" operator="over" />
+      </filter>
+      <filter id="subtleGlow" x="-20%" y="-20%" width="140%" height="140%">
+        <feGaussianBlur stdDeviation="2.5" result="blur" />
+        <feComposite in="SourceGraphic" in2="blur" operator="over" />
+      </filter>
+    </defs>
+
+    {/* Atmospheric Background Grid Lines & Circuitry */}
+    <g opacity="0.25" stroke="#6366F1" strokeWidth="1" strokeDasharray="3 3">
+      <line x1="20" y1="90" x2="500" y2="90" />
+      <line x1="140" y1="30" x2="140" y2="150" />
+      <line x1="260" y1="20" x2="260" y2="160" />
+      <line x1="380" y1="30" x2="380" y2="150" />
+      <circle cx="260" cy="90" r="60" stroke="#38BDF8" strokeWidth="1" strokeDasharray="4 4" />
+      <circle cx="260" cy="90" r="35" stroke="#A855F7" strokeWidth="1" />
+    </g>
+
+    {/* LEFT SIDE: HUMAN EXECUTIVE ARM & ORGANIC BIO-SYNAPSE FLOW */}
+    <g>
+      {/* Arm Silhouette & Contours */}
+      <path 
+        d="M20,115 C70,115 110,110 150,105 C180,100 205,96 235,92 C242,90 250,88 255,90 L255,98 C248,99 238,102 225,108 C195,120 160,126 120,126 C75,126 40,123 20,120 Z" 
+        fill="url(#humanArmGrad)" 
+        opacity="0.7"
+      />
+      <path 
+        d="M20,65 C60,65 100,70 140,78 C170,83 200,88 230,86 C242,85 252,86 256,90 C250,94 240,94 228,95 C195,96 160,90 120,84 C70,76 35,74 20,74 Z" 
+        fill="url(#humanArmGrad)" 
+        opacity="0.85"
+      />
+      {/* Human Fingers Clasping */}
+      <path d="M228,82 C236,78 248,78 258,84 C262,87 266,92 264,96 C262,100 255,103 248,101" stroke="#F472B6" strokeWidth="2.5" strokeLinecap="round" filter="url(#subtleGlow)" />
+      <path d="M232,88 C242,86 254,88 262,94 C264,96 265,100 260,104 C255,106 248,105 242,103" stroke="#F43F5E" strokeWidth="2.5" strokeLinecap="round" />
+      <path d="M225,95 C236,94 248,96 254,102 C256,105 254,109 248,111 C242,112 236,109 230,106" stroke="#FB7185" strokeWidth="2" strokeLinecap="round" />
+      <path d="M218,102 C228,102 240,105 246,110 C248,113 245,116 240,117 C234,117 227,114 220,110" stroke="#FDA4AF" strokeWidth="2" strokeLinecap="round" />
+      
+      {/* Synaptic Light Nodes on Human Side */}
+      <circle cx="80" cy="95" r="3" fill="#EC4899" filter="url(#subtleGlow)" />
+      <line x1="80" y1="95" x2="130" y2="88" stroke="#F472B6" strokeWidth="1.5" opacity="0.6" />
+      <circle cx="130" cy="88" r="3.5" fill="#F43F5E" filter="url(#subtleGlow)" />
+      <line x1="130" y1="88" x2="190" y2="92" stroke="#FDA4AF" strokeWidth="1.5" opacity="0.6" />
+      <circle cx="190" cy="92" r="4" fill="#F472B6" filter="url(#glowEffect)" />
+      <line x1="190" y1="92" x2="235" y2="90" stroke="#F43F5E" strokeWidth="2" />
+    </g>
+
+    {/* RIGHT SIDE: CYBERNETIC AI ROBOTIC ARM & QUANTUM DATA CIRCUITS */}
+    <g>
+      {/* AI Robotic Geometric Arm Plate */}
+      <path 
+        d="M500,115 C450,115 410,110 370,105 C340,100 315,96 285,92 C278,90 270,88 265,90 L265,98 C272,99 282,102 295,108 C325,120 360,126 400,126 C445,126 480,123 500,120 Z" 
+        fill="url(#aiArmGrad)" 
+        opacity="0.75"
+      />
+      <path 
+        d="M500,65 C460,65 420,70 380,78 C350,83 320,88 290,86 C278,85 268,86 264,90 C270,94 280,94 292,95 C325,96 360,90 400,84 C450,76 485,74 500,74 Z" 
+        fill="url(#aiArmGrad)" 
+        opacity="0.9"
+      />
+      
+      {/* AI Robotic Joints & Mechanical Segments */}
+      <rect x="420" y="78" width="12" height="24" rx="3" fill="#1E1B4B" stroke="#38BDF8" strokeWidth="1.5" />
+      <rect x="350" y="82" width="14" height="20" rx="3" fill="#0F172A" stroke="#06B6D4" strokeWidth="1.5" />
+      <circle cx="295" cy="92" r="5" fill="#0E7490" stroke="#38BDF8" strokeWidth="2" filter="url(#subtleGlow)" />
+      
+      {/* AI Robotic Fingers Clasping */}
+      <path d="M292,82 C284,78 272,78 262,84 C258,87 254,92 256,96 C258,100 265,103 272,101" stroke="#38BDF8" strokeWidth="2.5" strokeLinecap="round" filter="url(#subtleGlow)" />
+      <path d="M288,88 C278,86 266,88 258,94 C256,96 255,100 260,104 C265,106 272,105 278,103" stroke="#06B6D4" strokeWidth="2.5" strokeLinecap="round" />
+      <path d="M295,95 C284,94 272,96 266,102 C264,105 266,109 272,111 C278,112 284,109 290,106" stroke="#22D3EE" strokeWidth="2" strokeLinecap="round" />
+      <path d="M302,102 C292,102 280,105 274,110 C272,113 275,116 280,117 C286,117 293,114 300,110" stroke="#67E8F9" strokeWidth="2" strokeLinecap="round" />
+
+      {/* Cyber Circuit Traces */}
+      <path d="M480,95 L440,95 L420,85 L365,85 L345,95 L300,92" stroke="#38BDF8" strokeWidth="1.5" strokeDasharray="4 2" />
+      <circle cx="440" cy="95" r="3" fill="#38BDF8" filter="url(#subtleGlow)" />
+      <circle cx="365" cy="85" r="3.5" fill="#22D3EE" filter="url(#subtleGlow)" />
+      <circle cx="300" cy="92" r="4" fill="#06B6D4" filter="url(#glowEffect)" />
+    </g>
+
+    {/* CENTER QUANTUM HANDSHAKE NEXUS */}
+    <g>
+      {/* Radial Energy Burst */}
+      <circle cx="260" cy="92" r="28" fill="url(#nexusGlow)" filter="url(#glowEffect)" opacity="0.9" />
+      <circle cx="260" cy="92" r="14" fill="#FFFFFF" filter="url(#glowEffect)" />
+      <circle cx="260" cy="92" r="5" fill="#38BDF8" />
+
+      {/* Cross Spark Flare */}
+      <line x1="260" y1="55" x2="260" y2="129" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" filter="url(#subtleGlow)" />
+      <line x1="225" y1="92" x2="295" y2="92" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" filter="url(#subtleGlow)" />
+      <line x1="238" y1="70" x2="282" y2="114" stroke="#38BDF8" strokeWidth="1.5" strokeLinecap="round" opacity="0.8" />
+      <line x1="238" y1="114" x2="282" y2="70" stroke="#EC4899" strokeWidth="1.5" strokeLinecap="round" opacity="0.8" />
+
+      {/* Orbiting Quantum Particles */}
+      <circle cx="242" cy="74" r="2.5" fill="#F472B6" filter="url(#subtleGlow)" />
+      <circle cx="278" cy="110" r="2.5" fill="#38BDF8" filter="url(#subtleGlow)" />
+      <circle cx="280" cy="76" r="2" fill="#22D3EE" filter="url(#subtleGlow)" />
+      <circle cx="240" cy="108" r="2" fill="#FB7185" filter="url(#subtleGlow)" />
+    </g>
+
+    {/* Floating HUD Labels */}
+    <g fontFamily="monospace" fontSize="9" fontWeight="bold" letterSpacing="1">
+      <text x="35" y="45" fill="#F472B6" opacity="0.9">HUMAN STRATEGIC VISION</text>
+      <text x="340" y="45" fill="#38BDF8" opacity="0.9">AUTONOMOUS AI EXECUTION</text>
+      <text x="200" y="160" fill="#E2E8F0" opacity="0.8" fontSize="8.5">✦ QUANTUM TRUST NEXUS ✦</text>
+    </g>
+  </svg>
+);
+
+export const AiHumanPartnershipCard = () => (
+  <div className="w-full bg-gradient-to-b from-[#0B0F24]/90 via-[#070918]/90 to-[#040612]/95 border border-indigo-500/30 hover:border-cyan-500/40 rounded-2xl p-3 sm:p-4 relative overflow-hidden transition group shadow-xl backdrop-blur-xl">
+    {/* Ambient Corner Accents */}
+    <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/10 rounded-full blur-2xl pointer-events-none" />
+    <div className="absolute bottom-0 left-0 w-32 h-32 bg-purple-500/10 rounded-full blur-2xl pointer-events-none" />
+
+    {/* Top Header Row */}
+    <div className="flex items-center justify-between gap-2 border-b border-white/10 pb-2 mb-2">
+      <div className="flex items-center gap-2">
+        <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse shadow-[0_0_8px_rgba(6,182,212,0.8)]" />
+        <span className="text-[10px] sm:text-[11px] font-mono font-extrabold uppercase tracking-widest text-cyan-300">
+          Human + AI Strategic Synergy
+        </span>
+      </div>
+      <span className="text-[9px] font-mono font-bold uppercase tracking-wider bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 px-2 py-0.5 rounded-full">
+        Autonomous OS v4.8
+      </span>
+    </div>
+
+    {/* Central Bespoke Vector Graphic */}
+    <div className="w-full py-0.5 relative">
+      <AiHumanPartnershipVector className="w-full h-auto max-h-[110px] object-contain drop-shadow-[0_4px_20px_rgba(56,189,248,0.25)]" />
+    </div>
+
+    {/* Tagline & Metric Chips */}
+    <div className="space-y-2 pt-1 relative z-10 font-sans">
+      <p className="text-[11px] text-slate-300 leading-relaxed font-medium">
+        Empowering leadership with 24/7 autonomous agents across CRM, SDR pipeline, treasury, and multi-branch operations.
+      </p>
+
+      <div className="grid grid-cols-3 gap-2 pt-0.5 font-mono text-[10px]">
+        <div className="bg-[#050816]/90 border border-white/10 rounded-xl p-1.5 text-center">
+          <div className="text-cyan-400 font-extrabold text-[11px]">99.98%</div>
+          <div className="text-slate-400 text-[8.5px] truncate">Model Precision</div>
+        </div>
+        <div className="bg-[#050816]/90 border border-white/10 rounded-xl p-1.5 text-center">
+          <div className="text-purple-400 font-extrabold text-[11px]">10x Speed</div>
+          <div className="text-slate-400 text-[8.5px] truncate">Ops Velocity</div>
+        </div>
+        <div className="bg-[#050816]/90 border border-white/10 rounded-xl p-1.5 text-center">
+          <div className="text-emerald-400 font-extrabold text-[11px]">Zero-Trust</div>
+          <div className="text-slate-400 text-[8.5px] truncate">Data Isolation</div>
+        </div>
+      </div>
+    </div>
+  </div>
+);
 
 export const MarketForgeEmblemIcon = ({ className = "w-8 h-8", glow = true }: { className?: string; glow?: boolean }) => {
   return (
@@ -1072,82 +1257,124 @@ export default function LoginPortal({ onLogin, tenantsList, onActivateTenant }: 
       </div>
 
       {/* MAIN AUTH CORE GRID - BALANCED DUAL FRAME LAYOUT */}
-      <div className="max-w-7xl mx-auto w-full grid grid-cols-1 lg:grid-cols-2 gap-8 items-stretch z-10 py-6 md:py-10">
+      <div className="max-w-7xl mx-auto w-full grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8 items-stretch z-10 py-4 md:py-8">
         
-        {/* LEFT COLUMN: BRAND VALUE PROP & LOGO FRAME */}
-        <div className="bg-[#0B0D19]/90 border border-indigo-500/30 rounded-3xl p-6 md:p-8 shadow-2xl backdrop-blur-2xl relative overflow-hidden flex flex-col justify-between h-full space-y-6">
+        {/* LEFT COLUMN: BRAND VALUE PROP, UNIFIED ENTERPRISE CORE & LOGO FRAME */}
+        <div className="bg-[#0B0D19]/90 border border-indigo-500/30 rounded-3xl p-5 sm:p-7 shadow-2xl backdrop-blur-2xl relative overflow-hidden flex flex-col justify-between h-full space-y-4">
           <div className="absolute top-0 left-0 w-64 h-64 bg-cyan-600/10 blur-3xl pointer-events-none rounded-full" />
+          <div className="absolute bottom-0 right-0 w-64 h-64 bg-indigo-600/10 blur-3xl pointer-events-none rounded-full" />
 
           {/* Full Official Uploaded Brand Logo Frame */}
-          <div className="w-full bg-[#070814]/80 border border-white/10 rounded-2xl p-6 flex flex-col items-center justify-center relative overflow-hidden group shadow-inner">
+          <div className="w-full bg-[#070814]/90 border border-white/10 rounded-2xl p-4 sm:p-5 flex flex-col items-center justify-center relative overflow-hidden group shadow-inner">
             <div className="absolute top-2 right-3">
-              <span className="text-[9px] font-mono font-bold uppercase tracking-widest text-cyan-400 bg-cyan-500/10 px-2.5 py-0.5 rounded border border-cyan-500/20">
+              <span className="text-[9px] font-mono font-bold uppercase tracking-widest text-cyan-400 bg-cyan-500/10 px-2.5 py-0.5 rounded border border-cyan-500/20 flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
                 Primary Platform Branding
               </span>
             </div>
             <MarketForgeLogo variant="full" className="w-full max-w-md h-auto py-2 filter drop-shadow-[0_8px_25px_rgba(56,189,248,0.35)] transition group-hover:scale-[1.01]" />
           </div>
 
-          <div className="space-y-3 relative z-10">
+          {/* Unified Architecture Overview */}
+          <div className="space-y-2 relative z-10">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 text-xs font-mono font-extrabold uppercase tracking-wider">
               <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
               Unified Enterprise Architecture
             </div>
 
-            <p className="text-slate-300 text-xs md:text-sm leading-relaxed font-sans">
-              MarketForge OS unifies CRM &amp; Pipeline, AI SDR Autopilot, HR &amp; Payroll, Treasury Finance, Double-Entry Ledger, POS &amp; Multi-Warehouse Inventory, Digital Marketing, and Multi-Branch Management into one autonomous platform.
+            <p className="text-slate-300 text-xs leading-relaxed font-sans">
+              MarketForge OS replaces 15+ disjointed subscriptions by consolidating CRM &amp; Pipeline, AI SDR Autopilot, HR &amp; Payroll, Double-Entry Treasury, POS &amp; Multi-Warehouse Inventory, and Multi-Branch Management into one secure, zero-trust core.
             </p>
           </div>
 
-          {/* Capability Highlight Cards */}
-          <div className="space-y-3 pt-1 font-sans relative z-10">
-            <div className="p-3 bg-[#070814]/70 border border-white/10 hover:border-indigo-500/40 rounded-2xl flex items-start gap-3 transition group">
-              <div className="w-8 h-8 rounded-xl bg-purple-500/20 border border-purple-500/30 text-purple-300 flex items-center justify-center shrink-0">
-                <Bot className="w-4 h-4" />
+          {/* Core Enterprise Capabilities Grid - 6 Pillars */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 font-sans relative z-10">
+            <div className="p-3 bg-[#070814]/80 border border-white/10 hover:border-indigo-500/40 rounded-xl transition group">
+              <div className="flex items-center gap-2 mb-1.5">
+                <div className="w-6 h-6 rounded-lg bg-purple-500/20 border border-purple-500/30 text-purple-300 flex items-center justify-center shrink-0">
+                  <Bot className="w-3.5 h-3.5" />
+                </div>
+                <h4 className="text-xs font-bold text-white group-hover:text-indigo-300 transition">Autonomous AI SDRs</h4>
               </div>
-              <div>
-                <h4 className="text-xs font-bold text-white group-hover:text-indigo-300 transition">Autonomous AI Autopilot &amp; SDRs</h4>
-                <p className="text-[11px] text-slate-400 leading-snug">Research prospects, auto-draft cold email sequences, and qualify 24/7 sales inbound.</p>
-              </div>
+              <p className="text-[10px] text-slate-400 leading-snug">Auto-draft cold email campaigns &amp; qualify inbound sales leads 24/7.</p>
             </div>
 
-            <div className="p-3 bg-[#070814]/70 border border-white/10 hover:border-indigo-500/40 rounded-2xl flex items-start gap-3 transition group">
-              <div className="w-8 h-8 rounded-xl bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 flex items-center justify-center shrink-0">
-                <CreditCard className="w-4 h-4" />
+            <div className="p-3 bg-[#070814]/80 border border-white/10 hover:border-indigo-500/40 rounded-xl transition group">
+              <div className="flex items-center gap-2 mb-1.5">
+                <div className="w-6 h-6 rounded-lg bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 flex items-center justify-center shrink-0">
+                  <CreditCard className="w-3.5 h-3.5" />
+                </div>
+                <h4 className="text-xs font-bold text-white group-hover:text-emerald-300 transition">1-Click Payroll &amp; Tax</h4>
               </div>
-              <div>
-                <h4 className="text-xs font-bold text-white group-hover:text-emerald-300 transition">1-Click Global Payroll &amp; Finance</h4>
-                <p className="text-[11px] text-slate-400 leading-snug">Automated direct deposits, tax deductions, 90-day cashflow models &amp; double-entry ledger.</p>
-              </div>
+              <p className="text-[10px] text-slate-400 leading-snug">Automated salary disbursements, tax withholdings &amp; double-entry ledger.</p>
             </div>
 
-            <div className="p-3 bg-[#070814]/70 border border-white/10 hover:border-indigo-500/40 rounded-2xl flex items-start gap-3 transition group">
-              <div className="w-8 h-8 rounded-xl bg-cyan-500/20 border border-cyan-500/30 text-cyan-300 flex items-center justify-center shrink-0">
-                <Building2 className="w-4 h-4" />
+            <div className="p-3 bg-[#070814]/80 border border-white/10 hover:border-indigo-500/40 rounded-xl transition group">
+              <div className="flex items-center gap-2 mb-1.5">
+                <div className="w-6 h-6 rounded-lg bg-cyan-500/20 border border-cyan-500/30 text-cyan-300 flex items-center justify-center shrink-0">
+                  <Building2 className="w-3.5 h-3.5" />
+                </div>
+                <h4 className="text-xs font-bold text-white group-hover:text-cyan-300 transition">POS &amp; Multi-Branch HQ</h4>
               </div>
-              <div>
-                <h4 className="text-xs font-bold text-white group-hover:text-cyan-300 transition">Omnichannel POS &amp; Multi-Branch HQ</h4>
-                <p className="text-[11px] text-slate-400 leading-snug">Barcode scanners, multi-warehouse stock allocations, and consolidated branch P&amp;Ls.</p>
+              <p className="text-[10px] text-slate-400 leading-snug">Multi-warehouse stock allocations, barcode terminal &amp; branch P&amp;Ls.</p>
+            </div>
+
+            <div className="p-3 bg-[#070814]/80 border border-white/10 hover:border-indigo-500/40 rounded-xl transition group">
+              <div className="flex items-center gap-2 mb-1.5">
+                <div className="w-6 h-6 rounded-lg bg-amber-500/20 border border-amber-500/30 text-amber-300 flex items-center justify-center shrink-0">
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                </div>
+                <h4 className="text-xs font-bold text-white group-hover:text-amber-300 transition">Zero-Trust Isolation</h4>
               </div>
+              <p className="text-[10px] text-slate-400 leading-snug">Multi-tenant database segregation with role-based access control.</p>
+            </div>
+          </div>
+
+          {/* Engine Real-Time Telemetry Bar */}
+          <div className="p-3 bg-[#070814]/90 border border-white/10 rounded-xl relative z-10 flex items-center justify-between gap-2 text-[10px] font-mono text-slate-400">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+              <span className="text-white font-bold">Autonomous Engine Status:</span>
+              <span className="text-emerald-400">Nominal 100%</span>
+            </div>
+            <div className="hidden sm:flex items-center gap-2 text-slate-400">
+              <span>Latency: <strong className="text-cyan-300">&lt;45ms</strong></span>
+              <span>•</span>
+              <span>Encrypted: <strong className="text-indigo-300">AES-256</strong></span>
             </div>
           </div>
 
           {/* Trust Footnote */}
-          <div className="flex items-center gap-4 text-xs font-mono text-slate-400 border-t border-white/10 pt-4 relative z-10">
+          <div className="flex items-center justify-between text-xs font-mono text-slate-400 border-t border-white/10 pt-3 relative z-10">
             <span className="flex items-center gap-1.5"><ShieldCheck className="w-4 h-4 text-indigo-400" /> SOC2 Type II Certified</span>
             <span className="flex items-center gap-1.5"><Zap className="w-4 h-4 text-amber-400" /> 15+ SaaS Replaced</span>
+            <span className="hidden sm:flex items-center gap-1.5 text-cyan-400"><Cpu className="w-4 h-4" /> 100% Neural Autopilot</span>
           </div>
 
         </div>
 
-        {/* RIGHT COLUMN: INTERACTIVE AUTH FORM CARD */}
-        <div className="bg-[#0B0D19]/90 border border-indigo-500/30 rounded-3xl p-6 md:p-8 shadow-2xl backdrop-blur-2xl relative overflow-hidden flex flex-col justify-between h-full space-y-6">
+        {/* RIGHT COLUMN: INTERACTIVE AUTH FORM CARD WITH AI & HUMAN SYNERGY FRAME */}
+        <div className="bg-[#0B0D19]/90 border border-indigo-500/30 rounded-3xl p-5 sm:p-7 shadow-2xl backdrop-blur-2xl relative overflow-hidden flex flex-col space-y-4 h-full">
           
           {/* Ambient Inner Glow */}
           <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-600/10 blur-3xl pointer-events-none rounded-full" />
+          <div className="absolute bottom-0 left-0 w-48 h-48 bg-cyan-600/10 blur-3xl pointer-events-none rounded-full" />
+
+          {/* AI ZERO-TRUST GATEWAY TELEMETRY STRIP */}
+          <div className="flex items-center justify-between gap-2 px-3.5 py-2 rounded-xl bg-[#070918]/90 border border-indigo-500/30 text-[10px] sm:text-[11px] font-mono text-indigo-300 relative z-10 shadow-inner">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_rgba(52,211,153,0.8)]" />
+              <span className="font-bold text-slate-200">Zero-Trust Ingress Online</span>
+            </div>
+            <div className="flex items-center gap-2 text-[10px] text-slate-400">
+              <span className="text-cyan-300 flex items-center gap-1"><Cpu className="w-3 h-3 text-cyan-400" /> AI Autopilot Active</span>
+              <span>•</span>
+              <span className="text-emerald-300 flex items-center gap-1"><ShieldCheck className="w-3 h-3 text-emerald-400" /> 256-Bit TLS</span>
+            </div>
+          </div>
 
           {/* PORTAL TAB CHANGE CONTROLS */}
-          <div className="grid grid-cols-2 gap-1.5 bg-black/50 p-1.5 rounded-2xl border border-white/10 relative z-10">
+          <div className="grid grid-cols-2 gap-1.5 bg-black/60 p-1.5 rounded-2xl border border-white/10 relative z-10">
             <button
               onClick={() => {
                 setActiveTab('tenant');
@@ -1161,7 +1388,7 @@ export default function LoginPortal({ onLogin, tenantsList, onActivateTenant }: 
                   : 'text-slate-400 hover:text-white'
               }`}
             >
-              <Building2 className="w-4 h-4" />
+              <Building2 className="w-4 h-4 text-indigo-300" />
               Tenant Workspace
             </button>
             <button
@@ -1177,9 +1404,14 @@ export default function LoginPortal({ onLogin, tenantsList, onActivateTenant }: 
                   : 'text-slate-400 hover:text-white'
               }`}
             >
-              <ShieldCheck className="w-4 h-4" />
+              <ShieldCheck className="w-4 h-4 text-emerald-300" />
               Super Admin Entrance
             </button>
+          </div>
+
+          {/* AI & HUMAN STRATEGIC PARTNERSHIP FRAME INTEGRATED ON WORKSPACE SIDE */}
+          <div className="relative z-10">
+            <AiHumanPartnershipCard />
           </div>
 
           {tenantError && (
@@ -1571,42 +1803,102 @@ export default function LoginPortal({ onLogin, tenantsList, onActivateTenant }: 
                       </div>
                     )}
                     <div className="space-y-1.5">
-                      <label className="text-[10px] uppercase font-mono font-bold text-slate-400">Target Workspace Client</label>
-                      <select
-                        value={tenantId}
-                        onChange={(e) => {
-                          setTenantId(e.target.value);
-                          if (e.target.value === 'demo-tenant') setTenantEmail('owner@democorp.com');
-                          else if (e.target.value === 'sienna-tenant') setTenantEmail('evelyn@siennaclay.com');
-                          else if (e.target.value === 'solas-tenant') setTenantEmail('ops@solas.io');
-                          else if (e.target.value === 'alpha-tenant') setTenantEmail('founder@alpha.io');
-                        }}
-                        className="w-full bg-black/40 border border-white/10 text-white rounded-xl px-3.5 py-2.5 text-xs font-medium focus:outline-none focus:border-indigo-500"
-                      >
-                        <option value="auto">Auto-Detect Workspace</option>
-                        {(discoveredWorkspaces.length > 0 ? discoveredWorkspaces : tenantsList).map(t => (
-                          <option key={t.id} value={t.id}>
-                            {t.name} (Workspace: {t.id})
-                          </option>
-                        ))}
-                      </select>
+                      <div className="flex justify-between items-center">
+                        <label className="text-[10px] uppercase font-mono font-bold text-slate-400 flex items-center gap-1.5">
+                          <Building2 className="w-3.5 h-3.5 text-indigo-400" />
+                          <span>Target Workspace Client</span>
+                        </label>
+                        <span className="text-[9px] font-mono font-bold text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded border border-cyan-500/20">
+                          Auto-Routing
+                        </span>
+                      </div>
+                      <div className="relative">
+                        <select
+                          value={tenantId}
+                          onChange={(e) => {
+                            setTenantId(e.target.value);
+                            if (e.target.value === 'demo-tenant') setTenantEmail('owner@democorp.com');
+                            else if (e.target.value === 'sienna-tenant') setTenantEmail('evelyn@siennaclay.com');
+                            else if (e.target.value === 'solas-tenant') setTenantEmail('ops@solas.io');
+                            else if (e.target.value === 'alpha-tenant') setTenantEmail('founder@alpha.io');
+                          }}
+                          className="w-full bg-[#070918]/90 border border-white/15 hover:border-indigo-500/50 text-white rounded-xl pl-9 pr-4 py-2.5 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-400 transition"
+                        >
+                          <option value="auto">Auto-Detect Workspace</option>
+                          {(discoveredWorkspaces.length > 0 ? discoveredWorkspaces : tenantsList).map(t => (
+                            <option key={t.id} value={t.id}>
+                              {t.name} (Workspace: {t.id})
+                            </option>
+                          ))}
+                        </select>
+                        <Building2 className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      </div>
+
+                      {/* Quick Fast-Access Workspace Presets */}
+                      <div className="flex items-center gap-1.5 flex-wrap pt-1">
+                        <span className="text-[10px] font-mono text-slate-400 flex items-center gap-1">
+                          <Zap className="w-3 h-3 text-amber-400" /> Demo Presets:
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setTenantId('demo-tenant');
+                            setTenantEmail('owner@democorp.com');
+                            setTenantPassword('DemoCorp2026!');
+                          }}
+                          className="px-2 py-0.5 bg-indigo-500/10 hover:bg-indigo-500/25 text-indigo-300 border border-indigo-500/30 rounded-lg text-[10px] font-mono transition cursor-pointer"
+                        >
+                          Demo Corp (HQ)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setTenantId('sienna-tenant');
+                            setTenantEmail('evelyn@siennaclay.com');
+                            setTenantPassword('SiennaClay2026!');
+                          }}
+                          className="px-2 py-0.5 bg-cyan-500/10 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-500/30 rounded-lg text-[10px] font-mono transition cursor-pointer"
+                        >
+                          Sienna &amp; Clay
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setTenantId('solas-tenant');
+                            setTenantEmail('ops@solas.io');
+                            setTenantPassword('SolasSupply2026!');
+                          }}
+                          className="px-2 py-0.5 bg-emerald-500/10 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 rounded-lg text-[10px] font-mono transition cursor-pointer"
+                        >
+                          Solas Global
+                        </button>
+                      </div>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-1.5">
-                        <label className="text-[10px] uppercase font-mono font-bold text-slate-400">Authorized Email or Username</label>
-                        <input
-                          type="text"
-                          value={tenantEmail}
-                          onChange={(e) => setTenantEmail(e.target.value)}
-                          placeholder="e.g. user@company.com"
-                          className="w-full bg-black/40 border border-white/10 text-white text-xs rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-indigo-500"
-                          required
-                        />
+                        <label className="text-[10px] uppercase font-mono font-bold text-slate-400 flex items-center gap-1">
+                          <Mail className="w-3 h-3 text-indigo-400" />
+                          <span>Authorized Email or Username</span>
+                        </label>
+                        <div className="relative">
+                          <input
+                            type="text"
+                            value={tenantEmail}
+                            onChange={(e) => setTenantEmail(e.target.value)}
+                            placeholder="e.g. user@company.com"
+                            className="w-full bg-[#070918]/90 border border-white/15 hover:border-indigo-500/50 text-white text-xs rounded-xl pl-9 pr-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-400 transition"
+                            required
+                          />
+                          <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                        </div>
                       </div>
                       <div className="space-y-1.5">
                         <div className="flex justify-between items-center">
-                          <label className="text-[10px] uppercase font-mono font-bold text-slate-400">Password</label>
+                          <label className="text-[10px] uppercase font-mono font-bold text-slate-400 flex items-center gap-1">
+                            <Lock className="w-3 h-3 text-indigo-400" />
+                            <span>Password</span>
+                          </label>
                           <button
                             type="button"
                             onClick={() => {
@@ -1625,9 +1917,10 @@ export default function LoginPortal({ onLogin, tenantsList, onActivateTenant }: 
                             value={tenantPassword}
                             onChange={(e) => setTenantPassword(e.target.value)}
                             placeholder="••••••••"
-                            className="w-full bg-black/40 border border-white/10 text-white text-xs rounded-xl pl-3.5 pr-10 py-2.5 focus:outline-none focus:border-indigo-500"
+                            className="w-full bg-[#070918]/90 border border-white/15 hover:border-indigo-500/50 text-white text-xs rounded-xl pl-9 pr-10 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-400 transition"
                             required
                           />
+                          <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                           <button
                             type="button"
                             onClick={() => setShowTenantPassword(!showTenantPassword)}
@@ -1643,7 +1936,7 @@ export default function LoginPortal({ onLogin, tenantsList, onActivateTenant }: 
                     <button
                       type="submit"
                       disabled={isTenantAuthenticating}
-                      className="w-full py-3.5 bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-extrabold text-xs rounded-xl flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-indigo-600/20 border border-indigo-400/30 transition transform hover:-translate-y-0.5 disabled:opacity-80"
+                      className="w-full py-3.5 bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-extrabold text-xs rounded-xl flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-indigo-600/25 border border-indigo-400/40 transition transform hover:-translate-y-0.5 disabled:opacity-80 group"
                     >
                       {isTenantAuthenticating ? (
                         <>
@@ -1653,23 +1946,23 @@ export default function LoginPortal({ onLogin, tenantsList, onActivateTenant }: 
                       ) : (
                         <>
                           <span>Authorize and Enter Workspace</span>
-                          <ArrowRight className="w-4 h-4" />
+                          <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
                         </>
                       )}
                     </button>
 
-                    <div className="relative my-4 flex items-center justify-center">
+                    <div className="relative my-3.5 flex items-center justify-center">
                       <div className="absolute inset-0 flex items-center">
                         <div className="w-full border-t border-white/10" />
                       </div>
-                      <span className="relative bg-[#0B0D19] px-3 text-[10px] font-mono text-slate-500 uppercase tracking-widest">Or Connect with Google</span>
+                      <span className="relative bg-[#0B0D19] px-3 text-[10px] font-mono text-slate-500 uppercase tracking-widest">Or Connect with Google SSO</span>
                     </div>
 
                     <button
                       type="button"
                       disabled={isTenantAuthenticating}
                       onClick={() => handleGoogleLogin()}
-                      className="w-full py-3 bg-white hover:bg-slate-100 text-slate-950 font-black text-xs rounded-xl flex items-center justify-center gap-2 cursor-pointer shadow transition disabled:opacity-70"
+                      className="w-full py-3 bg-white hover:bg-slate-100 text-slate-950 font-black text-xs rounded-xl flex items-center justify-center gap-2.5 cursor-pointer shadow transition disabled:opacity-70"
                     >
                       {isTenantAuthenticating ? (
                         <>
@@ -1964,13 +2257,13 @@ export default function LoginPortal({ onLogin, tenantsList, onActivateTenant }: 
             )}
 
             {/* TOP ENTERPRISE CLIENTS SHOWCASE */}
-            <div className="pt-4 border-t border-white/10 space-y-3 relative z-10 font-sans">
+            <div className="pt-3.5 border-t border-white/10 space-y-2.5 relative z-10 font-sans">
               <div className="flex items-center justify-between text-[11px]">
                 <span className="flex items-center gap-1.5 font-mono text-xs font-extrabold text-cyan-300 uppercase tracking-wider">
                   <Building2 className="w-3.5 h-3.5 text-cyan-400" />
                   Top Enterprise Clients
                 </span>
-                <span className="text-[10px] font-mono text-slate-400">Trusted Industry Leaders</span>
+                <span className="text-[10px] font-mono text-slate-400">⚡ Live Production Workspaces</span>
               </div>
 
               <div className="grid grid-cols-2 gap-2 text-left">
@@ -1985,7 +2278,7 @@ export default function LoginPortal({ onLogin, tenantsList, onActivateTenant }: 
                         setTenantPassword(client.password);
                       }
                     }}
-                    className="p-2.5 bg-[#070814]/80 hover:bg-indigo-500/10 border border-white/10 hover:border-indigo-500/40 rounded-2xl transition text-left group cursor-pointer flex items-center gap-2.5"
+                    className="p-2 bg-[#070814]/90 hover:bg-indigo-500/15 border border-white/10 hover:border-indigo-500/40 rounded-xl transition text-left group cursor-pointer flex items-center gap-2"
                   >
                     <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-500/20 to-purple-500/20 border border-white/15 flex items-center justify-center shrink-0 font-bold text-xs text-indigo-300">
                       {client.logoUrl ? (
@@ -1996,13 +2289,26 @@ export default function LoginPortal({ onLogin, tenantsList, onActivateTenant }: 
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="text-xs font-bold text-white group-hover:text-indigo-300 transition truncate">{client.name}</div>
-                      <div className="text-[10px] text-slate-400 flex items-center gap-1 truncate">
+                      <div className="text-[9px] text-slate-400 flex items-center gap-1 truncate">
                         <span className="truncate">{client.category}</span>
                         {client.metric && <span className="text-cyan-400 font-mono font-bold shrink-0">• {client.metric}</span>}
                       </div>
                     </div>
                   </button>
                 ))}
+              </div>
+
+              {/* SECURITY & COMPLIANCE BADGE STRIP */}
+              <div className="pt-2 flex items-center justify-between text-[10px] font-mono text-slate-400 border-t border-white/5 flex-wrap gap-2">
+                <div className="flex items-center gap-1 text-emerald-400">
+                  <ShieldCheck className="w-3 h-3 text-emerald-400" />
+                  <span className="font-bold">SOC-2 &amp; ISO 27001 Certified</span>
+                </div>
+                <div className="flex items-center gap-2 text-[9px] text-slate-400">
+                  <span>AES-256 GCM</span>
+                  <span>•</span>
+                  <span>99.99% Uptime SLA</span>
+                </div>
               </div>
             </div>
 
