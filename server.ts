@@ -1554,6 +1554,19 @@ app.post("/api/superadmin/platform-email", requireAuth, requireRole(["super_admi
 
     serverMemoryStore.platform_email_config = updatedConfig;
 
+    // Sync process.env flags for system-wide consistency
+    process.env.EMAIL_PROVIDER = cleanProvider;
+    if (updatedConfig.enableProductionEmail) {
+      process.env.EMAIL_MODE = "production";
+    }
+    if (updatedResendKey && updatedResendKey.startsWith("re_")) {
+      process.env.RESEND_API_KEY = updatedResendKey;
+      process.env.RESEND_FROM_EMAIL = cleanSenderEmail;
+    }
+    if (updatedSendgridKey && updatedSendgridKey.startsWith("SG.")) {
+      process.env.SENDGRID_API_KEY = updatedSendgridKey;
+    }
+
     // Persist securely
     try {
       await saveToSaaSStore("platform_settings", "email_config", updatedConfig, "demo-tenant", (req as any).user?.email || "super_admin");
@@ -1602,8 +1615,9 @@ app.post("/api/superadmin/platform-email", requireAuth, requireRole(["super_admi
 // POST /api/superadmin/platform-email/test (Dedicated Standalone Diagnostic Test Email Dispatcher)
 app.post("/api/superadmin/platform-email/test", requireAuth, requireRole(["super_admin"]), async (req: express.Request, res: express.Response) => {
   const startTime = Date.now();
+  let requestedProvider = "smtp";
   try {
-    const { recipientEmail, testSubject, testMessage, subject, message } = req.body || {};
+    const { recipientEmail, testSubject, testMessage, subject, message, provider: bodyProvider, resendApiKey: bodyResendKey, senderEmail: bodySenderEmail, senderName: bodySenderName } = req.body || {};
     if (!recipientEmail || typeof recipientEmail !== "string" || !recipientEmail.includes("@")) {
       return res.status(400).json({
         success: false,
@@ -1614,11 +1628,12 @@ app.post("/api/superadmin/platform-email/test", requireAuth, requireRole(["super
 
     const targetRecipient = recipientEmail.trim();
 
-    // Use saved platform email configuration from server store
+    // Use saved platform email configuration or test payload overrides
     const current = serverMemoryStore.platform_email_config || {};
-    const provider = (current.provider || "smtp").toLowerCase();
-    const senderName = current.senderName || "MarketForge Operations";
-    const senderEmail = current.senderEmail || process.env.SMTP_FROM_EMAIL || "marketforge@scamspike.com";
+    requestedProvider = (bodyProvider || current.provider || "smtp").toLowerCase();
+    const provider = requestedProvider;
+    const senderName = bodySenderName || current.senderName || "MarketForge Operations";
+    const senderEmail = bodySenderEmail || current.senderEmail || (provider === "resend" ? "noreply@marketforge.scamspike.com" : (process.env.SMTP_FROM_EMAIL || "marketforge@scamspike.com"));
     const replyToEmail = current.replyToEmail || "support@marketforge.scamspike.com";
     const enableProductionEmail = current.enableProductionEmail !== false;
 
@@ -1709,7 +1724,7 @@ app.post("/api/superadmin/platform-email/test", requireAuth, requireRole(["super
         }
       };
     } else if (provider === "resend") {
-      const apiKey = current.resendApiKey || process.env.RESEND_API_KEY;
+      const apiKey = (bodyResendKey && !bodyResendKey.includes("••••")) ? bodyResendKey.trim() : (current.resendApiKey || process.env.RESEND_API_KEY);
       if (!apiKey || !apiKey.startsWith("re_")) {
         return res.status(400).json({
           success: false,
@@ -1717,29 +1732,46 @@ app.post("/api/superadmin/platform-email/test", requireAuth, requireRole(["super
           recipient: targetRecipient,
           stage: "RESEND_CONFIG",
           latencyMs: Date.now() - startTime,
-          error: "Resend API Key is missing or invalid in the saved platform configuration. Keys must start with 're_'.",
-          recommendation: "Save a valid Resend API key in Super Admin Email & SMTP Configuration before testing."
+          error: "Resend API Key is missing or invalid. Key must start with 're_'. Configure and save your API key in Email Settings before testing.",
+          recommendation: "Obtain an API key starting with 're_' from your Resend dashboard (https://resend.com/api-keys) and save it in Email Settings."
         });
       }
-      const resendProvider = new ResendEmailProvider(apiKey, senderEmail);
-      const resendRes = await resendProvider.send(targetRecipient, finalSubject, emailHtml, senderName);
-      testResult = {
-        success: true,
-        provider: "resend",
-        recipient: targetRecipient,
-        messageAccepted: true,
-        timestamp: new Date().toISOString(),
-        messageId: resendRes.messageId,
-        latencyMs: Date.now() - startTime,
-        message: `Successfully accepted and dispatched by Resend HTTPS API to ${targetRecipient}!`,
-        details: {
-          provider: "Resend REST API",
+
+      try {
+        const resendProvider = new ResendEmailProvider(apiKey, senderEmail);
+        const resendRes = await resendProvider.send(targetRecipient, finalSubject, emailHtml, senderName);
+        testResult = {
+          success: true,
+          provider: "resend",
           recipient: targetRecipient,
-          sender: `${senderName} <${senderEmail}>`,
+          messageAccepted: true,
+          timestamp: new Date().toISOString(),
           messageId: resendRes.messageId,
-          timestamp: new Date().toISOString()
-        }
-      };
+          latencyMs: Date.now() - startTime,
+          message: `Successfully accepted and dispatched by Resend HTTPS API to ${targetRecipient}!`,
+          details: {
+            provider: "Resend HTTPS API",
+            recipient: targetRecipient,
+            sender: `${senderName} <${senderEmail}>`,
+            messageId: resendRes.messageId,
+            timestamp: new Date().toISOString()
+          }
+        };
+      } catch (resendErr: any) {
+        const elapsed = Date.now() - startTime;
+        const errStr = resendErr.message || "Resend API Error";
+        return res.status(400).json({
+          success: false,
+          provider: "resend",
+          recipient: targetRecipient,
+          stage: "RESEND_DISPATCH",
+          latencyMs: elapsed,
+          error: errStr,
+          recommendation: errStr.includes("domain") 
+            ? "Ensure your sender email domain (e.g. @marketforge.scamspike.com) is verified in your Resend account." 
+            : "Verify that your Resend API key is active and has sending permissions."
+        });
+      }
     } else if (provider === "sendgrid") {
       const apiKey = current.sendgridApiKey || process.env.SENDGRID_API_KEY;
       if (!apiKey || !apiKey.startsWith("SG.")) {
@@ -1859,11 +1891,11 @@ app.post("/api/superadmin/platform-email/test", requireAuth, requireRole(["super
       rec = "Connection timed out or network was unreachable. If using Cloudflare, ensure DNS proxy is set to DNS-only (Gray Cloud).";
     } else if (cleanErrMsg.includes("sender") || cleanErrMsg.includes("550") || cleanErrMsg.includes("domain")) {
       rec = "Sender address verification failed: Ensure the Sender Email domain is verified with your mail provider.";
-    } else if (cleanErrMsg.includes("Resend API")) {
+    } else if (cleanErrMsg.includes("Resend API") || cleanErrMsg.includes("resend")) {
       rec = "Resend API rejected the request. Ensure your API key has send permissions and your sending domain is verified in Resend.";
     }
 
-    const currentProvider = serverMemoryStore.platform_email_config?.provider || "smtp";
+    const currentProvider = requestedProvider || serverMemoryStore.platform_email_config?.provider || "smtp";
 
     if (serverMemoryStore.platform_email_config) {
       serverMemoryStore.platform_email_config.lastTestStatus = "FAILED";
@@ -6410,28 +6442,50 @@ export class ResendEmailProvider implements EmailProvider {
   name = "resend";
   constructor(private apiKey: string, private fromEmail: string) {}
 
-  async send(to: string, subject: string, htmlBody: string, displayName: string) {
+  async send(to: string, subject: string, htmlBody: string, displayName: string): Promise<{ success: boolean; provider: string; messageId?: string }> {
+    if (!this.apiKey || !this.apiKey.startsWith("re_")) {
+      throw new Error("Resend API Key is missing or invalid. Key must start with 're_'. Configure it in Super Admin Email Settings.");
+    }
+
+    let sender = (this.fromEmail || "").trim();
+    if (!sender || !sender.includes("@")) {
+      sender = "noreply@marketforge.scamspike.com";
+    }
+
+    const payload = {
+      from: `"${displayName || 'MarketForge Operations'}" <${sender}>`,
+      to: [to],
+      subject: subject,
+      html: htmlBody
+    };
+
+    console.log(`[Resend HTTPS API] Sending email to ${to} from ${sender} (Subject: "${subject}")`);
+
     const response = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${this.apiKey}`,
+        "Authorization": `Bearer ${this.apiKey.trim()}`,
         "Content-Type": "application/json"
       },
-      body: JSON.stringify({
-        from: `"${displayName}" <${this.fromEmail}>`,
-        to: [to],
-        subject: subject,
-        html: htmlBody
-      })
+      body: JSON.stringify(payload)
     });
+
     if (!response.ok) {
       const errText = await response.text();
-      const resendErr = new Error(`Resend API response was not OK: ${errText}`);
+      let parsedErr: any = null;
+      try { parsedErr = JSON.parse(errText); } catch (_) {}
+      const errMsg = parsedErr?.message || parsedErr?.error || errText;
+      console.warn(`[Resend HTTPS API Error] Status ${response.status}: ${errMsg}`);
+      const resendErr = new Error(`Resend API Error (${response.status}): ${errMsg}`);
       (resendErr as any).httpStatus = response.status;
       (resendErr as any).providerResponse = errText;
       throw resendErr;
     }
-    return { success: true, provider: "resend" };
+
+    const data: any = await response.json().catch(() => ({}));
+    const messageId = data?.id || `resend_${Date.now()}`;
+    console.log(`[Resend HTTPS API Success] Dispatched successfully. Message ID: ${messageId}`);
+    return { success: true, provider: "resend", messageId };
   }
 }
 
@@ -6600,9 +6654,12 @@ async function sendRealEmail(to: string, subject: string, htmlBody: string, from
   const isExplicitSandbox = (process.env.EMAIL_MODE || "sandbox").toLowerCase() === "sandbox" || process.env.EMAIL_PROVIDER === "simulator";
   const isProductionEnabled = platformCfg.enableProductionEmail !== false;
 
+  // Determine active provider
+  const preferredProvider = (customConfig?.provider || platformCfg.provider || "smtp").toLowerCase();
+
   // Resolve config keys
   const resendKey = customConfig?.resendApiKey || platformCfg.resendApiKey || (process.env.RESEND_API_KEY && process.env.RESEND_API_KEY !== "YOUR_RESEND_KEY" ? process.env.RESEND_API_KEY : undefined);
-  const resendFrom = customConfig?.resendFromEmail || platformCfg.senderEmail || process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev";
+  const resendFrom = customConfig?.resendFromEmail || platformCfg.senderEmail || process.env.RESEND_FROM_EMAIL || "noreply@marketforge.scamspike.com";
 
   const globalCfg = (global as any).globalSmtpConfig;
   const sgKey = customConfig?.sendgridApiKey || platformCfg.sendgridApiKey || (process.env.SENDGRID_API_KEY && process.env.SENDGRID_API_KEY !== "YOUR_SENDGRID_KEY" ? process.env.SENDGRID_API_KEY : undefined);
@@ -6618,23 +6675,31 @@ async function sendRealEmail(to: string, subject: string, htmlBody: string, from
 
   const displayName = fromName || customConfig?.displayName || platformCfg.senderName || (tenantId === "sienna-tenant" ? "Sienna Studio" : (tenantId === "solas-tenant" ? "Solas Spa" : "MarketForge Operations"));
 
-  // Determine active provider
-  const preferredProvider = customConfig?.provider || platformCfg.provider || "smtp";
-
   // Build Drivers
   let primaryDriver: EmailProvider;
   if ((isExplicitSandbox && !customConfig) || !isProductionEnabled || preferredProvider === "simulator") {
     primaryDriver = new SimulatorEmailProvider();
-  } else if (preferredProvider === "sendgrid" && sgKey && sgKey.startsWith("SG.")) {
-    primaryDriver = new SendGridEmailProvider(sgKey, sgFrom);
-  } else if (preferredProvider === "resend" && resendKey && resendKey.startsWith("re_")) {
+  } else if (preferredProvider === "resend") {
+    if (!resendKey || !resendKey.startsWith("re_")) {
+      throw new Error("Resend API Key is missing or invalid in active platform configuration. Keys must start with 're_'. Configure it in Super Admin Email Settings.");
+    }
     primaryDriver = new ResendEmailProvider(resendKey, resendFrom);
-  } else if (primarySmtpHost && primarySmtpUser && primarySmtpPass) {
-    primaryDriver = new SmtpEmailProvider(primarySmtpHost, primarySmtpPort, primarySmtpUser, primarySmtpPass, primarySmtpFrom, primarySmtpSecurity, primarySmtpReplyTo);
-  } else if (sgKey && sgKey.startsWith("SG.")) {
+  } else if (preferredProvider === "sendgrid") {
+    if (!sgKey || !sgKey.startsWith("SG.")) {
+      throw new Error("SendGrid API Key is missing or invalid in active platform configuration. Keys must start with 'SG.'.");
+    }
     primaryDriver = new SendGridEmailProvider(sgKey, sgFrom);
+  } else if (preferredProvider === "smtp") {
+    if (!primarySmtpHost || !primarySmtpUser || !primarySmtpPass) {
+      throw new Error("SMTP configuration is incomplete. Host, Username, and Password are required.");
+    }
+    primaryDriver = new SmtpEmailProvider(primarySmtpHost, primarySmtpPort, primarySmtpUser, primarySmtpPass, primarySmtpFrom, primarySmtpSecurity, primarySmtpReplyTo);
   } else if (resendKey && resendKey.startsWith("re_")) {
     primaryDriver = new ResendEmailProvider(resendKey, resendFrom);
+  } else if (sgKey && sgKey.startsWith("SG.")) {
+    primaryDriver = new SendGridEmailProvider(sgKey, sgFrom);
+  } else if (primarySmtpHost && primarySmtpUser && primarySmtpPass) {
+    primaryDriver = new SmtpEmailProvider(primarySmtpHost, primarySmtpPort, primarySmtpUser, primarySmtpPass, primarySmtpFrom, primarySmtpSecurity, primarySmtpReplyTo);
   } else {
     primaryDriver = new SimulatorEmailProvider();
   }
@@ -6651,7 +6716,17 @@ async function sendRealEmail(to: string, subject: string, htmlBody: string, from
   try {
     finalResult = await primaryDriver.send(to, subject, htmlBody, displayName);
   } catch (primaryErr: any) {
-    primaryErrorMsg = primaryErr.message || "Primary Mail Gateway Timeout/Rejected";
+    primaryErrorMsg = primaryErr.message || "Primary Mail Gateway Error";
+
+    // When provider is Resend or SendGrid, DO NOT fall back to SMTP or Simulator!
+    if (preferredProvider === "resend" || preferredProvider === "sendgrid") {
+      console.warn(`[${preferredProvider.toUpperCase()} Direct Dispatch Error] ${primaryErrorMsg}`);
+      const enrichedErr = new Error(primaryErrorMsg);
+      (enrichedErr as any).httpStatus = primaryErr.httpStatus || 500;
+      (enrichedErr as any).provider = preferredProvider;
+      throw enrichedErr;
+    }
+
     console.info(`[Email Gateway Failover] Driver (${primaryDriver.name}) unavailable (${primaryErrorMsg}). Routing through Sandbox Simulator.`);
     
     // Log error to diagnostic store

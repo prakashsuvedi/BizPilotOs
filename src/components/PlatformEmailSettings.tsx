@@ -168,7 +168,11 @@ export default function PlatformEmailSettings({ onSaved }: PlatformEmailSettings
         body: JSON.stringify({
           recipientEmail: testRecipient.trim(),
           testSubject: testSubject.trim() || undefined,
-          testMessage: testMessage.trim() || undefined
+          testMessage: testMessage.trim() || undefined,
+          provider: config.provider,
+          resendApiKey: config.resendApiKey || undefined,
+          senderEmail: config.senderEmail || undefined,
+          senderName: config.senderName || undefined
         })
       });
 
@@ -194,6 +198,7 @@ export default function PlatformEmailSettings({ onSaved }: PlatformEmailSettings
     } catch (err: any) {
       setTestResult({
         success: false,
+        provider: config.provider,
         stage: 'NETWORK_REQUEST',
         error: err.message || 'Failed to dispatch test request.',
         recommendation: 'Verify backend API connectivity and network routing.'
@@ -581,7 +586,7 @@ export default function PlatformEmailSettings({ onSaved }: PlatformEmailSettings
                   {config.resendApiKeySet && (
                     <span className="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded font-semibold flex items-center gap-1">
                       <ShieldCheck className="w-3 h-3 text-emerald-600" />
-                      Key Saved
+                      Key Saved (re_••••••••)
                     </span>
                   )}
                 </div>
@@ -602,8 +607,33 @@ export default function PlatformEmailSettings({ onSaved }: PlatformEmailSettings
                   </button>
                 </div>
                 <p className="text-[11px] text-slate-400 mt-1">
-                  Ensure the sending domain is verified in your Resend account.
+                  Enter your Resend secret key starting with <code className="font-mono font-bold text-slate-600">re_</code>.
                 </p>
+              </div>
+
+              {/* Verified Resend Domain Banner */}
+              <div className="p-3 bg-emerald-50/70 border border-emerald-200/80 rounded-xl text-xs space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 font-bold text-emerald-900">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                    Verified Domain: <span className="font-mono text-[11px] text-emerald-950">marketforge.scamspike.com</span>
+                  </div>
+                  <span className="px-1.5 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-bold rounded uppercase">
+                    Verified
+                  </span>
+                </div>
+                <p className="text-[11px] text-emerald-800">
+                  Outbound transactional emails will dispatch directly via HTTPS API without SMTP port restrictions.
+                </p>
+                {config.senderEmail !== 'noreply@marketforge.scamspike.com' && (
+                  <button
+                    type="button"
+                    onClick={() => setConfig({ ...config, senderEmail: 'noreply@marketforge.scamspike.com' })}
+                    className="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-600 hover:text-indigo-800 underline cursor-pointer pt-0.5"
+                  >
+                    Set Sender Email to noreply@marketforge.scamspike.com
+                  </button>
+                )}
               </div>
             </div>
           )}
