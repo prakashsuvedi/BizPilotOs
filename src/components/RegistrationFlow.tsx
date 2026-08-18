@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { clientAuth, clientDb } from '../lib/firebase';
-import { Building2, Mail, Lock, CheckCircle2, AlertTriangle, ArrowRight, RefreshCw, Terminal, UtensilsCrossed, Compass, Share2, Users, User, MessageSquare, Globe, Bot, Send, Megaphone, Check, CreditCard, ShieldCheck } from 'lucide-react';
+import { Building2, Mail, Lock, CheckCircle2, AlertTriangle, ArrowRight, RefreshCw, Terminal, UtensilsCrossed, Compass, Share2, Users, User, MessageSquare, Globe, Bot, Send, Megaphone, Check, CreditCard, ShieldCheck, Eye, EyeOff } from 'lucide-react';
 import { OrchestrationEngine } from '../lib/orchestration';
+import PasswordStrengthView from './PasswordStrengthView';
+import { validatePasswordStrength } from '../lib/passwordValidation';
 
 const MODULE_CATALOG = [
   { id: 'restaurant', name: 'Restaurant Management System', priceNpr: 500, category: 'base', icon: UtensilsCrossed, description: 'POS, Order Management, Kitchen Display & Menu Builder' },
@@ -20,6 +22,7 @@ export default function RegistrationFlow({ onActivateTenant, onLogin }: { onActi
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [companyName, setCompanyName] = useState('');
   const [ownerName, setOwnerName] = useState('');
   const [companyDomain, setCompanyDomain] = useState('');
@@ -83,8 +86,9 @@ export default function RegistrationFlow({ onActivateTenant, onLogin }: { onActi
       setError('Please fill out all registration fields including OTP.');
       return;
     }
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters.');
+    const pwdCheck = validatePasswordStrength(password, email);
+    if (!pwdCheck.isValid) {
+      setError(pwdCheck.feedback[0] || 'Password does not meet security requirements.');
       return;
     }
     setStep(2);
@@ -264,16 +268,28 @@ export default function RegistrationFlow({ onActivateTenant, onLogin }: { onActi
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                 <input
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Min 6 characters"
-                  className="w-full bg-slate-900 border border-slate-700 text-white text-xs rounded-xl pl-9 pr-3 py-2.5 focus:outline-none font-mono tracking-wider"
+                  placeholder="Min 8 characters"
+                  className="w-full bg-slate-900 border border-slate-700 text-white text-xs rounded-xl pl-9 pr-10 py-2.5 focus:outline-none font-mono tracking-wider"
                   required
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition p-1 cursor-pointer"
+                  title={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                </button>
               </div>
             </div>
           </div>
+
+          {password && (
+            <PasswordStrengthView password={password} userEmail={email} />
+          )}
 
           <div className="space-y-1.5">
             <label className="text-[10px] uppercase font-mono font-bold text-slate-400 block">Verification Code (OTP)</label>

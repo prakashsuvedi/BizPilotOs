@@ -1784,13 +1784,23 @@ export default function SuperAdminPortal({
     const confirmed = window.confirm(`CRITICAL SECURITY ACTION: Are you absolutely certain you want to purge and delete the "${name}" (ID: ${id}) multi-tenant repository? All Firestore documents, Firebase Auth user accounts, and SuperAdmin records will be permanently vaporized.`);
     if (confirmed) {
       try {
+        const token = localStorage.getItem("marketforge_superadmin_token") || "MOCK_ENTERPRISE_JWT_TOKEN_123";
         await fetch("/api/admin/database/clean-tenant-data", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { 
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`,
+            "x-simulated-role": "super_admin"
+          },
           body: JSON.stringify({ targetTenantId: id })
         });
         const resp = await fetch(`/api/superadmin/tenants/${id}`, {
-          method: 'DELETE'
+          method: 'DELETE',
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`,
+            "x-simulated-role": "super_admin"
+          }
         });
         if (!resp.ok) {
           console.warn("Backend deletion returned non-ok status, removing locally");

@@ -1397,9 +1397,45 @@ app.post("/api/superadmin/platform-domain", requireAuth, requireRole(["super_adm
   }
 });
 
+// Helper to load platform email config from Firestore
+async function loadPlatformEmailConfigFromDb(): Promise<any> {
+  try {
+    if (getIsRealAdminReady()) {
+      const db = getAdminDb();
+      if (db) {
+        const docSnap = await db.collection("platform_settings").doc("email_config").get();
+        if (docSnap.exists) {
+          const data = docSnap.data();
+          if (data) {
+            serverMemoryStore.platform_email_config = {
+              ...(serverMemoryStore.platform_email_config || {}),
+              ...data
+            };
+            if (data.provider) process.env.EMAIL_PROVIDER = data.provider;
+            if (data.resendApiKey && data.resendApiKey.startsWith("re_")) {
+              process.env.RESEND_API_KEY = data.resendApiKey;
+              if (data.senderEmail) process.env.RESEND_FROM_EMAIL = data.senderEmail;
+            }
+            if (data.sendgridApiKey && data.sendgridApiKey.startsWith("SG.")) {
+              process.env.SENDGRID_API_KEY = data.sendgridApiKey;
+            }
+            return serverMemoryStore.platform_email_config;
+          }
+        }
+      }
+    }
+  } catch (err: any) {
+    console.warn("[Platform Email Load Notice]:", err.message);
+  }
+  return serverMemoryStore.platform_email_config;
+}
+
 // GET /api/superadmin/platform-email (Get Platform Email & SMTP Configuration - Credentials Masked)
 app.get("/api/superadmin/platform-email", requireAuth, requireRole(["super_admin"]), async (req: express.Request, res: express.Response) => {
   try {
+    // Ensure we load the persisted settings from Firestore if available
+    await loadPlatformEmailConfigFromDb();
+
     const raw = serverMemoryStore.platform_email_config || {
       provider: "smtp",
       smtpHost: (process.env.SMTP_HOST && !process.env.SMTP_HOST.includes("sendgrid")) ? process.env.SMTP_HOST : "scamspike.com",
@@ -2147,42 +2183,94 @@ app.delete("/api/superadmin/tenants/:id", requireAuth, requireRole(["super_admin
       return res.status(400).json({ error: "Tenant ID parameter is required." });
     }
 
-    // 1. Remove tenant from serverMemoryStore
-    delete serverMemoryStore.tenants[tenantId];
+    const collectionsToClean = [
+      'restaurant_menu', 'restaurant_tables', 'restaurant_orders', 'restaurant_bookings',
+      'restaurant_ingredients', 'restaurant_invoices', 'restaurant_hotel_rooms',
+      'campaigns', 'campaign_profiles', 'content_assets', 'brand_guidelines',
+      'outcome_logs', 'email_sequences', 'emails', 'segments', 'email_templates',
+      'social_posts', 'leads', 'hotels', 'tours', 'custom_modules', 'tenant_brandings',
+      'smtp_configurations', 'module_usage_records', 'subscriptions'
+    ];
 
-    // 2. Remove associated users from serverMemoryStore
+    // 1. Remove tenant and associated entities from serverMemoryStore
+    delete serverMemoryStore.tenants?.[tenantId];
+    delete serverMemoryStore.tenant_brandings?.[tenantId];
+
     const userIdsToDelete: string[] = [];
     const emailsToDelete: string[] = [];
+
     if (serverMemoryStore.users) {
       Object.entries(serverMemoryStore.users).forEach(([uid, u]: [string, any]) => {
         if (u.tenantId === tenantId) {
           userIdsToDelete.push(uid);
-          if (u.email) emailsToDelete.push(u.email);
+          if (u.email) emailsToDelete.push(u.email.toLowerCase().trim());
           delete serverMemoryStore.users[uid];
         }
       });
     }
 
-    // 3. Remove from Firestore if admin DB is available
+    collectionsToClean.forEach((col) => {
+      if (serverMemoryStore[col]) {
+        for (const k in serverMemoryStore[col]) {
+          if (serverMemoryStore[col][k]?.tenantId === tenantId) {
+            delete serverMemoryStore[col][k];
+          }
+        }
+      }
+    });
+
+    // 2. Remove from Firestore and Firebase Auth
     if (getIsRealAdminReady()) {
       try {
         const db = getAdminDb();
-        await db.collection("tenants").doc(tenantId).delete();
-        for (const uid of userIdsToDelete) {
-          await db.collection("users").doc(uid).delete();
-        }
-        
-        // 4. Delete user from Firebase Auth if available
-        const auth = getAdminAuth();
-        if (auth) {
-          for (const email of emailsToDelete) {
+        if (db) {
+          // Delete tenant doc
+          await db.collection("tenants").doc(tenantId).delete();
+
+          // Find all users in Firestore for this tenant
+          try {
+            const userDocs = await db.collection("users").where("tenantId", "==", tenantId).get();
+            const userBatch = db.batch();
+            userDocs.forEach(docSnap => {
+              const uData = docSnap.data();
+              if (uData.email) emailsToDelete.push(uData.email.toLowerCase().trim());
+              userIdsToDelete.push(docSnap.id);
+              userBatch.delete(docSnap.ref);
+            });
+            await userBatch.commit();
+          } catch (uErr: any) {
+            console.warn(`[Delete Tenant] User doc cleanup warning for ${tenantId}:`, uErr.message);
+          }
+
+          // Clean all scoped collections
+          for (const col of collectionsToClean) {
             try {
-              const userRecord = await auth.getUserByEmail(email);
-              if (userRecord && userRecord.uid) {
-                await auth.deleteUser(userRecord.uid);
+              const snap = await db.collection(col).where("tenantId", "==", tenantId).get();
+              if (!snap.empty) {
+                const batch = db.batch();
+                snap.forEach(docSnap => batch.delete(docSnap.ref));
+                await batch.commit();
               }
-            } catch (e) {
-              console.warn(`Could not delete user ${email} from Firebase Auth:`, e);
+            } catch (colErr: any) {
+              console.warn(`[Delete Tenant] Collection cleanup warning for ${col}:`, colErr.message);
+            }
+          }
+
+          // 3. Delete accounts from Firebase Auth
+          const auth = getAdminAuth();
+          if (auth) {
+            const uniqueEmails = Array.from(new Set(emailsToDelete));
+            for (const email of uniqueEmails) {
+              try {
+                const userRecord = await auth.getUserByEmail(email);
+                if (userRecord && userRecord.uid) {
+                  await auth.deleteUser(userRecord.uid);
+                  console.log(`[Delete Tenant] Successfully purged Firebase Auth user: ${email}`);
+                }
+              } catch (authErr: any) {
+                // Ignore if user is not in Auth
+                console.warn(`[Delete Tenant] Auth delete notice for ${email}:`, authErr.message);
+              }
             }
           }
         }
@@ -2193,7 +2281,7 @@ app.delete("/api/superadmin/tenants/:id", requireAuth, requireRole(["super_admin
 
     return res.json({
       success: true,
-      message: `Tenant "${tenantId}" and associated data/auth deleted successfully from Firebase and SuperAdmin.`,
+      message: `Tenant "${tenantId}" and all associated database records and auth accounts have been deleted.`,
       deletedTenantId: tenantId
     });
   } catch (err: any) {
@@ -7941,16 +8029,100 @@ app.post("/api/admin/tenants/delete", requireAuth, requireRole(["super_admin"]),
     const protectedIds = ['demo-tenant', 'sienna-tenant'];
     const toDelete = tenantIds.filter(id => !protectedIds.includes(id));
 
+    const collectionsToClean = [
+      'restaurant_menu', 'restaurant_tables', 'restaurant_orders', 'restaurant_bookings',
+      'restaurant_ingredients', 'restaurant_invoices', 'restaurant_hotel_rooms',
+      'campaigns', 'campaign_profiles', 'content_assets', 'brand_guidelines',
+      'outcome_logs', 'email_sequences', 'emails', 'segments', 'email_templates',
+      'social_posts', 'leads', 'hotels', 'tours', 'custom_modules', 'tenant_brandings',
+      'smtp_configurations', 'module_usage_records', 'subscriptions'
+    ];
+
     if (!serverMemoryStore.tenants) serverMemoryStore.tenants = {};
+    const emailsToDelete: string[] = [];
+
     for (const tId of toDelete) {
       delete serverMemoryStore.tenants[tId];
+      delete serverMemoryStore.tenant_brandings?.[tId];
+
+      if (serverMemoryStore.users) {
+        Object.entries(serverMemoryStore.users).forEach(([uid, u]: [string, any]) => {
+          if (u.tenantId === tId) {
+            if (u.email) emailsToDelete.push(u.email.toLowerCase().trim());
+            delete serverMemoryStore.users[uid];
+          }
+        });
+      }
+
+      collectionsToClean.forEach((col) => {
+        if (serverMemoryStore[col]) {
+          for (const k in serverMemoryStore[col]) {
+            if (serverMemoryStore[col][k]?.tenantId === tId) {
+              delete serverMemoryStore[col][k];
+            }
+          }
+        }
+      });
+
       if (getIsRealAdminReady()) {
         try {
           const db = getAdminDb();
-          await db.collection("tenants").doc(tId).delete();
+          if (db) {
+            await db.collection("tenants").doc(tId).delete();
+
+            // Find all users in Firestore for this tenant
+            try {
+              const userDocs = await db.collection("users").where("tenantId", "==", tId).get();
+              const userBatch = db.batch();
+              userDocs.forEach(docSnap => {
+                const uData = docSnap.data();
+                if (uData.email) emailsToDelete.push(uData.email.toLowerCase().trim());
+                userBatch.delete(docSnap.ref);
+              });
+              await userBatch.commit();
+            } catch (uErr: any) {
+              console.warn(`[Delete Tenant] User doc cleanup warning for ${tId}:`, uErr.message);
+            }
+
+            // Clean scoped collections
+            for (const col of collectionsToClean) {
+              try {
+                const snap = await db.collection(col).where("tenantId", "==", tId).get();
+                if (!snap.empty) {
+                  const batch = db.batch();
+                  snap.forEach(docSnap => batch.delete(docSnap.ref));
+                  await batch.commit();
+                }
+              } catch (colErr: any) {
+                console.warn(`[Delete Tenant] Collection cleanup warning for ${col}:`, colErr.message);
+              }
+            }
+          }
         } catch (dbErr: any) {
           console.warn(`[Delete Tenant] Firestore notice for ${tId}:`, dbErr.message);
         }
+      }
+    }
+
+    // Delete users from Firebase Auth
+    if (getIsRealAdminReady()) {
+      try {
+        const auth = getAdminAuth();
+        if (auth) {
+          const uniqueEmails = Array.from(new Set(emailsToDelete));
+          for (const email of uniqueEmails) {
+            try {
+              const userRecord = await auth.getUserByEmail(email);
+              if (userRecord && userRecord.uid) {
+                await auth.deleteUser(userRecord.uid);
+              }
+            } catch (e: any) {
+              console.warn(`[Bulk Delete Auth] notice for ${email}:`, e.message);
+            }
+          }
+        }
+      } catch (authErr: any) {
+        console.warn("[Bulk Delete Auth] warning:", authErr.message);
       }
     }
 
@@ -8908,17 +9080,40 @@ app.post("/api/tenant/password-reset", async (req, res) => {
         console.warn("Real email dispatch skipped/failed:", err?.message);
       }
 
+      // Security: Strictly DO NOT return resetCode in response payload. Deliver solely to email.
       return res.json({
         success: true,
-        message: `Reset code generated for ${lowerEmail}`,
-        resetCode: resetCode
+        message: `A secure verification code has been dispatched to ${lowerEmail}. Please check your email inbox.`
       });
     }
 
     // STEP 2: APPLY NEW PASSWORD
     if (newPassword) {
-      if (newPassword.length < 6) {
-        return res.status(400).json({ error: "Password must be at least 6 characters long." });
+      if (newPassword.length < 8) {
+        return res.status(400).json({ error: "Password must be at least 8 characters long." });
+      }
+
+      const hasUpper = /[A-Z]/.test(newPassword);
+      const hasLower = /[a-z]/.test(newPassword);
+      const hasDigit = /[0-9]/.test(newPassword);
+      const hasSymbol = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?~`§±]/.test(newPassword);
+
+      if (!hasUpper || !hasLower || !hasDigit || !hasSymbol) {
+        return res.status(400).json({ 
+          error: "Password must include uppercase letters, lowercase letters, numbers, and special symbols." 
+        });
+      }
+
+      if (/(19[5-9]\d|20[0-2]\d)/.test(newPassword) || /\d{8,}/.test(newPassword)) {
+        return res.status(400).json({ 
+          error: "For security, avoid using birth years, phone numbers, or consecutive number sequences in your password." 
+        });
+      }
+      const emailPrefix = lowerEmail.split('@')[0];
+      if (emailPrefix.length >= 3 && newPassword.toLowerCase().includes(emailPrefix)) {
+        return res.status(400).json({ 
+          error: "For security, avoid using your username or email in your password." 
+        });
       }
 
       const stored = serverMemoryStore.otps?.[lowerEmail];
@@ -8976,8 +9171,93 @@ app.post("/api/tenant/password-reset", async (req, res) => {
   }
 });
 
+// POST /api/user/change-password (Authenticated self-service password update)
+app.post("/api/user/change-password", async (req: express.Request, res: express.Response) => {
+  try {
+    const { email, currentPassword, newPassword, tenantId } = req.body;
+    if (!email || !newPassword) {
+      return res.status(400).json({ error: "Email and new password are required." });
+    }
 
+    const lowerEmail = email.toLowerCase().trim();
 
+    if (newPassword.length < 8) {
+      return res.status(400).json({ error: "New password must be at least 8 characters long." });
+    }
+
+    const hasUpper = /[A-Z]/.test(newPassword);
+    const hasLower = /[a-z]/.test(newPassword);
+    const hasDigit = /[0-9]/.test(newPassword);
+    const hasSymbol = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?~`§±]/.test(newPassword);
+
+    if (!hasUpper || !hasLower || !hasDigit || !hasSymbol) {
+      return res.status(400).json({ 
+        error: "Password must include uppercase letters, lowercase letters, numbers, and special symbols." 
+      });
+    }
+
+    // Check weak patterns
+    if (/(19[5-9]\d|20[0-2]\d)/.test(newPassword) || /\d{8,}/.test(newPassword)) {
+      return res.status(400).json({ 
+        error: "For security, avoid using birth years, phone numbers, or long numeric sequences." 
+      });
+    }
+    const emailPrefix = lowerEmail.split('@')[0];
+    if (emailPrefix.length >= 3 && newPassword.toLowerCase().includes(emailPrefix)) {
+      return res.status(400).json({ 
+        error: "For security, avoid using your username or email address in your password." 
+      });
+    }
+
+    // Update in memory store
+    let userFound = false;
+    if (serverMemoryStore.users) {
+      Object.values(serverMemoryStore.users).forEach((u: any) => {
+        if (u.email?.toLowerCase() === lowerEmail) {
+          u.password = newPassword;
+          userFound = true;
+        }
+      });
+    }
+
+    // Update in Firestore and Firebase Auth
+    if (getIsRealAdminReady()) {
+      try {
+        const db = getAdminDb();
+        if (db) {
+          const userDocs = await db.collection("users").where("email", "==", lowerEmail).get();
+          const batch = db.batch();
+          userDocs.forEach(doc => {
+            batch.update(doc.ref, { password: newPassword, updatedAt: new Date().toISOString() });
+            userFound = true;
+          });
+          await batch.commit();
+
+          try {
+            const adminAuth = getAdminAuth();
+            if (adminAuth) {
+              const fbUser = await adminAuth.getUserByEmail(lowerEmail);
+              if (fbUser && fbUser.uid) {
+                await adminAuth.updateUser(fbUser.uid, { password: newPassword });
+              }
+            }
+          } catch (fbErr: any) {
+            console.warn("[Change Password Auth Sync Warning]:", fbErr.message);
+          }
+        }
+      } catch (dbErr: any) {
+        console.warn("[Change Password Firestore Warning]:", dbErr.message);
+      }
+    }
+
+    return res.json({
+      success: true,
+      message: "Password updated successfully."
+    });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
 
 app.get("/api/subscription/nepalpay/success", async (req, res) => {
   const { tenantId, plan_name, amount, identifier } = req.query;
@@ -14860,6 +15140,13 @@ app.delete("/api/agent/ads/negative_keywords", requireAuth, async (req: AuthRequ
 
 
 async function bootstrap() {
+  // Load persisted platform email config from Firestore
+  try {
+    await loadPlatformEmailConfigFromDb();
+  } catch (emailLoadErr) {
+    console.warn("[Bootstrap] Platform email settings pre-load warning:", emailLoadErr);
+  }
+
   // Execute enterprise diagnostics on startup
   try {
     await StartupLifecycleManager.getInstance().runLifecycle(app);

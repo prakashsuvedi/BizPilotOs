@@ -46,8 +46,12 @@ import {
   Heart,
   KeyRound,
   RefreshCw,
-  AlertCircle
+  AlertCircle,
+  Eye,
+  EyeOff
 } from 'lucide-react';
+import PasswordStrengthView from './PasswordStrengthView';
+import { validatePasswordStrength } from '../lib/passwordValidation';
 
 export interface MarketForgeLandingProps {
   tenantId?: string;
@@ -90,6 +94,7 @@ export function MarketForgeLanding({
   // Direct Tenant Login Form State
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [isLoginLoading, setIsLoginLoading] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
 
@@ -97,6 +102,7 @@ export function MarketForgeLanding({
   const [resetEmail, setResetEmail] = useState('');
   const [resetCode, setResetCode] = useState('');
   const [resetNewPassword, setResetNewPassword] = useState('');
+  const [showResetPassword, setShowResetPassword] = useState(false);
   const [isResetLoading, setIsResetLoading] = useState(false);
   const [resetCodeSent, setResetCodeSent] = useState(false);
   const [resetMessage, setResetMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -207,11 +213,11 @@ export function MarketForgeLanding({
         throw new Error(data.error || 'Failed to dispatch password reset code.');
       }
 
-      setResetCode(data.resetCode || 'MKT-RESET-123456');
+      setResetCode('');
       setResetCodeSent(true);
       setResetMessage({
         type: 'success',
-        text: `✓ Verification code sent to ${resetEmail}. Set your new password below.`
+        text: `✓ Verification code sent to ${resetEmail}. Check your email inbox and enter the code below.`
       });
     } catch (err: any) {
       setResetMessage({ type: 'error', text: err.message || 'Error requesting password reset.' });
@@ -223,8 +229,14 @@ export function MarketForgeLanding({
   const handleConfirmPasswordReset = async (e: React.FormEvent) => {
     e.preventDefault();
     setResetMessage(null);
-    if (!resetNewPassword || resetNewPassword.length < 6) {
-      setResetMessage({ type: 'error', text: 'New password must be at least 6 characters long.' });
+    if (!resetCode || resetCode.trim().length === 0) {
+      setResetMessage({ type: 'error', text: 'Please enter the verification code sent to your email.' });
+      return;
+    }
+
+    const pwdCheck = validatePasswordStrength(resetNewPassword, resetEmail);
+    if (!pwdCheck.isValid) {
+      setResetMessage({ type: 'error', text: pwdCheck.feedback[0] || 'Password does not meet complexity requirements.' });
       return;
     }
 
@@ -235,7 +247,7 @@ export function MarketForgeLanding({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email: resetEmail,
-          code: resetCode,
+          code: resetCode.trim(),
           newPassword: resetNewPassword
         })
       });
@@ -1358,13 +1370,21 @@ export function MarketForgeLanding({
                     <div className="relative">
                       <Lock className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
                       <input
-                        type="password"
+                        type={showLoginPassword ? "text" : "password"}
                         value={loginPassword}
                         onChange={(e) => setLoginPassword(e.target.value)}
                         placeholder="••••••••••••"
-                        className="w-full bg-black/50 border border-white/15 text-white text-xs rounded-xl pl-10 pr-3.5 py-2.5 focus:outline-none focus:border-indigo-500 transition"
+                        className="w-full bg-black/50 border border-white/15 text-white text-xs rounded-xl pl-10 pr-10 py-2.5 focus:outline-none focus:border-indigo-500 transition"
                         required
                       />
+                      <button
+                        type="button"
+                        onClick={() => setShowLoginPassword(!showLoginPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 transition p-1 cursor-pointer"
+                        title={showLoginPassword ? "Hide password" : "Show password"}
+                      >
+                        {showLoginPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
                     </div>
                   </div>
 
@@ -1431,29 +1451,40 @@ export function MarketForgeLanding({
                 ) : (
                   <form onSubmit={handleConfirmPasswordReset} className="space-y-4 animate-fade-in">
                     <div className="space-y-1.5">
-                      <label className="text-[10px] font-mono font-bold uppercase text-slate-400 block">Reset Recovery Code</label>
+                      <label className="text-[10px] font-mono font-bold uppercase text-slate-400 block">Reset Recovery Code (From Email)</label>
                       <input
                         type="text"
                         value={resetCode}
                         onChange={(e) => setResetCode(e.target.value)}
-                        placeholder="MKT-RESET-123456"
+                        placeholder="Enter code from your email"
                         className="w-full bg-black/50 border border-white/15 text-white font-mono text-xs rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-indigo-500"
                         required
                       />
                     </div>
 
                     <div className="space-y-1.5">
-                      <label className="text-[10px] font-mono font-bold uppercase text-slate-400 block">New Password</label>
-                      <input
-                        type="password"
-                        value={resetNewPassword}
-                        onChange={(e) => setResetNewPassword(e.target.value)}
-                        placeholder="Enter new password (min 6 chars)"
-                        className="w-full bg-black/50 border border-white/15 text-white text-xs rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-indigo-500"
-                        required
-                        minLength={6}
-                      />
+                      <label className="text-[10px] font-mono font-bold uppercase text-slate-400 block">New Strong Password</label>
+                      <div className="relative">
+                        <input
+                          type={showResetPassword ? "text" : "password"}
+                          value={resetNewPassword}
+                          onChange={(e) => setResetNewPassword(e.target.value)}
+                          placeholder="Enter new strong password"
+                          className="w-full bg-black/50 border border-white/15 text-white text-xs rounded-xl pl-3.5 pr-10 py-2.5 focus:outline-none focus:border-indigo-500"
+                          required
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowResetPassword(!showResetPassword)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 transition p-1 cursor-pointer"
+                          title={showResetPassword ? "Hide password" : "Show password"}
+                        >
+                          {showResetPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
                     </div>
+
+                    <PasswordStrengthView password={resetNewPassword} userContext={{ email: resetEmail }} />
 
                     <button
                       type="submit"

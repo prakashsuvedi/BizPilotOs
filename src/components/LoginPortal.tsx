@@ -6,6 +6,8 @@ import { InfrastructureHub } from '../lib/infrastructure';
 import RegistrationFlow from './RegistrationFlow';
 import MarketForgeLogo from './MarketForgeLogo';
 import CompanyPagesModal, { CompanyPageType } from './CompanyPagesModal';
+import PasswordStrengthView from './PasswordStrengthView';
+import { validatePasswordStrength } from '../lib/passwordValidation';
 import { 
   getPlatformLogoSettings, 
   PlatformLogoSettings, 
@@ -55,6 +57,8 @@ import {
   Layout,
   Receipt,
   KeyRound,
+  Eye,
+  EyeOff,
   X
 } from 'lucide-react';
 
@@ -527,6 +531,7 @@ export default function LoginPortal({ onLogin, tenantsList, onActivateTenant }: 
   const [tenantId, setTenantId] = useState('auto');
   const [tenantEmail, setTenantEmail] = useState('');
   const [tenantPassword, setTenantPassword] = useState('');
+  const [showTenantPassword, setShowTenantPassword] = useState(false);
   const [tenantError, setTenantError] = useState<string | null>(null);
 
   // Tenant Register/Activation Simulation
@@ -554,6 +559,7 @@ export default function LoginPortal({ onLogin, tenantsList, onActivateTenant }: 
   const [onboardFullName, setOnboardFullName] = useState('');
   const [onboardUsername, setOnboardUsername] = useState('');
   const [onboardPassword, setOnboardPassword] = useState('');
+  const [showOnboardPassword, setShowOnboardPassword] = useState(false);
   const [onboardOtp, setOnboardOtp] = useState('');
   const [onboardOtpSent, setOnboardOtpSent] = useState(false);
   const [onboardError, setOnboardError] = useState<string | null>(null);
@@ -567,6 +573,7 @@ export default function LoginPortal({ onLogin, tenantsList, onActivateTenant }: 
   const [memRegName, setMemRegName] = useState('');
   const [memRegEmail, setMemRegEmail] = useState('');
   const [memRegPassword, setMemRegPassword] = useState('');
+  const [showMemRegPassword, setShowMemRegPassword] = useState(false);
   const [memRegRole, setMemRegRole] = useState('writer');
   const [memRegDesignation, setMemRegDesignation] = useState('Team Member');
   const [memRegDepartment, setMemRegDepartment] = useState('Operations');
@@ -636,6 +643,13 @@ export default function LoginPortal({ onLogin, tenantsList, onActivateTenant }: 
       return;
     }
 
+    const pwdCheck = validatePasswordStrength(memRegPassword, memRegEmail);
+    if (!pwdCheck.isValid) {
+      setMemRegError(pwdCheck.feedback[0] || 'Password does not meet security standards.');
+      setIsMemRegSubmitting(false);
+      return;
+    }
+
     try {
       const resp = await fetch("/api/tenant/add-team-member", {
         method: "POST",
@@ -691,6 +705,7 @@ export default function LoginPortal({ onLogin, tenantsList, onActivateTenant }: 
   // Superadmin Login Form
   const [adminEmail, setAdminEmail] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
+  const [showAdminPassword, setShowAdminPassword] = useState(false);
   const [adminMfaToken, setAdminMfaToken] = useState('');
   const [adminError, setAdminError] = useState<string | null>(null);
   const [isAdminAuthenticating, setIsAdminAuthenticating] = useState(false);
@@ -700,6 +715,7 @@ export default function LoginPortal({ onLogin, tenantsList, onActivateTenant }: 
   const [forgotEmail, setForgotEmail] = useState('');
   const [forgotCode, setForgotCode] = useState('');
   const [forgotNewPassword, setForgotNewPassword] = useState('');
+  const [showForgotNewPassword, setShowForgotNewPassword] = useState(false);
   const [forgotLogs, setForgotLogs] = useState<string[]>([]);
   const [isForgotSending, setIsForgotSending] = useState(false);
   const [isResetSubmitting, setIsResetSubmitting] = useState(false);
@@ -846,6 +862,13 @@ export default function LoginPortal({ onLogin, tenantsList, onActivateTenant }: 
     e.preventDefault();
     setOnboardError(null);
     setOnboardSuccess(null);
+
+    const pwdCheck = validatePasswordStrength(onboardPassword, onboardEmail);
+    if (!pwdCheck.isValid) {
+      setOnboardError(pwdCheck.feedback[0] || 'Password does not meet security requirements.');
+      return;
+    }
+
     setIsOnboardingSubmitting(true);
 
     try {
@@ -936,16 +959,14 @@ export default function LoginPortal({ onLogin, tenantsList, onActivateTenant }: 
         throw new Error(data.error || 'Failed to dispatch password reset code.');
       }
 
-      const generatedCode = data.resetCode || 'MKT-RESET-' + Math.floor(100000 + Math.random() * 900000);
-      setForgotCode(generatedCode);
+      setForgotCode('');
       setForgotLogs([
-        `[SMTP_CLI] EHLO marketforge-os.app`,
-        `[SMTP_CLI] MAIL FROM: <security-desk@marketforge-os.app>`,
-        `[SMTP_CLI] RCPT TO: <${forgotEmail}>`,
-        `[SMTP_CLI] SUBJECT: [MarketForge OS] Password Reset Code: ${generatedCode}`,
-        `[RECOVERY] High-fidelity password recovery token generated for ${forgotEmail}`
+        `[SECURITY_GATEWAY] Dispatching secure recovery token to mail provider...`,
+        `[ROUTER] Outbound message routed to ${forgotEmail}`,
+        `[PRIVACY_PROTECTION] Verification code securely sent to user inbox only.`,
+        `[STATUS] Awaiting manual token verification by account owner.`
       ]);
-      setForgotSuccess(`✓ Password reset verification code dispatched to ${forgotEmail}. Set your new password below.`);
+      setForgotSuccess(`✓ Password reset verification code dispatched to ${forgotEmail}. Please check your email inbox and enter the code below.`);
     } catch (err: any) {
       setTenantError(err.message || 'Failed to dispatch recovery email.');
     } finally {
@@ -956,8 +977,14 @@ export default function LoginPortal({ onLogin, tenantsList, onActivateTenant }: 
   const handleApplyNewPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setTenantError(null);
-    if (!forgotNewPassword || forgotNewPassword.length < 6) {
-      setTenantError('New password must be at least 6 characters long.');
+    if (!forgotCode || forgotCode.trim().length === 0) {
+      setTenantError('Please enter the verification code sent to your email.');
+      return;
+    }
+
+    const pwdCheck = validatePasswordStrength(forgotNewPassword, forgotEmail);
+    if (!pwdCheck.isValid) {
+      setTenantError(pwdCheck.feedback[0] || 'New password does not meet security requirements.');
       return;
     }
 
@@ -968,7 +995,7 @@ export default function LoginPortal({ onLogin, tenantsList, onActivateTenant }: 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email: forgotEmail,
-          code: forgotCode,
+          code: forgotCode.trim(),
           newPassword: forgotNewPassword
         })
       });
@@ -1243,16 +1270,30 @@ export default function LoginPortal({ onLogin, tenantsList, onActivateTenant }: 
                       </div>
                       <div className="space-y-1.5">
                         <label className="text-[10px] uppercase font-mono font-bold text-slate-400">New Custom Password</label>
-                        <input
-                          type="password"
-                          required
-                          placeholder="••••••••"
-                          value={onboardPassword}
-                          onChange={(e) => setOnboardPassword(e.target.value)}
-                          className="w-full bg-black/40 border border-white/10 text-white text-xs rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-indigo-500"
-                        />
+                        <div className="relative">
+                          <input
+                            type={showOnboardPassword ? "text" : "password"}
+                            required
+                            placeholder="••••••••"
+                            value={onboardPassword}
+                            onChange={(e) => setOnboardPassword(e.target.value)}
+                            className="w-full bg-black/40 border border-white/10 text-white text-xs rounded-xl pl-3.5 pr-10 py-2.5 focus:outline-none focus:border-indigo-500"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowOnboardPassword(!showOnboardPassword)}
+                            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition p-1 cursor-pointer"
+                            title={showOnboardPassword ? "Hide password" : "Show password"}
+                          >
+                            {showOnboardPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                          </button>
+                        </div>
                       </div>
                     </div>
+
+                    {onboardPassword && (
+                      <PasswordStrengthView password={onboardPassword} userEmail={onboardEmail} />
+                    )}
 
                     <div className="flex flex-col sm:flex-row gap-3 pt-2">
                       <button
@@ -1418,14 +1459,24 @@ export default function LoginPortal({ onLogin, tenantsList, onActivateTenant }: 
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div className="space-y-1.5">
                           <label className="text-[10px] uppercase font-mono font-bold text-slate-400">Create Access Password</label>
-                          <input
-                            type="password"
-                            required
-                            placeholder="••••••••"
-                            value={memRegPassword}
-                            onChange={(e) => setMemRegPassword(e.target.value)}
-                            className="w-full bg-black/40 border border-white/10 text-white text-xs rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-indigo-500"
-                          />
+                          <div className="relative">
+                            <input
+                              type={showMemRegPassword ? "text" : "password"}
+                              required
+                              placeholder="••••••••"
+                              value={memRegPassword}
+                              onChange={(e) => setMemRegPassword(e.target.value)}
+                              className="w-full bg-black/40 border border-white/10 text-white text-xs rounded-xl pl-3.5 pr-10 py-2.5 focus:outline-none focus:border-indigo-500"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowMemRegPassword(!showMemRegPassword)}
+                              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition p-1 cursor-pointer"
+                              title={showMemRegPassword ? "Hide password" : "Show password"}
+                            >
+                              {showMemRegPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                            </button>
+                          </div>
                         </div>
 
                         <div className="space-y-1.5">
@@ -1444,6 +1495,10 @@ export default function LoginPortal({ onLogin, tenantsList, onActivateTenant }: 
                           </select>
                         </div>
                       </div>
+
+                      {memRegPassword && (
+                        <PasswordStrengthView password={memRegPassword} userEmail={memRegEmail} />
+                      )}
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div className="space-y-1.5">
@@ -1564,14 +1619,24 @@ export default function LoginPortal({ onLogin, tenantsList, onActivateTenant }: 
                             Forgot Password?
                           </button>
                         </div>
-                        <input
-                          type="password"
-                          value={tenantPassword}
-                          onChange={(e) => setTenantPassword(e.target.value)}
-                          placeholder="••••••••"
-                          className="w-full bg-black/40 border border-white/10 text-white text-xs rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-indigo-500"
-                          required
-                        />
+                        <div className="relative">
+                          <input
+                            type={showTenantPassword ? "text" : "password"}
+                            value={tenantPassword}
+                            onChange={(e) => setTenantPassword(e.target.value)}
+                            placeholder="••••••••"
+                            className="w-full bg-black/40 border border-white/10 text-white text-xs rounded-xl pl-3.5 pr-10 py-2.5 focus:outline-none focus:border-indigo-500"
+                            required
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowTenantPassword(!showTenantPassword)}
+                            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition p-1 cursor-pointer"
+                            title={showTenantPassword ? "Hide password" : "Show password"}
+                          >
+                            {showTenantPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                          </button>
+                        </div>
                       </div>
                     </div>
 
@@ -1710,17 +1775,31 @@ export default function LoginPortal({ onLogin, tenantsList, onActivateTenant }: 
                         </div>
 
                         <div className="space-y-1.5">
-                          <label className="text-[10px] uppercase font-mono font-bold text-slate-400 block">New Password</label>
-                          <input
-                            type="password"
-                            value={forgotNewPassword}
-                            onChange={(e) => setForgotNewPassword(e.target.value)}
-                            placeholder="Enter new password (min 6 characters)"
-                            className="w-full bg-black/40 border border-white/10 text-white text-xs rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-indigo-500"
-                            required
-                            minLength={6}
-                          />
+                          <label className="text-[10px] uppercase font-mono font-bold text-slate-400 block">New Strong Password</label>
+                          <div className="relative">
+                            <input
+                              type={showForgotNewPassword ? "text" : "password"}
+                              value={forgotNewPassword}
+                              onChange={(e) => setForgotNewPassword(e.target.value)}
+                              placeholder="Min 8 chars with uppercase, lowercase, numbers & symbols"
+                              className="w-full bg-black/40 border border-white/10 text-white text-xs rounded-xl pl-3.5 pr-10 py-2.5 focus:outline-none focus:border-indigo-500"
+                              required
+                              minLength={8}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowForgotNewPassword(!showForgotNewPassword)}
+                              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition p-1 cursor-pointer"
+                              title={showForgotNewPassword ? "Hide password" : "Show password"}
+                            >
+                              {showForgotNewPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                            </button>
+                          </div>
                         </div>
+
+                        {forgotNewPassword && (
+                          <PasswordStrengthView password={forgotNewPassword} userEmail={forgotEmail} />
+                        )}
 
                         <button
                           type="submit"
@@ -1836,13 +1915,23 @@ export default function LoginPortal({ onLogin, tenantsList, onActivateTenant }: 
                           Forgot Password?
                         </button>
                       </div>
-                      <input
-                        type="password"
-                        value={adminPassword}
-                        onChange={(e) => setAdminPassword(e.target.value)}
-                        className="w-full bg-black/40 border border-white/10 text-white text-xs rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-indigo-500"
-                        required
-                      />
+                      <div className="relative">
+                        <input
+                          type={showAdminPassword ? "text" : "password"}
+                          value={adminPassword}
+                          onChange={(e) => setAdminPassword(e.target.value)}
+                          className="w-full bg-black/40 border border-white/10 text-white text-xs rounded-xl pl-3.5 pr-10 py-2.5 focus:outline-none focus:border-indigo-500"
+                          required
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowAdminPassword(!showAdminPassword)}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition p-1 cursor-pointer"
+                          title={showAdminPassword ? "Hide password" : "Show password"}
+                        >
+                          {showAdminPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                        </button>
+                      </div>
                     </div>
                     <div className="space-y-1.5">
                       <label className="text-[10px] uppercase font-mono font-bold text-slate-400">One-Time MFA Passcode <span className="text-slate-500 font-normal">(Optional)</span></label>

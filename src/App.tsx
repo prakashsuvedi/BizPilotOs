@@ -97,6 +97,7 @@ const AdvancedWebhookEngine = React.lazy(() => import('./components/AdvancedWebh
 const IntegrationManager = React.lazy(() => import('./components/IntegrationManager'));
 const AiTelemetryModal = React.lazy(() => import('./components/AiTelemetryModal'));
 const PaymentSuccessModal = React.lazy(() => import('./components/PaymentSuccessModal'));
+const FirstVisitSecurityModal = React.lazy(() => import('./components/FirstVisitSecurityModal'));
 
 // Sleek lightweight loading fallback for dynamic workspace modules
 const WorkspaceModuleLoader = () => (
@@ -238,6 +239,7 @@ export default function App() {
   const [isQuickActionsOpen, setIsQuickActionsOpen] = useState(false);
   const [isSubscriptionModalOpen, setIsSubscriptionModalOpen] = useState(false);
   const [isPaymentSuccessOpen, setIsPaymentSuccessOpen] = useState(false);
+  const [isFirstVisitSecurityModalOpen, setIsFirstVisitSecurityModalOpen] = useState(false);
   const [themeMode, setThemeMode] = useState<'dark' | 'light'>(() => {
     return (localStorage.getItem('marketforge_theme_mode') as 'dark' | 'light') || 'dark';
   });
@@ -772,6 +774,11 @@ export default function App() {
     setDashboardTab('command');
     setIsHeaderFolded(true);
     navigateToTenant(tenantId, 'workspace');
+
+    // Trigger First-Visit Security Password Change recommendation if not previously dismissed
+    if (email && !localStorage.getItem(`marketforge_security_notice_dismissed_${email}`)) {
+      setIsFirstVisitSecurityModalOpen(true);
+    }
   };
 
   const handleLogout = async () => {
@@ -2785,6 +2792,22 @@ export default function App() {
             tenantName={activeTenantName}
             tenantPlan={activeTenantObj?.plan || "Growth"}
             isSuperAdmin={user?.role === 'super_admin'}
+          />
+        </React.Suspense>
+      )}
+
+      {/* First-Visit Security Recommendation Modal for New Tenants */}
+      {isFirstVisitSecurityModalOpen && user && user.role !== 'super_admin' && (
+        <React.Suspense fallback={null}>
+          <FirstVisitSecurityModal
+            user={{
+              email: user.email,
+              name: user.name,
+              tenantId: user.tenantId,
+              role: user.role
+            }}
+            onClose={() => setIsFirstVisitSecurityModalOpen(false)}
+            onPasswordChanged={() => setIsFirstVisitSecurityModalOpen(false)}
           />
         </React.Suspense>
       )}

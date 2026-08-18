@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Lock, Mail, Key, ShieldCheck, UserCheck, AlertCircle, Sparkles, X, ChevronRight, Award, Loader2 } from 'lucide-react';
+import { Lock, Mail, Key, ShieldCheck, UserCheck, AlertCircle, Sparkles, X, ChevronRight, Award, Loader2, Eye, EyeOff } from 'lucide-react';
 import { TenantTeamMember } from '../types';
 
 interface Props {
@@ -26,6 +26,7 @@ export default function MemberAuthModal({
   const [authMode, setAuthMode] = useState<'password' | 'pin'>('password');
   const [emailInput, setEmailInput] = useState('');
   const [passwordInput, setPasswordInput] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [pinInput, setPinInput] = useState('');
   const [selectedPinMemberId, setSelectedPinMemberId] = useState<string>('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -297,13 +298,21 @@ export default function MemberAuthModal({
               <div className="relative">
                 <Key className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
                 <input
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   required
                   placeholder="••••••••••••"
                   value={passwordInput}
                   onChange={(e) => setPasswordInput(e.target.value)}
-                  className="w-full pl-10 pr-3.5 py-2.5 border border-slate-300 rounded-xl text-xs font-mono font-bold text-slate-900 focus:outline-none focus:border-indigo-500"
+                  className="w-full pl-10 pr-10 py-2.5 border border-slate-300 rounded-xl text-xs font-mono font-bold text-slate-900 focus:outline-none focus:border-indigo-500"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition p-1 cursor-pointer"
+                  title={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
               </div>
             </div>
 
