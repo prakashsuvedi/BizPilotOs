@@ -559,6 +559,7 @@ export default function LoginPortal({ onLogin, tenantsList, onActivateTenant }: 
   const [onboardError, setOnboardError] = useState<string | null>(null);
   const [onboardSuccess, setOnboardSuccess] = useState<string | null>(null);
   const [isOnboardingSubmitting, setIsOnboardingSubmitting] = useState(false);
+  const [loginNotice, setLoginNotice] = useState<string | null>(null);
 
   // Team Member Self-Registration States
   const [isMemberRegisterMode, setIsMemberRegisterMode] = useState(false);
@@ -577,10 +578,19 @@ export default function LoginPortal({ onLogin, tenantsList, onActivateTenant }: 
   React.useEffect(() => {
     try {
       const params = new URLSearchParams(window.location.search);
-      const queryTenant = params.get('tenant') || params.get('tenantId') || params.get('slug') || params.get('t');
+      let queryTenant = params.get('tenant') || params.get('tenantId') || params.get('slug') || params.get('t');
       const queryRegister = params.get('register');
       const queryMember = params.get('member');
       const queryEmail = params.get('email');
+
+      if (!queryTenant && typeof window !== 'undefined') {
+        const pathParts = window.location.pathname.split('/').filter(Boolean);
+        if (pathParts.length >= 2 && (pathParts[0] === 't' || pathParts[0] === 'tenant')) {
+          queryTenant = pathParts[1];
+        } else if (pathParts.length === 1 && !['admin', 'superadmin', 'login', 'register', 'pricing', 'about', 'contact'].includes(pathParts[0].toLowerCase())) {
+          queryTenant = pathParts[0];
+        }
+      }
 
       if (queryTenant) {
         setTenantId(queryTenant);
@@ -595,12 +605,22 @@ export default function LoginPortal({ onLogin, tenantsList, onActivateTenant }: 
       } else if (queryTenant && queryRegister === '1' && queryEmail) {
         setIsOnboardingMode(true);
         setOnboardTenantId(queryTenant);
-        setOnboardEmail(decodeURIComponent(queryEmail));
+        const decodedEmail = decodeURIComponent(queryEmail);
+        setOnboardEmail(decodedEmail);
+        setOnboardUsername(decodedEmail.split('@')[0]);
       }
     } catch (err) {
       console.warn("Query parameters parsing skipped:", err);
     }
   }, []);
+
+  const handleSkipToLogin = () => {
+    setIsOnboardingMode(false);
+    setTenantId(onboardTenantId || tenantId);
+    setTenantEmail(onboardEmail);
+    setTenantPassword('');
+    setLoginNotice(`You can log in using the temporary initial password sent to your email (${onboardEmail}).`);
+  };
 
   const handleMemberRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1148,15 +1168,19 @@ export default function LoginPortal({ onLogin, tenantsList, onActivateTenant }: 
                 <div className="space-y-5 relative z-10">
                   <div className="border-b border-white/10 pb-3 flex justify-between items-center">
                     <div>
-                      <h3 className="text-base font-extrabold text-white">Initialize Tenant Owner Account</h3>
-                      <p className="text-[11px] text-slate-400 mt-0.5">Define supervisor credentials to claim your workspace.</p>
+                      <h3 className="text-base font-extrabold text-white">Setup or Change Password</h3>
+                      <p className="text-[11px] text-slate-400 mt-0.5">Customize your supervisor credentials or skip to use credentials from your email.</p>
                     </div>
                     <button
-                      onClick={() => setIsOnboardingMode(false)}
+                      onClick={handleSkipToLogin}
                       className="text-indigo-400 hover:text-indigo-300 text-xs font-bold transition hover:underline cursor-pointer"
                     >
-                      ← Standard Login
+                      Skip to Sign In →
                     </button>
+                  </div>
+
+                  <div className="p-3 bg-indigo-950/40 border border-indigo-500/30 rounded-xl text-indigo-200 text-xs text-left leading-relaxed">
+                    💡 <strong>Initial Credentials Provided:</strong> You can set a custom password and username below for higher security, or click <strong>Skip</strong> to log in with the initial password sent to your email.
                   </div>
 
                   {onboardError && (
@@ -1207,18 +1231,18 @@ export default function LoginPortal({ onLogin, tenantsList, onActivateTenant }: 
 
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1.5">
-                        <label className="text-[10px] uppercase font-mono font-bold text-slate-400">System Username</label>
+                        <label className="text-[10px] uppercase font-mono font-bold text-slate-400">Custom Username</label>
                         <input
                           type="text"
                           required
-                          placeholder="vance_ceo"
+                          placeholder="e.g. owner_admin"
                           value={onboardUsername}
                           onChange={(e) => setOnboardUsername(e.target.value)}
                           className="w-full bg-black/40 border border-white/10 text-white text-xs rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-indigo-500 font-mono"
                         />
                       </div>
                       <div className="space-y-1.5">
-                        <label className="text-[10px] uppercase font-mono font-bold text-slate-400">Access Password</label>
+                        <label className="text-[10px] uppercase font-mono font-bold text-slate-400">New Custom Password</label>
                         <input
                           type="password"
                           required
@@ -1230,13 +1254,23 @@ export default function LoginPortal({ onLogin, tenantsList, onActivateTenant }: 
                       </div>
                     </div>
 
-                    <button
-                      type="submit"
-                      disabled={isOnboardingSubmitting}
-                      className="w-full py-3.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-extrabold py-3 px-4 rounded-xl text-xs uppercase tracking-wider transition shadow-lg cursor-pointer disabled:opacity-50"
-                    >
-                      {isOnboardingSubmitting ? "Finalizing Security Keys..." : "Claim Workspace & Activate"}
-                    </button>
+                    <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                      <button
+                        type="submit"
+                        disabled={isOnboardingSubmitting}
+                        className="flex-1 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-extrabold px-4 rounded-xl text-xs uppercase tracking-wider transition shadow-lg cursor-pointer disabled:opacity-50 text-center"
+                      >
+                        {isOnboardingSubmitting ? "Updating Password & Activating..." : "Save Password & Launch Workspace"}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleSkipToLogin}
+                        className="py-3 px-4 bg-white/10 hover:bg-white/15 text-slate-300 hover:text-white font-bold rounded-xl text-xs transition border border-white/10 cursor-pointer text-center"
+                      >
+                        Skip & Use Email Password
+                      </button>
+                    </div>
                   </form>
                 </div>
               ) : (
@@ -1466,6 +1500,21 @@ export default function LoginPortal({ onLogin, tenantsList, onActivateTenant }: 
                   ) : !isForgotPasswordMode && !isRegisterMode ? (
                   // STANDARD TENANT LOGIN FORM
                   <form onSubmit={handleTenantLogin} className="space-y-4 text-left font-sans">
+                    {loginNotice && (
+                      <div className="p-3 bg-indigo-950/50 border border-indigo-500/40 rounded-xl text-indigo-200 text-xs flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle2 className="w-4 h-4 text-indigo-400 shrink-0" />
+                          <span>{loginNotice}</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setLoginNotice(null)}
+                          className="text-slate-400 hover:text-white text-xs cursor-pointer ml-2"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    )}
                     <div className="space-y-1.5">
                       <label className="text-[10px] uppercase font-mono font-bold text-slate-400">Target Workspace Client</label>
                       <select

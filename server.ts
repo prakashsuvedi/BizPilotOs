@@ -11559,39 +11559,54 @@ app.post("/api/admin/create-tenant", async (req, res) => {
       // ==========================================
       await transitionLifecycleState(tenantId, TenantLifecycleState.STEP_17_RENDER_TEMPLATE, "Processing localized template variables and compiling beautiful HTML output assets", async () => {
         emailHtml = `
-          <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff;">
+          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 16px; background-color: #ffffff; color: #1e293b;">
             <div style="text-align: center; margin-bottom: 24px;">
-              <h2 style="color: #4f46e5; margin: 0; font-size: 24px; font-weight: bold; tracking-tight: -0.05em;">MarketForge OS</h2>
-              <p style="color: #64748b; font-size: 12px; margin: 4px 0 0 0; text-transform: uppercase; letter-spacing: 0.1em;">Enterprise Agency Platform</p>
+              <h2 style="color: #4f46e5; margin: 0; font-size: 24px; font-weight: 800; letter-spacing: -0.02em;">MarketForge OS</h2>
+              <p style="color: #64748b; font-size: 12px; margin: 4px 0 0 0; text-transform: uppercase; letter-spacing: 0.1em; font-weight: 600;">Enterprise Agency Platform</p>
             </div>
             
             <div style="color: #1e293b; line-height: 1.6; font-size: 15px;">
-              <p>Greetings,</p>
-              <p>A brand new workspace **"${name}"** has been successfully designated on the MarketForge SaaS platform under your administration. The platform has automatically initiated client environment provisioning.</p>
+              <p style="margin-top: 0;">Greetings,</p>
+              <p>A new enterprise workspace <strong>"${name}"</strong> has been successfully designated on the MarketForge SaaS platform under your administration.</p>
               
-              <div style="background-color: #f8fafc; border-left: 4px solid #4f46e5; padding: 12px 16px; margin: 20px 0; border-radius: 0 8px 8px 0;">
-                <strong>Workspace Domain details:</strong><br/>
-                • Workspace Route: <a href="https://${computedDomain}" style="color: #4f46e5; text-decoration: none; font-weight: 600;">${computedDomain}</a><br/>
-                • Access Path: <a href="${inviteLink}" style="color: #4f46e5; text-decoration: none; font-weight: 600;">${currentAppHost}/${tenantId}</a><br/>
-                • Assigned Tier: <strong>${currentPlan}</strong>
+              <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-left: 4px solid #4f46e5; padding: 16px 20px; margin: 22px 0; border-radius: 8px;">
+                <div style="font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #4f46e5; margin-bottom: 12px;">Workspace Access Credentials</div>
+                <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+                  <tr>
+                    <td style="padding: 5px 0; color: #64748b; width: 140px;">Workspace Route:</td>
+                    <td style="padding: 5px 0; font-weight: 600; color: #0f172a;"><a href="${inviteLink}" style="color: #4f46e5; text-decoration: none;">${computedDomain}</a></td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 5px 0; color: #64748b;">Assigned Tier:</td>
+                    <td style="padding: 5px 0; font-weight: 600; color: #0f172a;">${currentPlan}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 5px 0; color: #64748b;">Username / Email:</td>
+                    <td style="padding: 5px 0; font-weight: 600; color: #0f172a;"><code style="background-color: #e2e8f0; padding: 2px 8px; border-radius: 4px; font-family: monospace; font-size: 13px;">${ownerEmail}</code></td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 5px 0; color: #64748b;">Initial Password:</td>
+                    <td style="padding: 5px 0; font-weight: 600; color: #0f172a;"><code style="background-color: #e2e8f0; padding: 2px 8px; border-radius: 4px; font-family: monospace; font-size: 13px; color: #4f46e5;">${tempPassword}</code></td>
+                  </tr>
+                </table>
               </div>
               
-              <p>Please click the button below to verify your email, set a secure account password, and establish your tenant administrator username:</p>
+              <p style="margin-bottom: 20px;">You can log in directly using the initial password above, or click below to set a custom password, change your administrator username, or skip directly to your dashboard:</p>
               
               <div style="text-align: center; margin: 30px 0;">
-                <a href="${inviteLink}" style="background-color: #4f46e5; color: #ffffff; padding: 12px 30px; font-size: 15px; font-weight: bold; text-decoration: none; border-radius: 8px; display: inline-block; box-shadow: 0 4px 6px -1px rgba(79, 70, 229, 0.2);">
-                  Initialize Setup and Set Password
+                <a href="${inviteLink}" style="background-color: #4f46e5; color: #ffffff; padding: 13px 32px; font-size: 15px; font-weight: 700; text-decoration: none; border-radius: 8px; display: inline-block; box-shadow: 0 4px 10px rgba(79, 70, 229, 0.25);">
+                  Setup Password or Access Workspace
                 </a>
               </div>
               
-              <p style="font-size: 13px; color: #64748b; margin-top: 30px;">
-                If the button doesn't work, copy and paste the following URL into your browser: <br/>
+              <p style="font-size: 13px; color: #64748b; margin-top: 28px; line-height: 1.5;">
+                Direct Setup Link: <br/>
                 <span style="font-family: monospace; word-break: break-all; color: #4f46e5; font-size: 12px;">${inviteLink}</span>
               </p>
             </div>
             
-            <div style="border-top: 1px solid #e2e8f0; padding-top: 20px; margin-top: 40px; text-align: center; font-size: 11px; color: #94a3b8;">
-              Sent via Secure Outbound Gateway on behalf of MarketForge OS Systems Administration.<br/>
+            <div style="border-top: 1px solid #e2e8f0; padding-top: 18px; margin-top: 36px; text-align: center; font-size: 11px; color: #94a3b8;">
+              Sent via Secure Outbound Gateway &bull; MarketForge OS Systems Administration<br/>
               &copy; 2026 MarketForge AI. All rights reserved.
             </div>
           </div>
