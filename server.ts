@@ -6494,7 +6494,7 @@ export class SendGridEmailProvider implements EmailProvider {
   constructor(private apiKey: string, private fromEmail: string) {}
 
   async send(to: string, subject: string, htmlBody: string, displayName: string) {
-    if (process.env.DISABLE_SENDGRID === "true" || process.env.EMAIL_PROVIDER === "simulator" || (process.env.EMAIL_MODE || "sandbox").toLowerCase() === "sandbox") {
+    if (process.env.DISABLE_SENDGRID === "true" || process.env.EMAIL_PROVIDER === "simulator") {
       console.log("[SendGrid Provider] Using sandbox simulator dispatch mode");
       return { success: true, provider: "simulator" };
     }
@@ -6651,11 +6651,10 @@ async function sendRealEmail(to: string, subject: string, htmlBody: string, from
 
   // Active Platform Email Configuration
   const platformCfg = serverMemoryStore.platform_email_config || {};
-  const isExplicitSandbox = (process.env.EMAIL_MODE || "sandbox").toLowerCase() === "sandbox" || process.env.EMAIL_PROVIDER === "simulator";
-  const isProductionEnabled = platformCfg.enableProductionEmail !== false;
+  const isProductionEnabled = platformCfg.enableProductionEmail !== false && process.env.EMAIL_MODE !== "sandbox";
 
   // Determine active provider
-  const preferredProvider = (customConfig?.provider || platformCfg.provider || "smtp").toLowerCase();
+  const preferredProvider = (customConfig?.provider || platformCfg.provider || process.env.EMAIL_PROVIDER || (process.env.RESEND_API_KEY ? "resend" : "smtp")).toLowerCase();
 
   // Resolve config keys
   const resendKey = customConfig?.resendApiKey || platformCfg.resendApiKey || (process.env.RESEND_API_KEY && process.env.RESEND_API_KEY !== "YOUR_RESEND_KEY" ? process.env.RESEND_API_KEY : undefined);
@@ -6677,7 +6676,7 @@ async function sendRealEmail(to: string, subject: string, htmlBody: string, from
 
   // Build Drivers
   let primaryDriver: EmailProvider;
-  if ((isExplicitSandbox && !customConfig) || !isProductionEnabled || preferredProvider === "simulator") {
+  if (!isProductionEnabled || preferredProvider === "simulator") {
     primaryDriver = new SimulatorEmailProvider();
   } else if (preferredProvider === "resend") {
     if (!resendKey || !resendKey.startsWith("re_")) {
@@ -11488,7 +11487,7 @@ app.post("/api/admin/create-tenant", async (req, res) => {
             </div>
             
             <div style="border-top: 1px solid #e2e8f0; padding-top: 20px; margin-top: 40px; text-align: center; font-size: 11px; color: #94a3b8;">
-              Sent via Secure SMTP Relay on behalf of MarketForge OS Systems Administration.<br/>
+              Sent via Secure Outbound Gateway on behalf of MarketForge OS Systems Administration.<br/>
               &copy; 2026 MarketForge AI. All rights reserved.
             </div>
           </div>
