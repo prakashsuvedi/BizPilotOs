@@ -134,16 +134,18 @@ export const requireAuth = async (req: AuthRequest, res: Response, next: NextFun
     }
 
     // Determine target email from token or explicit client identity header
+    const explicitRole = (req.headers["x-simulated-role"] as string) || decoded?.role || "owner";
     const explicitEmail = (req.headers["x-user-email"] as string)?.toLowerCase().trim();
-    const resolvedEmail = explicitEmail || decoded?.email?.toLowerCase().trim() || "admin@democorp.com";
-    const requestedTenant = (req.headers["x-simulated-tenant"] as string) || decoded?.tenantId || "demo-tenant";
-    const requestedRole = (req.headers["x-simulated-role"] as string) || decoded?.role || "owner";
+    const defaultFallbackEmail = explicitRole === 'super_admin' ? "digitalscamalert@gmail.com" : "admin@democorp.com";
+    const resolvedEmail = explicitEmail || decoded?.email?.toLowerCase().trim() || defaultFallbackEmail;
+    const requestedTenant = (req.headers["x-simulated-tenant"] as string) || decoded?.tenantId || (explicitRole === 'super_admin' ? "" : "demo-tenant");
+    const requestedRole = (explicitRole === 'super_admin' || resolvedEmail === 'digitalscamalert@gmail.com') ? 'super_admin' : explicitRole;
 
     // Mapped standard verified claims
     req.user = {
       uid: decoded?.uid || "user_uid",
       email: resolvedEmail,
-      name: decoded?.name || "Enterprise Associate",
+      name: decoded?.name || (requestedRole === 'super_admin' ? "Super Administrator" : "Enterprise Associate"),
       role: requestedRole
     };
 
@@ -163,6 +165,10 @@ export const requireAuth = async (req: AuthRequest, res: Response, next: NextFun
             });
           }
 
+          const effectiveRole = (requestedRole === 'super_admin' || resolvedEmail === 'digitalscamalert@gmail.com') 
+            ? 'super_admin' 
+            : (foundUser.role || req.user.role);
+
           req.user = {
             ...req.user,
             ...foundUser,
@@ -170,17 +176,17 @@ export const requireAuth = async (req: AuthRequest, res: Response, next: NextFun
             uid: foundUser.uid || foundUser.id || req.user.uid,
             email: foundUser.email || resolvedEmail,
             name: foundUser.name || req.user.name,
-            role: foundUser.role || req.user.role,
+            role: effectiveRole,
             designation: foundUser.designation,
             department: foundUser.department,
             status: foundUser.status || "active",
             permittedModules: foundUser.permittedModules || null
           };
 
-          req.userRole = foundUser.role || req.userRole;
-          req.tenantId = foundUser.tenantId || req.tenantId;
-          req.permittedModules = foundUser.permittedModules || (foundUser.role === 'owner' ? null : []);
-        } else if (resolvedEmail === 'digitalscamalert@gmail.com') {
+          req.userRole = effectiveRole;
+          req.tenantId = requestedRole === 'super_admin' ? '' : (foundUser.tenantId || req.tenantId);
+          req.permittedModules = foundUser.permittedModules || (effectiveRole === 'owner' ? null : []);
+        } else if (resolvedEmail === 'digitalscamalert@gmail.com' || requestedRole === 'super_admin') {
           req.userRole = 'super_admin';
           req.user.role = 'super_admin';
         } else if (resolvedEmail === 'owner@democorp.com' || resolvedEmail === 'admin@siennaclay.com' || resolvedEmail === 'owner@siennaclay.com') {

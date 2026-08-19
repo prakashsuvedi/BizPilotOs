@@ -1910,7 +1910,8 @@ export default function SuperAdminPortal({
           headers: { 
             "Content-Type": "application/json",
             "Authorization": `Bearer ${token}`,
-            "x-simulated-role": "super_admin"
+            "x-simulated-role": "super_admin",
+            "x-user-email": "digitalscamalert@gmail.com"
           },
           body: JSON.stringify({ targetTenantId: id })
         });
@@ -1919,7 +1920,8 @@ export default function SuperAdminPortal({
           headers: {
             "Content-Type": "application/json",
             "Authorization": `Bearer ${token}`,
-            "x-simulated-role": "super_admin"
+            "x-simulated-role": "super_admin",
+            "x-user-email": "digitalscamalert@gmail.com"
           }
         });
         if (!resp.ok) {
