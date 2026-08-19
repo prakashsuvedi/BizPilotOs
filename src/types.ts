@@ -154,6 +154,7 @@ export interface TenantConfig {
   name: string;
   domain: string;
   ownerEmail: string;
+  businessType?: string;
   isCustom?: boolean;
   status: 'active' | 'suspended';
   plan: 'Basic' | 'Growth' | 'Pro' | 'Enterprise' | 'Custom';

@@ -10,10 +10,13 @@ export interface CustomProductTile {
   id: string;
   title: string;
   price: string;
+  unit?: string;
+  rating?: string;
   image: string;
   category: string;
   badge?: string;
   description?: string;
+  features?: string[];
 }
 
 export interface CustomLandingData {
@@ -30,6 +33,7 @@ import { clearStaleLocalStorageCache } from './imageUtils';
 
 export interface TenantBranding {
   tenantId: string;
+  businessType?: string;
   companyName: string;
   tagline: string;
   logoUrl: string;
@@ -134,6 +138,7 @@ export function getTenantBranding(tenantId: string): TenantBranding {
 
   const fallback: TenantBranding = {
     tenantId,
+    businessType: tenantFromMaster?.businessType || defaultPreset.businessType,
     companyName: cleanFormattedName || 'Enterprise Workspace',
     tagline: defaultPreset.tagline || 'Leading Next-Gen Operations & Integrated Commerce.',
     logoUrl: defaultPreset.logoUrl || '',

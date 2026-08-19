@@ -87,7 +87,9 @@ import {
   Archive,
   Ban,
   PlayCircle,
-  Network
+  Network,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { 
   HELP_ARTICLES, 
@@ -377,6 +379,68 @@ export default function SuperAdminPortal({
   // Current sub-view tabs
   const [saTab, setSaTab] = useState<'analytics' | 'tenants' | 'users' | 'flags' | 'security' | 'secrets_vault' | 'commerce' | 'module_pricing' | 'front_customizer' | 'platform_deployment' | 'success_center' | 'integrations' | 'workflow_automation' | 'api_gateway' | 'webhook_engine' | 'health' | 'diagnostics' | 'verification' | 'enterprise_knowledge' | 'orchestration' | 'autonomous_intelligence' | 'enterprise_ai_os' | 'smtp_connectivity' | 'restaurant_os' | 'tours_os' | 'website_builder' | 'business_ops' | 'platform_tester' | 'hotel_os' | 'social_studio' | 'email_studio' | 'ad_studio' | 'campaign_planner' | 'domains'>('analytics');
   const [activeSaCategory, setActiveSaCategory] = useState<'all' | 'governance' | 'industry' | 'marketing' | 'ai' | 'infra'>('all');
+
+  // Slider Arrow Refs & State for PC / Desktop horizontal navigation
+  const categoryScrollRef = useRef<HTMLDivElement>(null);
+  const subtabsScrollRef = useRef<HTMLDivElement>(null);
+
+  const [canScrollSubtabsLeft, setCanScrollSubtabsLeft] = useState(false);
+  const [canScrollSubtabsRight, setCanScrollSubtabsRight] = useState(true);
+
+  const [canScrollCategoryLeft, setCanScrollCategoryLeft] = useState(false);
+  const [canScrollCategoryRight, setCanScrollCategoryRight] = useState(true);
+
+  const checkSubtabsScroll = () => {
+    if (subtabsScrollRef.current) {
+      const { scrollLeft, scrollWidth, clientWidth } = subtabsScrollRef.current;
+      setCanScrollSubtabsLeft(scrollLeft > 5);
+      setCanScrollSubtabsRight(scrollLeft < scrollWidth - clientWidth - 5);
+    }
+  };
+
+  const checkCategoryScroll = () => {
+    if (categoryScrollRef.current) {
+      const { scrollLeft, scrollWidth, clientWidth } = categoryScrollRef.current;
+      setCanScrollCategoryLeft(scrollLeft > 5);
+      setCanScrollCategoryRight(scrollLeft < scrollWidth - clientWidth - 5);
+    }
+  };
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      checkSubtabsScroll();
+      checkCategoryScroll();
+    }, 100);
+    window.addEventListener('resize', checkSubtabsScroll);
+    window.addEventListener('resize', checkCategoryScroll);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('resize', checkSubtabsScroll);
+      window.removeEventListener('resize', checkCategoryScroll);
+    };
+  }, [activeSaCategory, saTab]);
+
+  const scrollSubtabs = (direction: 'left' | 'right') => {
+    if (subtabsScrollRef.current) {
+      const distance = 340;
+      subtabsScrollRef.current.scrollBy({
+        left: direction === 'left' ? -distance : distance,
+        behavior: 'smooth'
+      });
+      setTimeout(checkSubtabsScroll, 350);
+    }
+  };
+
+  const scrollCategories = (direction: 'left' | 'right') => {
+    if (categoryScrollRef.current) {
+      const distance = 240;
+      categoryScrollRef.current.scrollBy({
+        left: direction === 'left' ? -distance : distance,
+        behavior: 'smooth'
+      });
+      setTimeout(checkCategoryScroll, 350);
+    }
+  };
 
   // Module Dynamic Pricing State
   const [modulePricing, setModulePricing] = useState<any[]>(() => [
@@ -2114,79 +2178,137 @@ export default function SuperAdminPortal({
           </div>
         </div>
 
-        {/* Category Pills */}
-        <div className="flex gap-1.5 overflow-x-auto pb-1 text-xs">
+        {/* Category Pills with Slider Arrows for PC Navigation */}
+        <div className="relative flex items-center gap-1.5">
           <button
-            onClick={() => setActiveSaCategory('all')}
-            className={`px-3 py-1.5 rounded-lg font-semibold cursor-pointer transition whitespace-nowrap flex items-center gap-1.5 ${
-              activeSaCategory === 'all'
-                ? 'bg-indigo-600 text-white font-bold shadow'
-                : 'bg-slate-800/80 text-slate-300 hover:bg-slate-700/80'
+            type="button"
+            onClick={() => scrollCategories('left')}
+            disabled={!canScrollCategoryLeft}
+            aria-label="Slide categories left"
+            title="Slide categories left"
+            className={`shrink-0 p-1.5 rounded-lg border transition flex items-center justify-center cursor-pointer text-xs ${
+              canScrollCategoryLeft
+                ? 'bg-slate-800 text-slate-200 hover:bg-indigo-600 hover:text-white border-slate-700 hover:scale-105 active:scale-95 shadow-sm'
+                : 'bg-slate-800/40 text-slate-600 border-slate-800/60 cursor-not-allowed opacity-35'
             }`}
           >
-            <Globe className="w-3.5 h-3.5" />
-            All Modules (28)
+            <ChevronLeft className="w-4 h-4" />
           </button>
+
+          <div 
+            ref={categoryScrollRef}
+            onScroll={checkCategoryScroll}
+            className="flex gap-1.5 overflow-x-auto pb-1 text-xs scroll-smooth flex-1 select-none"
+          >
+            <button
+              onClick={() => setActiveSaCategory('all')}
+              className={`px-3 py-1.5 rounded-lg font-semibold cursor-pointer transition whitespace-nowrap flex items-center gap-1.5 ${
+                activeSaCategory === 'all'
+                  ? 'bg-indigo-600 text-white font-bold shadow'
+                  : 'bg-slate-800/80 text-slate-300 hover:bg-slate-700/80'
+              }`}
+            >
+              <Globe className="w-3.5 h-3.5" />
+              All Modules (28)
+            </button>
+            <button
+              onClick={() => setActiveSaCategory('governance')}
+              className={`px-3 py-1.5 rounded-lg font-semibold cursor-pointer transition whitespace-nowrap flex items-center gap-1.5 ${
+                activeSaCategory === 'governance'
+                  ? 'bg-indigo-600 text-white font-bold shadow'
+                  : 'bg-slate-800/80 text-slate-300 hover:bg-slate-700/80'
+              }`}
+            >
+              <Sliders className="w-3.5 h-3.5 text-blue-400" />
+              Governance & Billing (9)
+            </button>
+            <button
+              onClick={() => setActiveSaCategory('industry')}
+              className={`px-3 py-1.5 rounded-lg font-semibold cursor-pointer transition whitespace-nowrap flex items-center gap-1.5 ${
+                activeSaCategory === 'industry'
+                  ? 'bg-indigo-600 text-white font-bold shadow'
+                  : 'bg-slate-800/80 text-slate-300 hover:bg-slate-700/80'
+              }`}
+            >
+              <Building2 className="w-3.5 h-3.5 text-orange-400" />
+              Industry OS Verticals (5)
+            </button>
+            <button
+              onClick={() => setActiveSaCategory('marketing')}
+              className={`px-3 py-1.5 rounded-lg font-semibold cursor-pointer transition whitespace-nowrap flex items-center gap-1.5 ${
+                activeSaCategory === 'marketing'
+                  ? 'bg-indigo-600 text-white font-bold shadow'
+                  : 'bg-slate-800/80 text-slate-300 hover:bg-slate-700/80'
+              }`}
+            >
+              <Sparkles className="w-3.5 h-3.5 text-pink-400" />
+              Marketing & Growth (4)
+            </button>
+            <button
+              onClick={() => setActiveSaCategory('ai')}
+              className={`px-3 py-1.5 rounded-lg font-semibold cursor-pointer transition whitespace-nowrap flex items-center gap-1.5 ${
+                activeSaCategory === 'ai'
+                  ? 'bg-indigo-600 text-white font-bold shadow'
+                  : 'bg-slate-800/80 text-slate-300 hover:bg-slate-700/80'
+              }`}
+            >
+              <Cpu className="w-3.5 h-3.5 text-cyan-400" />
+              Enterprise AI & Agents (4)
+            </button>
+            <button
+              onClick={() => setActiveSaCategory('infra')}
+              className={`px-3 py-1.5 rounded-lg font-semibold cursor-pointer transition whitespace-nowrap flex items-center gap-1.5 ${
+                activeSaCategory === 'infra'
+                  ? 'bg-indigo-600 text-white font-bold shadow'
+                  : 'bg-slate-800/80 text-slate-300 hover:bg-slate-700/80'
+              }`}
+            >
+              <Terminal className="w-3.5 h-3.5 text-emerald-400" />
+              Infra & Testing (6)
+            </button>
+          </div>
+
           <button
-            onClick={() => setActiveSaCategory('governance')}
-            className={`px-3 py-1.5 rounded-lg font-semibold cursor-pointer transition whitespace-nowrap flex items-center gap-1.5 ${
-              activeSaCategory === 'governance'
-                ? 'bg-indigo-600 text-white font-bold shadow'
-                : 'bg-slate-800/80 text-slate-300 hover:bg-slate-700/80'
+            type="button"
+            onClick={() => scrollCategories('right')}
+            disabled={!canScrollCategoryRight}
+            aria-label="Slide categories right"
+            title="Slide categories right"
+            className={`shrink-0 p-1.5 rounded-lg border transition flex items-center justify-center cursor-pointer text-xs ${
+              canScrollCategoryRight
+                ? 'bg-slate-800 text-slate-200 hover:bg-indigo-600 hover:text-white border-slate-700 hover:scale-105 active:scale-95 shadow-sm'
+                : 'bg-slate-800/40 text-slate-600 border-slate-800/60 cursor-not-allowed opacity-35'
             }`}
           >
-            <Sliders className="w-3.5 h-3.5 text-blue-400" />
-            Governance & Billing (9)
-          </button>
-          <button
-            onClick={() => setActiveSaCategory('industry')}
-            className={`px-3 py-1.5 rounded-lg font-semibold cursor-pointer transition whitespace-nowrap flex items-center gap-1.5 ${
-              activeSaCategory === 'industry'
-                ? 'bg-indigo-600 text-white font-bold shadow'
-                : 'bg-slate-800/80 text-slate-300 hover:bg-slate-700/80'
-            }`}
-          >
-            <Building2 className="w-3.5 h-3.5 text-orange-400" />
-            Industry OS Verticals (5)
-          </button>
-          <button
-            onClick={() => setActiveSaCategory('marketing')}
-            className={`px-3 py-1.5 rounded-lg font-semibold cursor-pointer transition whitespace-nowrap flex items-center gap-1.5 ${
-              activeSaCategory === 'marketing'
-                ? 'bg-indigo-600 text-white font-bold shadow'
-                : 'bg-slate-800/80 text-slate-300 hover:bg-slate-700/80'
-            }`}
-          >
-            <Sparkles className="w-3.5 h-3.5 text-pink-400" />
-            Marketing & Growth (4)
-          </button>
-          <button
-            onClick={() => setActiveSaCategory('ai')}
-            className={`px-3 py-1.5 rounded-lg font-semibold cursor-pointer transition whitespace-nowrap flex items-center gap-1.5 ${
-              activeSaCategory === 'ai'
-                ? 'bg-indigo-600 text-white font-bold shadow'
-                : 'bg-slate-800/80 text-slate-300 hover:bg-slate-700/80'
-            }`}
-          >
-            <Cpu className="w-3.5 h-3.5 text-cyan-400" />
-            Enterprise AI & Agents (4)
-          </button>
-          <button
-            onClick={() => setActiveSaCategory('infra')}
-            className={`px-3 py-1.5 rounded-lg font-semibold cursor-pointer transition whitespace-nowrap flex items-center gap-1.5 ${
-              activeSaCategory === 'infra'
-                ? 'bg-indigo-600 text-white font-bold shadow'
-                : 'bg-slate-800/80 text-slate-300 hover:bg-slate-700/80'
-            }`}
-          >
-            <Terminal className="w-3.5 h-3.5 text-emerald-400" />
-            Infra & Testing (6)
+            <ChevronRight className="w-4 h-4" />
           </button>
         </div>
       </div>
 
-      {/* HORIZONTAL ADMIN CONTROL SUBTABS */}
-      <div className="flex gap-1.5 border-b border-slate-200 pb-2 overflow-x-auto">
+      {/* HORIZONTAL ADMIN CONTROL SUBTABS WITH SLIDER ARROWS FOR PC & TOUCH */}
+      <div className="relative flex items-center gap-2 border-b border-slate-200 pb-2">
+        {/* Left Slider Arrow Button */}
+        <button
+          type="button"
+          onClick={() => scrollSubtabs('left')}
+          disabled={!canScrollSubtabsLeft}
+          aria-label="Slide module tabs left"
+          title="Slide module tabs left"
+          className={`shrink-0 p-2 rounded-xl border transition flex items-center justify-center cursor-pointer shadow-sm ${
+            canScrollSubtabsLeft
+              ? 'bg-slate-900 text-white hover:bg-indigo-600 border-slate-800 hover:border-indigo-500 hover:scale-105 active:scale-95'
+              : 'bg-slate-100 text-slate-300 border-slate-200 cursor-not-allowed opacity-40'
+          }`}
+        >
+          <ChevronLeft className="w-4 h-4" />
+        </button>
+
+        {/* Scrollable Track */}
+        <div 
+          ref={subtabsScrollRef}
+          onScroll={checkSubtabsScroll}
+          className="flex gap-1.5 overflow-x-auto scroll-smooth flex-1 select-none py-0.5"
+        >
         {/* GROUP 1: GOVERNANCE & BILLING */}
         {(activeSaCategory === 'all' || activeSaCategory === 'governance') && (
           <>
@@ -2591,6 +2713,23 @@ export default function SuperAdminPortal({
             </button>
           </>
         )}
+        </div>
+
+        {/* Right Slider Arrow Button */}
+        <button
+          type="button"
+          onClick={() => scrollSubtabs('right')}
+          disabled={!canScrollSubtabsRight}
+          aria-label="Slide module tabs right"
+          title="Slide module tabs right"
+          className={`shrink-0 p-2 rounded-xl border transition flex items-center justify-center cursor-pointer shadow-sm ${
+            canScrollSubtabsRight
+              ? 'bg-slate-900 text-white hover:bg-indigo-600 border-slate-800 hover:border-indigo-500 hover:scale-105 active:scale-95'
+              : 'bg-slate-100 text-slate-300 border-slate-200 cursor-not-allowed opacity-40'
+          }`}
+        >
+          <ChevronRight className="w-4 h-4" />
+        </button>
       </div>
 
       {/* TAB VIEW: WORKFLOW AUTOMATION STUDIO */}
