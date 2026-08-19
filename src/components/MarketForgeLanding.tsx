@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Helmet } from 'react-helmet-async';
 import { MarketForgeLogo, MarketForgeEmblem } from './MarketForgeLogo';
 import { getTenantBranding, saveTenantBranding, TenantBranding } from '../lib/tenantBranding';
+import { BusinessType, BUSINESS_TEMPLATES } from '../lib/businessTemplates';
 import type { CompanyPageType } from './CompanyPagesModal';
 
 const CompanyPagesModal = React.lazy(() => import('./CompanyPagesModal'));
@@ -297,8 +298,11 @@ export function MarketForgeLanding({
     setTimeout(() => setCopiedToast(null), 2500);
   };
 
-  // Determine Business Vertical from Tenant Profile / Name
-  const detectBusinessType = (): 'hotel_resort' | 'restaurant' | 'tours_travel' | 'retail_commerce' | 'agency_enterprise' => {
+  // Determine Business Vertical from Stored Branding or Auto-Detection
+  const detectBusinessType = (): BusinessType => {
+    if (branding.businessType && BUSINESS_TEMPLATES[branding.businessType as BusinessType]) {
+      return branding.businessType as BusinessType;
+    }
     const combined = ((branding.companyName || '') + ' ' + tenantId).toLowerCase();
     if (combined.includes('hotel') || combined.includes('resort') || combined.includes('lodge') || combined.includes('inn') || combined.includes('hospitality') || combined.includes('stay') || combined.includes('villa')) {
       return 'hotel_resort';
@@ -309,13 +313,29 @@ export function MarketForgeLanding({
     if (combined.includes('tour') || combined.includes('travel') || combined.includes('trek') || combined.includes('trip') || combined.includes('adventure') || combined.includes('expedition') || combined.includes('holiday')) {
       return 'tours_travel';
     }
+    if (combined.includes('health') || combined.includes('clinic') || combined.includes('hospital') || combined.includes('doctor') || combined.includes('dental') || combined.includes('medical') || combined.includes('pharma')) {
+      return 'healthcare_clinic';
+    }
+    if (combined.includes('fitness') || combined.includes('gym') || combined.includes('workout') || combined.includes('crossfit') || combined.includes('yoga') || combined.includes('sports')) {
+      return 'fitness_gym';
+    }
+    if (combined.includes('real estate') || combined.includes('property') || combined.includes('realty') || combined.includes('homes') || combined.includes('estate') || combined.includes('apartments')) {
+      return 'real_estate';
+    }
+    if (combined.includes('academy') || combined.includes('school') || combined.includes('course') || combined.includes('institute') || combined.includes('education') || combined.includes('learn')) {
+      return 'education_academy';
+    }
+    if (combined.includes('saas') || combined.includes('software') || combined.includes('tech') || combined.includes('cloud') || combined.includes('api') || combined.includes('ai')) {
+      return 'tech_saas';
+    }
     if (combined.includes('store') || combined.includes('shop') || combined.includes('mart') || combined.includes('retail') || combined.includes('clay') || combined.includes('fashion') || combined.includes('boutique') || combined.includes('hardware') || combined.includes('gear')) {
       return 'retail_commerce';
     }
     return 'agency_enterprise';
   };
 
-  const businessType = detectBusinessType();
+  const businessType: BusinessType = detectBusinessType();
+  const currentTemplate = BUSINESS_TEMPLATES[businessType] || BUSINESS_TEMPLATES.agency_enterprise;
 
   const handleSubmitInquiry = (e: React.FormEvent) => {
     e.preventDefault();
@@ -555,8 +575,25 @@ export function MarketForgeLanding({
     }
   ];
 
-  // Select Active Dataset based on Business Vertical
+  // Select Active Dataset based on Business Vertical and Custom Branding Catalog
   const getActiveDataset = () => {
+    // If tenant customized products exist, prioritize them
+    if (branding.customLandingData?.productsCatalog && branding.customLandingData.productsCatalog.length > 0) {
+      return {
+        items: branding.customLandingData.productsCatalog,
+        title: branding.customLandingData.catalogSectionTitle || currentTemplate?.offeringsTitle || 'Featured Offerings & Catalog',
+        label: currentTemplate?.inquiryActionLabel || 'Inquire & Order'
+      };
+    }
+
+    if (currentTemplate && currentTemplate.defaultItems) {
+      return {
+        items: currentTemplate.defaultItems,
+        title: currentTemplate.offeringsTitle || 'Featured Offerings & Catalog',
+        label: currentTemplate.inquiryActionLabel || 'Inquire & Order'
+      };
+    }
+
     switch (businessType) {
       case 'hotel_resort':
         return { items: hotelRoomsData, title: 'Luxury Rooms, Suites & Villas', label: 'Inquire & Book Room' };
@@ -740,7 +777,7 @@ export function MarketForgeLanding({
               </div>
 
               <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black text-white tracking-tight leading-tight">
-                {branding.customLandingData?.heroTitle || (
+                {branding.customLandingData?.heroTitle || currentTemplate?.defaultHeroTitle || (
                   businessType === 'hotel_resort' ? 'World-Class Hospitality & Luxury Stay' :
                   businessType === 'restaurant' ? 'Artisanal Dining & Gourmet Cuisine' :
                   businessType === 'tours_travel' ? 'Unforgettable Travel & Trekking Escapes' :
@@ -750,7 +787,7 @@ export function MarketForgeLanding({
               </h1>
 
               <p className="text-slate-300 text-sm sm:text-base leading-relaxed max-w-2xl font-sans">
-                {branding.customLandingData?.heroSubtitle || branding.tagline || (
+                {branding.customLandingData?.heroSubtitle || branding.tagline || currentTemplate?.defaultHeroSubtitle || (
                   businessType === 'hotel_resort' ? 'Immerse yourself in tranquil comfort, premium amenities, and personalized guest services tailored to your stay.' :
                   businessType === 'restaurant' ? 'Experience farm-to-table freshness, signature chef recipes, and warm dining hospitality every single day.' :
                   'Delivering premier quality, dedicated customer care, and industry-leading standards.'
@@ -764,7 +801,7 @@ export function MarketForgeLanding({
                   className="px-6 py-3.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-extrabold text-xs sm:text-sm rounded-2xl shadow-xl shadow-emerald-600/20 border border-emerald-400/40 flex items-center gap-2 transition transform hover:-translate-y-0.5 cursor-pointer"
                 >
                   <ShoppingBag className="w-4 h-4 text-amber-200" />
-                  <span>{businessType === 'hotel_resort' ? 'Explore Rooms & Suites' : businessType === 'restaurant' ? 'View Gourmet Menu' : businessType === 'tours_travel' ? 'View Tour Packages' : 'Explore Offerings'}</span>
+                  <span>{branding.customLandingData?.ctaButtonText || currentTemplate?.defaultCtaButtonText || 'Explore Offerings'}</span>
                   <ArrowRight className="w-4 h-4" />
                 </a>
 
@@ -783,18 +820,15 @@ export function MarketForgeLanding({
 
               {/* Trust Indicators */}
               <div className="pt-4 flex flex-wrap items-center gap-6 text-slate-400 text-xs border-t border-white/10">
-                <div className="flex items-center gap-2">
-                  <Award className="w-4 h-4 text-amber-400" />
-                  <span>Premium Quality Assured</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                  <span>Direct Customer Support</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Star className="w-4 h-4 text-yellow-400 fill-yellow-400" />
-                  <span>4.9 / 5 Guest Rating</span>
-                </div>
+                {(branding.customLandingData?.showcaseFeatures && branding.customLandingData.showcaseFeatures.length > 0
+                  ? branding.customLandingData.showcaseFeatures
+                  : currentTemplate?.defaultFeatures || ['Premium Quality Assured', 'Direct Customer Support', '4.9 / 5 Client Rating']
+                ).map((feat, idx) => (
+                  <div key={idx} className="flex items-center gap-2">
+                    {idx === 0 ? <Award className="w-4 h-4 text-amber-400" /> : idx === 1 ? <CheckCircle2 className="w-4 h-4 text-emerald-400" /> : <Star className="w-4 h-4 text-yellow-400 fill-yellow-400" />}
+                    <span>{feat}</span>
+                  </div>
+                ))}
               </div>
 
             </div>
@@ -803,12 +837,7 @@ export function MarketForgeLanding({
             <div className="lg:col-span-5 relative">
               <div className="rounded-3xl overflow-hidden border border-white/20 shadow-2xl bg-slate-900 relative aspect-4/3 group">
                 <img
-                  src={branding.customLandingData?.heroImageUrl || branding.logoUrl || (
-                    businessType === 'hotel_resort' ? 'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=1000&q=80' :
-                    businessType === 'restaurant' ? 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1000&q=80' :
-                    businessType === 'tours_travel' ? 'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?auto=format&fit=crop&w=1000&q=80' :
-                    'https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=1000&q=80'
-                  )}
+                  src={branding.customLandingData?.heroImageUrl || currentTemplate?.defaultHeroImageUrl || branding.logoUrl || 'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=1000&q=80'}
                   alt={branding.companyName}
                   className="w-full h-full object-cover group-hover:scale-105 transition duration-700"
                 />

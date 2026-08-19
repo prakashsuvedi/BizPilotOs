@@ -11297,7 +11297,7 @@ app.post("/api/admin/validate-byok-key", async (req, res) => {
 
 // Endpoint to trigger fully transactional tenant provisioning, cPanel integration and SMTP outbound invitation email
 app.post("/api/admin/create-tenant", async (req, res) => {
-  const { id, name, domain, ownerEmail, plan, activatedModules, disabledModules, currency, subscriptionPrice } = req.body;
+  const { id, name, domain, ownerEmail, plan, activatedModules, disabledModules, currency, subscriptionPrice, businessType } = req.body;
 
   if (!id || !name || !ownerEmail) {
     return res.status(400).json({ error: "Parameters 'id', 'name' and 'ownerEmail' are required." });
@@ -11306,6 +11306,7 @@ app.post("/api/admin/create-tenant", async (req, res) => {
   const tenantId = id.trim().toLowerCase().replace(/\s+/g, '-');
   const planMrrMap: any = { Basic: 99, Growth: 249, Pro: 499, Enterprise: 1200 };
   const currentPlan = plan || 'Growth';
+  const assignedBusinessType = businessType || 'agency_enterprise';
 
   // Check if tenant already exists in memory or live Firestore
   const isReal = getIsRealAdminReady();
@@ -11390,6 +11391,7 @@ app.post("/api/admin/create-tenant", async (req, res) => {
     freshTenant = {
       id: tenantId,
       name,
+      businessType: assignedBusinessType,
       domain: computedDomain,
       ownerEmail,
       isCustom: true,

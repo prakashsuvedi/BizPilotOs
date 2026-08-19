@@ -126,6 +126,8 @@ import ApiGatewayDeveloperPortal from './ApiGatewayDeveloperPortal';
 import AdvancedWebhookEngine from './AdvancedWebhookEngine';
 import IntegrationManager from './IntegrationManager';
 import { UIStyleEngine } from '../lib/UIStyleEngine';
+import { BusinessType, BUSINESS_TEMPLATES, generateBusinessDefaultBranding } from '../lib/businessTemplates';
+import { saveTenantBranding, getTenantBranding } from '../lib/tenantBranding';
 
 // Interfaces for our stateful Simulated DB
 export interface TenantConfig {
@@ -891,6 +893,7 @@ export default function SuperAdminPortal({
   const [newTenantId, setNewTenantId] = useState('');
   const [newTenantDomain, setNewTenantDomain] = useState('');
   const [newTenantOwner, setNewTenantOwner] = useState('');
+  const [newTenantBusinessType, setNewTenantBusinessType] = useState<BusinessType>('hotel_resort');
   const [newTenantPlan, setNewTenantPlan] = useState<'Basic' | 'Growth' | 'Pro' | 'Enterprise'>('Growth');
   const [newTenantCurrency, setNewTenantCurrency] = useState<'USD' | 'NPR' | 'INR' | 'EUR' | 'GBP' | 'AUD' | 'CAD'>('USD');
   const [newTenantCustomPrice, setNewTenantCustomPrice] = useState<string>('249');
@@ -1518,6 +1521,7 @@ export default function SuperAdminPortal({
         body: JSON.stringify({
           id: computedId,
           name: newTenantName,
+          businessType: newTenantBusinessType,
           domain: newTenantDomain || `marketforge.scamspike.com/${computedId}`,
           ownerEmail: newTenantOwner,
           plan: newTenantPlan,
@@ -1534,9 +1538,20 @@ export default function SuperAdminPortal({
 
       const outcome = await resp.json();
 
+      // Initialize rich industry-specific branding and custom landing catalog immediately
+      const initialBranding = generateBusinessDefaultBranding(
+        computedId,
+        newTenantName,
+        newTenantBusinessType,
+        newTenantDomain || `marketforge.scamspike.com/${computedId}`,
+        newTenantOwner
+      );
+      await saveTenantBranding(initialBranding);
+
       const freshTenant: TenantConfig = {
         id: computedId,
         name: newTenantName,
+        businessType: newTenantBusinessType,
         domain: newTenantDomain || `marketforge.scamspike.com/${computedId}`,
         ownerEmail: newTenantOwner,
         isCustom: true,
@@ -4034,6 +4049,39 @@ export default function SuperAdminPortal({
                       }}
                       className="w-full px-3 py-2 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-500 text-xs font-sans text-slate-800"
                     />
+                  </div>
+
+                  {/* BUSINESS TYPE & DEMO TEMPLATE SELECTOR */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-slate-800 block">
+                        Business Type & Initial Landing Demo
+                      </label>
+                      <span className="text-[10px] font-mono text-indigo-600 font-semibold bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-200">
+                        {BUSINESS_TEMPLATES[newTenantBusinessType]?.badge || 'Selected'}
+                      </span>
+                    </div>
+                    <select
+                      value={newTenantBusinessType}
+                      onChange={(e) => {
+                        const bType = e.target.value as BusinessType;
+                        setNewTenantBusinessType(bType);
+                        const tmpl = BUSINESS_TEMPLATES[bType];
+                        if (tmpl?.recommendedModules) {
+                          setNewTenantModules(tmpl.recommendedModules);
+                        }
+                      }}
+                      className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-indigo-500 focus:bg-white cursor-pointer font-sans"
+                    >
+                      {Object.values(BUSINESS_TEMPLATES).map((tmpl) => (
+                        <option key={tmpl.id} value={tmpl.id}>
+                          {tmpl.name} — ({tmpl.badge})
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-[11px] text-slate-500 italic">
+                      ✨ {BUSINESS_TEMPLATES[newTenantBusinessType]?.description}
+                    </p>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
