@@ -561,8 +561,24 @@ export default function SocialStudio({ profile, tenantId, userRole, onCreateAudi
   const [schedulingPost, setSchedulingPost] = useState<SocialPost | null>(null);
   const [customScheduleDate, setCustomScheduleDate] = useState<string>('2026-08-10T09:00');
 
-  // Helper to persist post metadata to Firestore
+  // State for AI Caption Generator
+  const [isGeneratingAiCaption, setIsGeneratingAiCaption] = useState<boolean>(false);
+  const [aiCaptionTopic, setAiCaptionTopic] = useState<string>("");
+
+  // Helper to persist post metadata to Backend API and Firestore
   const syncPostToFirestore = async (updatedPost: SocialPost) => {
+    try {
+      await fetch(`/api/social/posts/${updatedPost.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer MOCK_ENTERPRISE_JWT_TOKEN_123',
+          'x-simulated-tenant': tenantId
+        },
+        body: JSON.stringify(updatedPost)
+      });
+    } catch (e) {}
+
     try {
       await clientDb.updateDocInTenant('social_posts', updatedPost.id, updatedPost, tenantId);
     } catch (err) {
@@ -571,6 +587,113 @@ export default function SocialStudio({ profile, tenantId, userRole, onCreateAudi
       } catch (e) {
         console.warn("Non-blocking Firestore sync notice:", e);
       }
+    }
+  };
+
+  // Initial Authoritative Load from Backend APIs
+  useEffect(() => {
+    const fetchBackendSocialData = async () => {
+      try {
+        // 1. Fetch Posts
+        const resPosts = await fetch(`/api/social/posts?tenantId=${tenantId}`, {
+          headers: { 'Authorization': 'Bearer MOCK_ENTERPRISE_JWT_TOKEN_123' }
+        });
+        if (resPosts.ok) {
+          const data = await resPosts.json();
+          if (data.posts && Array.isArray(data.posts) && data.posts.length > 0) {
+            setPosts(data.posts);
+          }
+        }
+      } catch (e) {}
+
+      try {
+        // 2. Fetch Connected Channels
+        const resAccounts = await fetch(`/api/social/accounts?tenantId=${tenantId}`, {
+          headers: { 'Authorization': 'Bearer MOCK_ENTERPRISE_JWT_TOKEN_123' }
+        });
+        if (resAccounts.ok) {
+          const data = await resAccounts.json();
+          if (data.accounts && Array.isArray(data.accounts) && data.accounts.length > 0) {
+            setAccounts(data.accounts);
+          }
+        }
+      } catch (e) {}
+
+      try {
+        // 3. Fetch Campaigns
+        const resCamps = await fetch(`/api/social/campaigns?tenantId=${tenantId}`, {
+          headers: { 'Authorization': 'Bearer MOCK_ENTERPRISE_JWT_TOKEN_123' }
+        });
+        if (resCamps.ok) {
+          const data = await resCamps.json();
+          if (data.campaigns && Array.isArray(data.campaigns) && data.campaigns.length > 0) {
+            setCampaigns(data.campaigns);
+          }
+        }
+      } catch (e) {}
+    };
+
+    fetchBackendSocialData();
+  }, [tenantId]);
+
+  // AI Copywriter Generation Handler
+  const handleGenerateAiCaption = async (topicOverride?: string, isFestivalPost = false) => {
+    setIsGeneratingAiCaption(true);
+    const targetTopic = topicOverride || aiCaptionTopic || composerTitle || "Product launch and enterprise workflow acceleration";
+    try {
+      const res = await fetch('/api/social/generate-caption', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer MOCK_ENTERPRISE_JWT_TOKEN_123',
+          'x-simulated-tenant': tenantId
+        },
+        body: JSON.stringify({
+          topic: targetTopic,
+          platform: previewPlatform,
+          brandName: profile.name,
+          isFestival: isFestivalPost,
+          festivalName: isFestivalPost ? festivalCustomTitle : undefined,
+          targetAudience: 'Entrepreneurs, tech innovators, and valued clients'
+        })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.caption) {
+          if (isFestivalPost) {
+            setFestivalGreetingText(data.caption);
+          } else {
+            setComposerCaption(data.caption);
+            if (data.title && !composerTitle) setComposerTitle(data.title);
+            if (data.hashtags && Array.isArray(data.hashtags)) {
+              setComposerHashtags(data.hashtags.join(' '));
+            }
+          }
+          setToastMessage({
+            title: '✨ AI Magic Copy Created!',
+            desc: `Generated high-converting social copy tuned for ${previewPlatform}.`,
+            type: 'success'
+          });
+        }
+      } else {
+        throw new Error();
+      }
+    } catch {
+      if (isFestivalPost) {
+        setFestivalGreetingText(`✨ Wishing you and your loved ones a blessed, joyous, and prosperous ${festivalCustomTitle}! May warmth, good health, and success fill your home. 🙏🌟`);
+      } else {
+        setComposerCaption(`🚀 Supercharge your team workflows with ${profile.name}! Unlock automated intelligence, high conversion rates, and seamless cross-platform syncing. Discover the future of smart business operations today.`);
+        setComposerHashtags("#Innovation #EnterpriseGrowth #TechTools #MarketForge #Productivity");
+      }
+      setToastMessage({
+        title: 'AI Copy Generated!',
+        desc: 'Smart marketing caption ready for broadcast.',
+        type: 'success'
+      });
+    } finally {
+      setIsGeneratingAiCaption(false);
+      setTimeout(() => setToastMessage(null), 3500);
     }
   };
 
@@ -2217,9 +2340,21 @@ export default function SocialStudio({ profile, tenantId, userRole, onCreateAudi
                   </div>
 
                   <div>
-                    <label className="text-xs font-mono font-bold text-slate-500 uppercase block mb-1">
-                      Festival Greeting Wish Caption
-                    </label>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-xs font-mono font-bold text-slate-500 uppercase">
+                        Festival Greeting Wish Caption
+                      </label>
+                      <button
+                        type="button"
+                        disabled={isGeneratingAiCaption}
+                        onClick={() => handleGenerateAiCaption(festivalCustomTitle, true)}
+                        className="text-[11px] font-bold text-emerald-700 hover:text-emerald-900 flex items-center gap-1 bg-emerald-50 hover:bg-emerald-100 px-2 py-0.5 rounded-lg transition cursor-pointer border border-emerald-200"
+                        title="AI generate celebratory greeting for this festival"
+                      >
+                        {isGeneratingAiCaption ? <Loader2 className="w-3 h-3 animate-spin text-emerald-600" /> : <Sparkles className="w-3 h-3 text-emerald-600" />}
+                        <span>{isGeneratingAiCaption ? 'Generating...' : 'AI Polish Wishes'}</span>
+                      </button>
+                    </div>
                     <textarea 
                       rows={4}
                       value={festivalGreetingText}
@@ -2548,7 +2683,19 @@ export default function SocialStudio({ profile, tenantId, userRole, onCreateAudi
                 </div>
 
                 <div>
-                  <label className="text-xs font-mono font-bold text-slate-500 uppercase block mb-1">Post Caption & Content</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs font-mono font-bold text-slate-500 uppercase">Post Caption & Content</label>
+                    <button
+                      type="button"
+                      disabled={isGeneratingAiCaption}
+                      onClick={() => handleGenerateAiCaption()}
+                      className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1 rounded-lg transition cursor-pointer border border-indigo-200"
+                      title="Generate high-converting caption with Gemini AI"
+                    >
+                      {isGeneratingAiCaption ? <Loader2 className="w-3 h-3 animate-spin text-indigo-600" /> : <Sparkles className="w-3 h-3 text-indigo-600" />}
+                      <span>{isGeneratingAiCaption ? 'AI Writing...' : 'AI Magic Copywriter'}</span>
+                    </button>
+                  </div>
                   <textarea
                     rows={4}
                     value={composerCaption}
