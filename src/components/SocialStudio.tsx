@@ -508,10 +508,31 @@ export default function SocialStudio({ profile, tenantId, userRole, onCreateAudi
   const [composerHashtags, setComposerHashtags] = useState<string>("");
   const [composerCampaignId, setComposerCampaignId] = useState<string>("");
   const [composerPlatforms, setComposerPlatforms] = useState<string[]>(['LINKEDIN', 'INSTAGRAM', 'FACEBOOK']);
+  const [composerSelectedAccountIds, setComposerSelectedAccountIds] = useState<string[]>([]);
   const [composerPostType, setComposerPostType] = useState<'TEXT' | 'IMAGE' | 'VIDEO' | 'CAROUSEL' | 'LINK'>('IMAGE');
   const [composerScheduledFor, setComposerScheduledFor] = useState<string>('2026-08-07T09:25');
   const [composerMediaUrl, setComposerMediaUrl] = useState<string>("https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&auto=format&fit=crop&q=80");
   const [previewPlatform, setPreviewPlatform] = useState<'TIKTOK' | 'LINKEDIN' | 'FACEBOOK' | 'INSTAGRAM' | 'TWITTER'>('INSTAGRAM');
+
+  // Handle local image/media file upload
+  const handleMediaFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        if (typeof reader.result === 'string') {
+          setComposerMediaUrl(reader.result);
+          setToastMessage({
+            title: '📸 Image Uploaded!',
+            desc: `Loaded "${file.name}" for your social post media preview.`,
+            type: 'success'
+          });
+          setTimeout(() => setToastMessage(null), 3000);
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   // New Campaign Modal State
   const [showCampaignModal, setShowCampaignModal] = useState<boolean>(false);
@@ -2645,28 +2666,141 @@ export default function SocialStudio({ profile, tenantId, userRole, onCreateAudi
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 overflow-y-auto p-1">
               {/* Form Controls */}
               <div className="space-y-4">
+                {/* Format / Post Type Tabs */}
                 <div>
-                  <label className="text-xs font-mono font-bold text-slate-500 uppercase block mb-1">Target Channels</label>
-                  <div className="flex flex-wrap gap-2">
-                    {['FACEBOOK', 'INSTAGRAM', 'LINKEDIN', 'TWITTER', 'TIKTOK'].map(p => (
+                  <label className="text-xs font-mono font-bold text-slate-500 uppercase block mb-1.5">1. Post Format</label>
+                  <div className="grid grid-cols-5 gap-1 bg-slate-100 p-1 rounded-xl">
+                    {[
+                      { type: 'TEXT', label: 'Text', icon: '📝' },
+                      { type: 'IMAGE', label: 'Image', icon: '🖼️' },
+                      { type: 'VIDEO', label: 'Video', icon: '🎬' },
+                      { type: 'CAROUSEL', label: 'Carousel', icon: '📑' },
+                      { type: 'LINK', label: 'Link', icon: '🔗' },
+                    ].map(fmt => (
                       <button
-                        key={p}
+                        key={fmt.type}
                         type="button"
-                        onClick={() => {
-                          setComposerPlatforms(prev => prev.includes(p) ? prev.filter(x => x !== p) : [...prev, p]);
-                        }}
-                        className={`px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition cursor-pointer ${
-                          composerPlatforms.includes(p) 
-                            ? 'bg-sky-600 text-white border-sky-600 shadow-xs' 
-                            : 'bg-slate-50 text-slate-700 border-slate-200'
+                        onClick={() => setComposerPostType(fmt.type as any)}
+                        className={`py-1.5 px-1 rounded-lg text-[11px] font-bold transition flex items-center justify-center gap-1 cursor-pointer ${
+                          composerPostType === fmt.type
+                            ? 'bg-white text-slate-900 shadow-xs border border-slate-200'
+                            : 'text-slate-600 hover:text-slate-900'
                         }`}
                       >
-                        {getPlatformIcon(p, "w-3.5 h-3.5")}
-                        <span>{p}</span>
+                        <span>{fmt.icon}</span>
+                        <span>{fmt.label}</span>
                       </button>
                     ))}
                   </div>
                 </div>
+
+                {/* Target Connected Pages & Accounts */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-xs font-mono font-bold text-slate-500 uppercase">2. Select Target Pages & Channels</label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (composerSelectedAccountIds.length === accounts.length) {
+                          setComposerSelectedAccountIds([]);
+                          setComposerPlatforms([]);
+                        } else {
+                          setComposerSelectedAccountIds(accounts.map(a => a.id));
+                          setComposerPlatforms(Array.from(new Set(accounts.map(a => a.platform))));
+                        }
+                      }}
+                      className="text-[11px] font-bold text-sky-600 hover:underline cursor-pointer"
+                    >
+                      {composerSelectedAccountIds.length === accounts.length ? 'Deselect All' : 'Select All Pages'}
+                    </button>
+                  </div>
+
+                  {accounts.length === 0 ? (
+                    <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 flex items-center justify-between">
+                      <span>No connected pages found.</span>
+                      <button
+                        type="button"
+                        onClick={() => { setShowComposer(false); setShowConnectModal(true); }}
+                        className="font-bold underline text-amber-900 cursor-pointer"
+                      >
+                        + Connect Pages Now
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-1.5 max-h-36 overflow-y-auto border border-slate-200 rounded-xl p-2 bg-slate-50">
+                      {accounts.map(acc => {
+                        const isChecked = composerSelectedAccountIds.includes(acc.id) || (composerSelectedAccountIds.length === 0 && composerPlatforms.includes(acc.platform));
+                        return (
+                          <div
+                            key={acc.id}
+                            onClick={() => {
+                              setComposerSelectedAccountIds(prev => {
+                                const next = prev.includes(acc.id) ? prev.filter(x => x !== acc.id) : [...prev, acc.id];
+                                const targetPlats = Array.from(new Set(accounts.filter(a => next.includes(a.id)).map(a => a.platform)));
+                                setComposerPlatforms(targetPlats.length > 0 ? targetPlats : [acc.platform]);
+                                return next;
+                              });
+                            }}
+                            className={`p-2 rounded-lg border transition cursor-pointer flex items-center justify-between text-xs ${
+                              isChecked ? 'bg-white border-sky-500 shadow-2xs' : 'bg-slate-100/60 border-slate-200 opacity-75'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={() => {}}
+                                className="w-3.5 h-3.5 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+                              />
+                              <img src={acc.profileImage} alt="" className="w-6 h-6 rounded-full object-cover" />
+                              <div>
+                                <p className="font-extrabold text-[11px] text-slate-900 leading-tight">{acc.accountName}</p>
+                                <p className="text-[10px] text-slate-500 font-mono">{acc.accountHandle} • {acc.followerCount?.toLocaleString()} followers</p>
+                              </div>
+                            </div>
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-700 flex items-center gap-1">
+                              {getPlatformIcon(acc.platform, "w-3 h-3")}
+                              <span>{acc.platform}</span>
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* Media Uploader for Image/Video/Carousel */}
+                {composerPostType !== 'TEXT' && (
+                  <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-mono font-bold text-slate-500 uppercase">3. Media Upload & Asset</label>
+                      <label className="text-[11px] font-bold text-sky-600 hover:text-sky-800 bg-sky-50 border border-sky-200 px-2.5 py-1 rounded-lg cursor-pointer transition">
+                        📁 Browse Device
+                        <input
+                          type="file"
+                          accept="image/*,video/*"
+                          onChange={handleMediaFileUpload}
+                          className="hidden"
+                        />
+                      </label>
+                    </div>
+
+                    <input
+                      type="url"
+                      value={composerMediaUrl}
+                      onChange={(e) => setComposerMediaUrl(e.target.value)}
+                      placeholder="Or paste media asset URL (https://...)"
+                      className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-800 focus:outline-none"
+                    />
+
+                    {composerMediaUrl && (
+                      <div className="flex items-center gap-2 text-[10px] text-emerald-700 font-mono">
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        <span>Media asset linked and ready for dispatch.</span>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 <div>
                   <label className="text-xs font-mono font-bold text-slate-500 uppercase block mb-1">Link to Campaign (Optional)</label>
@@ -2705,25 +2839,27 @@ export default function SocialStudio({ profile, tenantId, userRole, onCreateAudi
                   />
                 </div>
 
-                <div>
-                  <label className="text-xs font-mono font-bold text-slate-500 uppercase block mb-1">Hashtags</label>
-                  <input
-                    type="text"
-                    value={composerHashtags}
-                    onChange={(e) => setComposerHashtags(e.target.value)}
-                    placeholder="#MarketForge #Growth #SaaS"
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 focus:outline-none font-mono"
-                  />
-                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-xs font-mono font-bold text-slate-500 uppercase block mb-1">Hashtags</label>
+                    <input
+                      type="text"
+                      value={composerHashtags}
+                      onChange={(e) => setComposerHashtags(e.target.value)}
+                      placeholder="#MarketForge #Growth"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 focus:outline-none font-mono"
+                    />
+                  </div>
 
-                <div>
-                  <label className="text-xs font-mono font-bold text-slate-500 uppercase block mb-1">Scheduled Date & Time</label>
-                  <input
-                    type="datetime-local"
-                    value={composerScheduledFor}
-                    onChange={(e) => setComposerScheduledFor(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none"
-                  />
+                  <div>
+                    <label className="text-xs font-mono font-bold text-slate-500 uppercase block mb-1">Schedule Date & Time</label>
+                    <input
+                      type="datetime-local"
+                      value={composerScheduledFor}
+                      onChange={(e) => setComposerScheduledFor(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none"
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -2751,15 +2887,15 @@ export default function SocialStudio({ profile, tenantId, userRole, onCreateAudi
                     </div>
                     <div>
                       <p className="font-bold text-slate-900">{profile.name} Official</p>
-                      <p className="text-[10px] text-slate-400">Sponsored • Just now</p>
+                      <p className="text-[10px] text-slate-400">Scheduled • {composerPostType} Post</p>
                     </div>
                   </div>
 
-                  <p className="text-slate-800 leading-relaxed font-normal">
+                  <p className="text-slate-800 leading-relaxed font-normal whitespace-pre-wrap">
                     {composerCaption || "Your caption will appear here in real-time preview mode..."}
                   </p>
 
-                  {composerMediaUrl && (
+                  {composerPostType !== 'TEXT' && composerMediaUrl && (
                     <div className="aspect-video bg-slate-100 rounded-xl overflow-hidden">
                       <img src={composerMediaUrl} alt="" className="w-full h-full object-cover" />
                     </div>
@@ -2780,23 +2916,29 @@ export default function SocialStudio({ profile, tenantId, userRole, onCreateAudi
                   <button
                     type="button"
                     onClick={() => {
+                      const selectedAccounts = accounts.filter(a => 
+                        composerSelectedAccountIds.includes(a.id) || (composerSelectedAccountIds.length === 0 && composerPlatforms.includes(a.platform))
+                      );
+                      const targetPlatforms = Array.from(new Set(selectedAccounts.map(a => a.platform)));
+                      const finalPlatforms = targetPlatforms.length > 0 ? targetPlatforms : composerPlatforms;
+
                       const newPost: SocialPost = {
                         id: `post-${Date.now()}`,
-                        platforms: composerPlatforms,
+                        platforms: finalPlatforms,
                         postType: composerPostType,
                         caption: composerCaption,
                         hashtags: composerHashtags.split(' ').filter(Boolean),
                         scheduledFor: composerScheduledFor,
                         status: 'SCHEDULED',
                         campaignId: composerCampaignId || undefined,
-                        mediaUrls: [composerMediaUrl],
+                        mediaUrls: composerPostType !== 'TEXT' && composerMediaUrl ? [composerMediaUrl] : [],
                         metrics: { likes: 0, comments: 0, shares: 0, saves: 0, impressions: 0, clicks: 0 },
                         createdAt: new Date().toISOString()
                       };
                       setPosts(prev => [newPost, ...prev]);
                       syncPostToFirestore(newPost);
                       setShowComposer(false);
-                      setToastMessage({ title: 'Post Scheduled!', desc: 'Post created and scheduled in workspace calendar.', type: 'success' });
+                      setToastMessage({ title: '📅 Post Scheduled!', desc: `Post scheduled for ${selectedAccounts.length || finalPlatforms.length} target pages.`, type: 'success' });
                       setTimeout(() => setToastMessage(null), 3000);
                     }}
                     className="py-3 bg-sky-600 hover:bg-sky-700 text-white font-extrabold text-xs rounded-xl shadow-md cursor-pointer transition"
