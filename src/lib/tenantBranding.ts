@@ -158,6 +158,25 @@ export function getTenantBranding(tenantId: string): TenantBranding {
   return fallback;
 }
 
+export async function fetchTenantBrandingFromServer(tenantId: string): Promise<TenantBranding | null> {
+  if (!tenantId) return null;
+  try {
+    const res = await fetch(`/api/tenant/branding?tenantId=${encodeURIComponent(tenantId)}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.branding) {
+        try {
+          localStorage.setItem(`marketforge_tenant_branding_${tenantId}`, JSON.stringify(data.branding));
+        } catch (e) {}
+        return data.branding;
+      }
+    }
+  } catch (err) {
+    console.warn('[TenantBranding] Server fetch failed, fallback to local store:', err);
+  }
+  return null;
+}
+
 export async function saveTenantBranding(branding: TenantBranding): Promise<void> {
   if (!branding.tenantId) return;
   branding.lastUpdated = new Date().toISOString();
@@ -175,7 +194,7 @@ export async function saveTenantBranding(branding: TenantBranding): Promise<void
     }
   }
 
-  // 2. Sync to master tenant list
+  // 2. Sync to master tenant list in localStorage
   try {
     const masterRaw = localStorage.getItem('marketforge_sa_tenants');
     if (masterRaw) {
@@ -189,15 +208,49 @@ export async function saveTenantBranding(branding: TenantBranding): Promise<void
     }
   } catch (e) {}
 
-  // 3. Sync to Firestore non-blocking
+  // 3. Persist via backend API endpoint (Authoritative Persistence)
+  try {
+    await fetch('/api/tenant/branding', {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'x-simulated-tenant': branding.tenantId
+      },
+      body: JSON.stringify(branding)
+    }).catch((err) => console.warn('[Branding API Post]', err));
+  } catch (apiErr) {}
+
+  // 4. Sync to Firestore client-side non-blocking
   try {
     await clientDb.addDocToTenant('tenant_brandings', branding, branding.tenantId).catch(() => {});
   } catch (err) {}
 
-  // 4. Broadcast global event for instant UI re-rendering
+  // 5. Broadcast global event for instant UI re-rendering across components
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('tenant_branding_updated', { detail: { tenantId: branding.tenantId, branding } }));
   }
+}
+
+export async function resetTenantBranding(tenantId: string, businessType?: string): Promise<TenantBranding> {
+  let branding: TenantBranding = getTenantBranding(tenantId);
+  try {
+    const res = await fetch('/api/tenant/branding/reset', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tenantId, businessType })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data?.branding) {
+        branding = data.branding;
+      }
+    }
+  } catch (err) {
+    console.warn('[Branding Reset API]', err);
+  }
+
+  await saveTenantBranding(branding);
+  return branding;
 }
 
 export async function verifyTenantCustomDomain(
@@ -226,6 +279,15 @@ export async function verifyTenantCustomDomain(
   };
 
   await saveTenantBranding(updatedBranding);
+
+  // Invoke backend domain verification endpoint
+  try {
+    await fetch('/api/tenant/branding/domain/verify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tenantId, domain: cleanDomain })
+    }).catch(() => {});
+  } catch (e) {}
 
   // Sync with domain records list in localStorage
   try {

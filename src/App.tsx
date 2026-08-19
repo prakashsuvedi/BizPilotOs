@@ -1279,8 +1279,8 @@ export default function App() {
   const isModuleDisabledForTenant = (tabId: string): { disabled: boolean; reason: 'disabled' | 'inactive' | null } => {
     if (!activeTenantObj) return { disabled: false, reason: null };
     
-    // Core infrastructure tabs always accessible
-    if (['landing', 'command', 'success_center', 'subscription'].includes(tabId)) {
+    // Core infrastructure and white-labeling tabs always accessible to workspace
+    if (['landing', 'command', 'success_center', 'subscription', 'whitelabel', 'domains'].includes(tabId)) {
       return { disabled: false, reason: null };
     }
 

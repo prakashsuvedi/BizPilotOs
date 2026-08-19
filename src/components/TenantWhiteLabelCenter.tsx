@@ -27,7 +27,9 @@ import {
 import {
   TenantBranding,
   getTenantBranding,
+  fetchTenantBrandingFromServer,
   saveTenantBranding,
+  resetTenantBranding,
   verifyTenantCustomDomain
 } from '../lib/tenantBranding';
 import WhiteLabelBrandingEditor from './WhiteLabelBrandingEditor';
@@ -61,6 +63,7 @@ export default function TenantWhiteLabelCenter({ tenantId, onNavigateToWebsiteBu
   const [activeTab, setActiveTab] = useState<'branding' | 'contact' | 'domain' | 'homepage'>('branding');
   
   const [isSaving, setIsSaving] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [customDomainInput, setCustomDomainInput] = useState(branding.customDomain);
   const [isVerifyingDomain, setIsVerifyingDomain] = useState(false);
@@ -68,15 +71,35 @@ export default function TenantWhiteLabelCenter({ tenantId, onNavigateToWebsiteBu
   const [copiedTxt, setCopiedTxt] = useState(false);
 
   useEffect(() => {
-    const loaded = getTenantBranding(tenantId);
-    setBranding(loaded);
-    setCustomDomainInput(loaded.customDomain);
+    // 1. Initial fast load from local store
+    const local = getTenantBranding(tenantId);
+    setBranding(local);
+    setCustomDomainInput(local.customDomain);
+
+    // 2. Authoritative background sync from server API
+    fetchTenantBrandingFromServer(tenantId).then((serverData) => {
+      if (serverData) {
+        setBranding(serverData);
+        setCustomDomainInput(serverData.customDomain);
+      }
+    });
   }, [tenantId]);
 
   const handleSaveAll = async () => {
     setIsSaving(true);
     await saveTenantBranding(branding);
     setIsSaving(false);
+    setSaveSuccess(true);
+    setTimeout(() => setSaveSuccess(false), 3500);
+  };
+
+  const handleResetDefaults = async () => {
+    if (!window.confirm('Reset this workspace branding to business category template defaults?')) return;
+    setIsResetting(true);
+    const resetData = await resetTenantBranding(tenantId, branding.businessType);
+    setBranding(resetData);
+    setCustomDomainInput(resetData.customDomain);
+    setIsResetting(false);
     setSaveSuccess(true);
     setTimeout(() => setSaveSuccess(false), 3500);
   };
@@ -123,6 +146,15 @@ export default function TenantWhiteLabelCenter({ tenantId, onNavigateToWebsiteBu
         </div>
 
         <div className="flex items-center gap-3">
+          <button
+            onClick={handleResetDefaults}
+            disabled={isResetting || isSaving}
+            className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-medium text-xs rounded-xl border border-white/10 flex items-center gap-2 transition cursor-pointer"
+            title="Reset to business category defaults"
+          >
+            {isResetting ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+            Reset Defaults
+          </button>
           <button
             onClick={handleSaveAll}
             disabled={isSaving}
