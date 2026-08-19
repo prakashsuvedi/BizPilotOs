@@ -822,13 +822,20 @@ export function MarketForgeLanding({
               <div className="pt-4 flex flex-wrap items-center gap-6 text-slate-400 text-xs border-t border-white/10">
                 {(branding.customLandingData?.showcaseFeatures && branding.customLandingData.showcaseFeatures.length > 0
                   ? branding.customLandingData.showcaseFeatures
-                  : currentTemplate?.defaultFeatures || ['Premium Quality Assured', 'Direct Customer Support', '4.9 / 5 Client Rating']
-                ).map((feat, idx) => (
-                  <div key={idx} className="flex items-center gap-2">
-                    {idx === 0 ? <Award className="w-4 h-4 text-amber-400" /> : idx === 1 ? <CheckCircle2 className="w-4 h-4 text-emerald-400" /> : <Star className="w-4 h-4 text-yellow-400 fill-yellow-400" />}
-                    <span>{feat}</span>
-                  </div>
-                ))}
+                  : currentTemplate?.defaultFeatures || [
+                      { title: 'Premium Quality Assured', desc: '', badge: '' },
+                      { title: 'Direct Customer Support', desc: '', badge: '' },
+                      { title: '4.9 / 5 Client Rating', desc: '', badge: '' }
+                    ]
+                ).map((feat: any, idx: number) => {
+                  const label = typeof feat === 'string' ? feat : (feat?.title || feat?.desc || 'Verified Feature');
+                  return (
+                    <div key={idx} className="flex items-center gap-2">
+                      {idx === 0 ? <Award className="w-4 h-4 text-amber-400 shrink-0" /> : idx === 1 ? <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" /> : <Star className="w-4 h-4 text-yellow-400 fill-yellow-400 shrink-0" />}
+                      <span>{label}</span>
+                    </div>
+                  );
+                })}
               </div>
 
             </div>
@@ -923,12 +930,15 @@ export function MarketForgeLanding({
 
                     {/* Features checklist */}
                     <div className="pt-2 space-y-1.5">
-                      {item.features?.map((feat: string, idx: number) => (
-                        <div key={idx} className="flex items-center gap-2 text-[11px] text-slate-400">
-                          <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                          <span>{feat}</span>
-                        </div>
-                      ))}
+                      {item.features?.map((feat: any, idx: number) => {
+                        const featText = typeof feat === 'string' ? feat : (feat?.title || feat?.desc || '');
+                        return (
+                          <div key={idx} className="flex items-center gap-2 text-[11px] text-slate-400">
+                            <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                            <span>{featText}</span>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 </div>
