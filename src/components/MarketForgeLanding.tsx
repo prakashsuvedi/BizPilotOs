@@ -5,8 +5,9 @@ import { MarketForgeLogo, MarketForgeEmblem } from './MarketForgeLogo';
 import { getTenantBranding, saveTenantBranding, TenantBranding } from '../lib/tenantBranding';
 import { BusinessType, BUSINESS_TEMPLATES, generateBusinessDefaultBranding } from '../lib/businessTemplates';
 import type { CompanyPageType } from './CompanyPagesModal';
+import { lazyWithRetry } from '../lib/lazyWithRetry';
 
-const CompanyPagesModal = React.lazy(() => import('./CompanyPagesModal'));
+const CompanyPagesModal = lazyWithRetry(() => import('./CompanyPagesModal'), 'CompanyPagesModal');
 import { clientAuth } from '../lib/firebase';
 import { InfrastructureHub } from '../lib/infrastructure';
 import {

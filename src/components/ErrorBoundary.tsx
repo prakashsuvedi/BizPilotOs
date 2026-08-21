@@ -131,6 +131,11 @@ export class ErrorBoundary extends Component<Props, State> {
             <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-mono text-slate-700 overflow-x-auto">
               <span className="font-bold text-rose-600">Error: </span>
               {this.state.error?.message || 'An unexpected rendering error occurred.'}
+              {this.state.error?.message?.includes('dynamically imported module') && (
+                <div className="mt-2 text-[11px] font-sans font-medium text-amber-800 bg-amber-50 p-2 rounded-lg border border-amber-200">
+                  ⚡ <strong>New App Build Available:</strong> The application was recently updated with fresh assets. Click "Reload Page" to sync the newest version.
+                </div>
+              )}
             </div>
 
             {/* Collapsible Details in Dev or on demand */}

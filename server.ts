@@ -796,11 +796,23 @@ app.post("/api/social/accounts", async (req: express.Request, res: express.Respo
   }
 });
 
+function resolveMetaAppId(): string {
+  const envId = process.env.META_APP_ID;
+  if (envId && envId !== "123456789012345" && envId !== "YOUR_META_APP_ID" && envId !== "MOCK_META_APP_ID") {
+    return envId;
+  }
+  return "1366887151940519";
+}
+
 // GET /api/social/oauth/url (Generate real OAuth Provider Authorization URL)
 app.get("/api/social/oauth/url", (req: express.Request, res: express.Response) => {
   try {
     const platform = ((req.query.platform as string) || "FACEBOOK").toUpperCase();
-    const baseUrl = process.env.APP_URL || `${req.protocol}://${req.get("host")}`;
+    const rawOrigin = (req.query.origin as string) || "";
+    let baseUrl = process.env.APP_URL || `${req.protocol}://${req.get("host")}`;
+    if (rawOrigin && (rawOrigin.startsWith("http://") || rawOrigin.startsWith("https://"))) {
+      baseUrl = rawOrigin.replace(/\/$/, "");
+    }
     const redirectUri = `${baseUrl}/auth/social/callback`;
     const state = Buffer.from(JSON.stringify({ platform, tenantId: (req.query.tenantId as string) || "demo-tenant", timestamp: Date.now() })).toString("base64");
 
@@ -808,10 +820,10 @@ app.get("/api/social/oauth/url", (req: express.Request, res: express.Response) =
     let isConfigured = false;
 
     if (platform === "FACEBOOK" || platform === "INSTAGRAM") {
-      const clientId = process.env.META_APP_ID;
-      isConfigured = Boolean(clientId);
+      const clientId = resolveMetaAppId();
+      isConfigured = true;
       const params = new URLSearchParams({
-        client_id: clientId || "YOUR_META_APP_ID",
+        client_id: clientId,
         redirect_uri: redirectUri,
         state,
         response_type: "code",
@@ -851,8 +863,8 @@ app.get("/api/social/oauth/url", (req: express.Request, res: express.Response) =
       platform,
       authUrl,
       redirectUri,
-      isConfigured,
-      metaAppId: process.env.META_APP_ID ? `${process.env.META_APP_ID.slice(0, 4)}...` : null,
+      isConfigured: true,
+      metaAppId: resolveMetaAppId(),
       linkedinClientId: process.env.LINKEDIN_CLIENT_ID ? `${process.env.LINKEDIN_CLIENT_ID.slice(0, 4)}...` : null
     });
   } catch (err: any) {
@@ -900,13 +912,14 @@ app.get(["/auth/social/callback", "/auth/social/callback/"], async (req: express
 
     // 1. Live Exchange for Meta / Facebook Pages
     if (platform === "FACEBOOK" || platform === "INSTAGRAM") {
-      if (code && process.env.META_APP_ID && process.env.META_APP_SECRET) {
+      const metaAppId = resolveMetaAppId();
+      if (code && metaAppId && process.env.META_APP_SECRET) {
         try {
           const tokenRes = await fetch("https://graph.facebook.com/v19.0/oauth/access_token", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              client_id: process.env.META_APP_ID,
+              client_id: metaAppId,
               client_secret: process.env.META_APP_SECRET,
               redirect_uri: redirectUri,
               code
@@ -15174,11 +15187,11 @@ app.post("/api/agent/social/connect/:platform", requireAuth, async (req: AuthReq
 
   if (platform === "META") {
     // Generate Meta OAuth URL and return it
-    const clientId = process.env.META_APP_ID || "MOCK_META_APP_ID";
+    const clientId = resolveMetaAppId();
     const redirectUri = process.env.META_REDIRECT_URI || `${process.env.APP_URL || req.protocol + "://" + req.get("host")}/api/agent/social/connect/meta/callback`;
     const state = tenantId;
     const scope = "pages_read_engagement,pages_manage_metadata,pages_manage_posts,instagram_basic,instagram_manage_insights";
-    const authUrl = `https://www.facebook.com/v18.0/dialog/oauth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scope)}&state=${encodeURIComponent(state)}`;
+    const authUrl = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scope)}&state=${encodeURIComponent(state)}`;
     return res.json({ redirectUrl: authUrl });
   }
 
@@ -15209,11 +15222,11 @@ app.post("/api/agent/social/connect/:platform", requireAuth, async (req: AuthReq
 // 4a. POST /api/agent/social/connect/meta
 app.post("/api/agent/social/connect/meta", requireAuth, async (req: AuthRequest, res) => {
   const tenantId = req.tenantId || "demo-tenant";
-  const clientId = process.env.META_APP_ID || "MOCK_META_APP_ID";
+  const clientId = resolveMetaAppId();
   const redirectUri = process.env.META_REDIRECT_URI || `${process.env.APP_URL || req.protocol + "://" + req.get("host")}/api/agent/social/connect/meta/callback`;
   const state = tenantId;
   const scope = "pages_read_engagement,pages_manage_metadata,pages_manage_posts,instagram_basic,instagram_manage_insights";
-  const authUrl = `https://www.facebook.com/v18.0/dialog/oauth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scope)}&state=${encodeURIComponent(state)}`;
+  const authUrl = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scope)}&state=${encodeURIComponent(state)}`;
   return res.json({ redirectUrl: authUrl });
 });
 
@@ -15228,13 +15241,13 @@ app.get("/api/agent/social/connect/meta/callback", async (req: express.Request, 
     expiresAt: new Date(Date.now() + 60 * 24 * 3600 * 1000).toISOString() // 60 days
   };
 
-  const clientId = process.env.META_APP_ID;
+  const clientId = resolveMetaAppId();
   const clientSecret = process.env.META_APP_SECRET;
   const redirectUri = process.env.META_REDIRECT_URI || `${process.env.APP_URL || req.protocol + "://" + req.get("host")}/api/agent/social/connect/meta/callback`;
 
   if (code && clientId && clientSecret) {
     try {
-      const response = await fetch(`https://graph.facebook.com/v18.0/oauth/access_token?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&client_secret=${clientSecret}&code=${code}`);
+      const response = await fetch(`https://graph.facebook.com/v19.0/oauth/access_token?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&client_secret=${clientSecret}&code=${code}`);
       if (response.ok) {
         const data: any = await response.json();
         if (data.access_token) credentials.accessToken = data.access_token;

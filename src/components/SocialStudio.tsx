@@ -1055,7 +1055,8 @@ export default function SocialStudio({ profile, tenantId, userRole, onCreateAudi
 
     try {
       // 1. Query server for the official OAuth Provider Authorization URL
-      const res = await fetch(`/api/social/oauth/url?platform=${plat}&tenantId=${tenantId}`);
+      const currentOrigin = typeof window !== 'undefined' ? window.location.origin : '';
+      const res = await fetch(`/api/social/oauth/url?platform=${plat}&tenantId=${tenantId}&origin=${encodeURIComponent(currentOrigin)}`);
       if (!res.ok) throw new Error("Failed to get OAuth authorization URL");
       const data = await res.json();
 
@@ -3218,6 +3219,13 @@ export default function SocialStudio({ profile, tenantId, userRole, onCreateAudi
                     <p className="text-xs text-slate-300 leading-relaxed">
                       Click below to open the official <strong className="text-white">{connectPlatform} Login & Page Permissions</strong> authorization window. Once granted, all your linked brand pages will be automatically fetched.
                     </p>
+
+                    {(connectPlatform === 'FACEBOOK' || connectPlatform === 'INSTAGRAM') && (
+                      <div className="flex items-center justify-between p-2.5 bg-sky-950/40 rounded-xl border border-sky-800/60 text-[11px] font-mono">
+                        <span className="text-sky-400 font-bold">Meta App ID:</span>
+                        <span className="text-white font-bold bg-sky-900/60 px-2 py-0.5 rounded border border-sky-700/50">1366887151940519</span>
+                      </div>
+                    )}
 
                     <div className="p-3 bg-slate-950/80 rounded-xl border border-slate-800 text-[10px] text-slate-300 font-mono space-y-1">
                       <p className="font-bold text-sky-400">🔒 Official OAuth Scope Permissions Requested:</p>
