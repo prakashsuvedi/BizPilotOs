@@ -60,14 +60,14 @@ export const PREMIUM_MODE_SETTINGS: Record<PremiumOutputMode, PremiumModeConfig>
     reasoningDepth: 'low',
     qualityThreshold: 80,
     outputLength: 'concise',
-    modelToUse: 'gemini-3.5-flash'
+    modelToUse: 'gemini-3.7-flash'
   },
   professional: {
     researchDepth: 'standard',
     reasoningDepth: 'medium',
     qualityThreshold: 85,
     outputLength: 'moderate',
-    modelToUse: 'gemini-3.5-flash'
+    modelToUse: 'gemini-3.7-flash'
   },
   agency: {
     researchDepth: 'deep',
@@ -555,7 +555,7 @@ Audit and score this draft on 10 crucial parameters. Give each a score from 0 (c
 Format your response strictly as a single JSON object.`;
 
       const scoreRes = await ai.models.generateContent({
-        model: "gemini-3.5-flash",
+        model: "gemini-3.7-flash",
         contents: prompt,
         config: {
           responseMimeType: "application/json",

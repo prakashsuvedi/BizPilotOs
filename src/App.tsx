@@ -664,10 +664,9 @@ export default function App() {
             tenantId
           };
           setProfile(freshProfile);
-          await clientDb.addDocToTenant("campaign_profiles", freshProfile, tenantId).catch(err => console.warn("Failed to persist fresh profile:", err));
+          clientDb.addDocToTenant("campaign_profiles", freshProfile, tenantId).catch(() => {});
         }
       } catch (err1) {
-        console.warn("Failed loading campaign profiles from Firestore:", err1);
         setProfile({ ...defaultProfile, name: dynamicTenantName, tenantId });
       }
 
@@ -683,10 +682,9 @@ export default function App() {
             tenantId
           };
           setGuideline(freshGuideline);
-          await clientDb.addDocToTenant("brand_guidelines", freshGuideline, tenantId).catch(err => console.warn("Failed to persist fresh guideline:", err));
+          clientDb.addDocToTenant("brand_guidelines", freshGuideline, tenantId).catch(() => {});
         }
       } catch (err2) {
-        console.warn("Failed loading brand guidelines from Firestore:", err2);
         setGuideline(defaultGuideline);
       }
 
@@ -699,7 +697,6 @@ export default function App() {
           setCampaign(null);
         }
       } catch (err3) {
-        console.warn("Failed loading campaigns from Firestore:", err3);
         setCampaign(null);
       }
     } catch (e) {

@@ -88,13 +88,24 @@ export interface GeminiFailureAnalysis {
 export function analyzeGeminiError(err: any, attemptedModel: string): GeminiFailureAnalysis {
   const errMsg = String(err.message || err).toLowerCase();
   
+  if (errMsg.includes("503") || errMsg.includes("unavailable") || errMsg.includes("high demand") || errMsg.includes("temporarily unavailable")) {
+    return {
+      rootCause: "Temporary Upstream High Demand (HTTP 503 UNAVAILABLE)",
+      whyItHappened: "The requested model is experiencing a temporary spike in traffic. The API key is authentic, and fallback models or automatic retries handle the request.",
+      howToFixIt: "Requests automatically route to available cluster models like gemini-3.1-flash-lite or retry with exponential backoff.",
+      currentModel: attemptedModel,
+      suggestedModel: "gemini-3.1-flash-lite",
+      fallbackUsed: true
+    };
+  }
+
   if (errMsg.includes("429") || errMsg.includes("quota") || errMsg.includes("rate limit") || errMsg.includes("resource_exhausted")) {
     return {
       rootCause: "API Quota Limit Exceeded (Rate / Daily Limit)",
       whyItHappened: "The configured Gemini API Key has hit either its Requests-Per-Minute (RPM) or Daily Tokens-Per-Minute (TPM) limit on the active tier.",
       howToFixIt: "Upgrade to a paid enterprise plan via the Google AI Studio console or integrate backoff/queuing logic.",
       currentModel: attemptedModel,
-      suggestedModel: "gemini-3.5-flash",
+      suggestedModel: "gemini-3.7-flash",
       fallbackUsed: true
     };
   }
@@ -105,7 +116,7 @@ export function analyzeGeminiError(err: any, attemptedModel: string): GeminiFail
       whyItHappened: "The server failed to authenticate requests because the GEMINI_API_KEY environment variable is invalid, empty, or placeholder text.",
       howToFixIt: "Enter an active, authentic Gemini API key under the Secrets panel in the Settings menu.",
       currentModel: attemptedModel,
-      suggestedModel: "gemini-3.5-flash",
+      suggestedModel: "gemini-3.7-flash",
       fallbackUsed: true
     };
   }
@@ -116,7 +127,7 @@ export function analyzeGeminiError(err: any, attemptedModel: string): GeminiFail
       whyItHappened: "Google AI Studio restricts API request traffic from certain geographical IP addresses or Cloud regions.",
       howToFixIt: "Use a Google Cloud VPN/Proxy or deploy your Cloud Run container inside a supported US/EU region.",
       currentModel: attemptedModel,
-      suggestedModel: "gemini-3.5-flash",
+      suggestedModel: "gemini-3.7-flash",
       fallbackUsed: true
     };
   }
@@ -125,9 +136,9 @@ export function analyzeGeminiError(err: any, attemptedModel: string): GeminiFail
     return {
       rootCause: "Invalid or Deprecated Model Identifier",
       whyItHappened: "The requested model ID is deprecated, disabled, or spelled incorrectly in the API payload parameters.",
-      howToFixIt: "Ensure you use the modern Google AI Studio models like 'gemini-3.5-flash' or 'gemini-3.1-pro-preview' as specified in the standard guidelines.",
+      howToFixIt: "Ensure you use modern Google AI Studio models like 'gemini-3.7-flash' or 'gemini-3.1-pro-preview' as specified in the standard guidelines.",
       currentModel: attemptedModel,
-      suggestedModel: "gemini-3.5-flash",
+      suggestedModel: "gemini-3.7-flash",
       fallbackUsed: true
     };
   }
@@ -137,24 +148,24 @@ export function analyzeGeminiError(err: any, attemptedModel: string): GeminiFail
     whyItHappened: `An unexpected API failure occurred: ${err.message || err}`,
     howToFixIt: "Consult official Google AI Studio developer documentation or verify network routing conditions.",
     currentModel: attemptedModel,
-    suggestedModel: "gemini-3.5-flash",
+    suggestedModel: "gemini-3.7-flash",
     fallbackUsed: true
   };
 }
 
 // Resilient model fallback implementation
 export const GEMINI_MODEL_FALLBACK_CHAIN = [
-  "gemini-2.5-flash",
-  "gemini-2.0-flash",
-  "gemini-1.5-flash",
-  "gemini-3.5-flash"
+  "gemini-3.7-flash",
+  "gemini-flash-latest",
+  "gemini-3.1-flash-lite",
+  "gemini-3.1-pro-preview"
 ];
 
 // Execute a resilient Gemini generation
 export async function executeResilientGemini(
   aiClient: any,
   payload: { contents: any; config?: any },
-  initialModel: string = "gemini-3.5-flash"
+  initialModel: string = "gemini-3.7-flash"
 ): Promise<{ text: string; modelUsed: string; errorTrace?: string }> {
   if (!aiClient) {
     throw new Error("Gemini AI client is uninitialized. Verify API keys in your environment.");

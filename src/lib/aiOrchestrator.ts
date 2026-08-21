@@ -16,7 +16,7 @@ export interface AIOrchestrationRequest {
   prompt: string;
   capability?: string;
   moduleName?: string;
-  preferredModel?: 'gemini-2.0-flash' | 'gemini-1.5-pro' | 'claude-3.5-sonnet' | 'gpt-4o' | 'local-llama-3';
+  preferredModel?: 'gemini-3.7-flash' | 'gemini-3.1-pro-preview' | 'claude-3.5-sonnet' | 'gpt-4o' | 'local-llama-3';
   temperature?: number;
   maxTokens?: number;
 }
@@ -63,7 +63,7 @@ export class AIOrchestrator {
           const compiledPrompt = this.compileMasterPrompt(request, businessContext, relevantMemory);
 
           // 4. Model Routing
-          const modelToUse = request.preferredModel || 'gemini-2.0-flash';
+          const modelToUse = request.preferredModel || 'gemini-3.7-flash';
           let rawResponseText = '';
           let estimatedTokens = 0;
 
@@ -120,7 +120,7 @@ export class AIOrchestrator {
       return {
         success: false,
         text: `The Enterprise Orchestrator was unable to complete the AI generation. Details: ${error?.message || 'Server error'}`,
-        modelRouted: request.preferredModel || 'gemini-2.0-flash',
+        modelRouted: request.preferredModel || 'gemini-3.7-flash',
         latencyMs,
         tokensUsed: 0,
         creditsCharged: 0,
@@ -210,8 +210,9 @@ ${request.prompt}
 
     try {
       const ai = new GoogleGenAI({ apiKey });
+      const targetModel = model.includes('pro') ? 'gemini-3.1-pro-preview' : 'gemini-3.7-flash';
       const response = await ai.models.generateContent({
-        model: model === 'gemini-1.5-pro' ? 'gemini-2.5-flash' : 'gemini-2.0-flash',
+        model: targetModel,
         contents: prompt,
         config: {
           temperature

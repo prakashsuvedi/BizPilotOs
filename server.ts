@@ -247,10 +247,18 @@ Generate exactly 3 high-converting content suggestions JSON array. Each object i
 Respond ONLY with valid JSON array, no markdown backticks.`;
 
       try {
-        const response = await gemini.models.generateContent({
-          model: 'gemini-2.5-flash',
-          contents: prompt
-        });
+        let response;
+        try {
+          response = await gemini.models.generateContent({
+            model: 'gemini-3.7-flash',
+            contents: prompt
+          });
+        } catch (firstErr: any) {
+          response = await gemini.models.generateContent({
+            model: 'gemini-3.1-flash-lite',
+            contents: prompt
+          });
+        }
 
         const text = response.text || '';
         const cleanJson = text.replace(/```json/g, '').replace(/```/g, '').trim();
@@ -401,10 +409,15 @@ app.post("/api/social/discover-pages", (req, res) => {
 // Social Studio: Instant Post Publishing / Broadcast Endpoint with Real Graph & REST API Bridge
 app.post("/api/social/publish-now", async (req, res) => {
   try {
-    const { postId, caption, platforms, pageIds } = req.body || {};
+    const { postId, caption, platforms, pageIds, tenantId: bodyTenantId } = req.body || {};
+    const tenantId = (req.headers["x-simulated-tenant"] as string) || bodyTenantId || "demo-tenant";
     const targetPlatforms = Array.isArray(platforms) && platforms.length > 0 ? platforms : ['FACEBOOK', 'LINKEDIN', 'INSTAGRAM'];
     const postCaption = caption || "Special broadcast update from MarketForge Social Studio!";
     
+    // Retrieve connected accounts for this tenant from memory or Firestore
+    const tenantAccounts = Object.values(serverMemoryStore.social_accounts || {})
+      .filter((a: any) => !a.tenantId || a.tenantId === tenantId || a.tenantId === 'demo-tenant');
+
     const broadcastResults: any[] = [];
 
     for (const plat of targetPlatforms) {
@@ -414,60 +427,81 @@ app.post("/api/social/publish-now", async (req, res) => {
       let liveUrl = `https://www.${plat.toLowerCase()}.com/p/${postId || realPostId}`;
       let apiNotes = "Simulated channel delivery (configure access token in environment for live feed injection)";
 
+      // Look up specific connected account for this platform
+      const connectedAcc = tenantAccounts.find((a: any) => a.platform?.toUpperCase() === pUpper && a.isActive);
+
       // 1. Real LinkedIn API Integration
-      if (pUpper === 'LINKEDIN' && process.env.LINKEDIN_MEMBER_TOKEN && process.env.LINKEDIN_MEMBER_URN) {
+      const linkedinToken = process.env.LINKEDIN_MEMBER_TOKEN || connectedAcc?.accessToken;
+      const rawLinkedinUrn = process.env.LINKEDIN_MEMBER_URN || connectedAcc?.pageId;
+      if (pUpper === 'LINKEDIN' && linkedinToken) {
         try {
-          const authorUrn = process.env.LINKEDIN_MEMBER_URN.startsWith('urn:li:') 
-            ? process.env.LINKEDIN_MEMBER_URN 
-            : `urn:li:person:${process.env.LINKEDIN_MEMBER_URN}`;
-
-          const liRes = await fetch("https://api.linkedin.com/v2/ugcPosts", {
-            method: "POST",
-            headers: {
-              "Authorization": `Bearer ${process.env.LINKEDIN_MEMBER_TOKEN}`,
-              "X-Restli-Protocol-Version": "2.0.0",
-              "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-              author: authorUrn,
-              lifecycleState: "PUBLISHED",
-              specificContent: {
-                "com.linkedin.ugc.ShareContent": {
-                  shareCommentary: { text: postCaption },
-                  shareMediaCategory: "NONE"
-                }
-              },
-              visibility: {
-                "com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC"
+          let authorUrn = rawLinkedinUrn ? (rawLinkedinUrn.startsWith('urn:li:') ? rawLinkedinUrn : `urn:li:person:${rawLinkedinUrn}`) : null;
+          
+          // If URN not explicitly configured, fetch user's member ID using token
+          if (!authorUrn) {
+            try {
+              const uRes = await fetch("https://api.linkedin.com/v2/userinfo", {
+                headers: { "Authorization": `Bearer ${linkedinToken}` }
+              });
+              const uData: any = await uRes.json();
+              if (uData.sub) {
+                authorUrn = `urn:li:person:${uData.sub}`;
               }
-            })
-          });
+            } catch (_) {}
+          }
 
-          if (liRes.ok) {
-            const liData: any = await liRes.json();
-            realApiStatus = 'LIVE_API_PUBLISHED';
-            realPostId = liData.id || realPostId;
-            liveUrl = `https://www.linkedin.com/feed/update/${liData.id || ''}`;
-            apiNotes = "Directly published to live LinkedIn profile/company page via LinkedIn v2 REST API.";
+          if (authorUrn) {
+            const liRes = await fetch("https://api.linkedin.com/v2/ugcPosts", {
+              method: "POST",
+              headers: {
+                "Authorization": `Bearer ${linkedinToken}`,
+                "X-Restli-Protocol-Version": "2.0.0",
+                "Content-Type": "application/json"
+              },
+              body: JSON.stringify({
+                author: authorUrn,
+                lifecycleState: "PUBLISHED",
+                specificContent: {
+                  "com.linkedin.ugc.ShareContent": {
+                    shareCommentary: { text: postCaption },
+                    shareMediaCategory: "NONE"
+                  }
+                },
+                visibility: {
+                  "com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC"
+                }
+              })
+            });
+
+            if (liRes.ok) {
+              const liData: any = await liRes.json();
+              realApiStatus = 'LIVE_API_PUBLISHED';
+              realPostId = liData.id || realPostId;
+              liveUrl = `https://www.linkedin.com/feed/update/${liData.id || ''}`;
+              apiNotes = "Directly published to live LinkedIn profile/company page via LinkedIn v2 REST API.";
+            } else {
+              const errText = await liRes.text();
+              apiNotes = `LinkedIn API responded with HTTP ${liRes.status}: ${errText.slice(0, 100)}`;
+            }
           } else {
-            const errText = await liRes.text();
-            apiNotes = `LinkedIn API responded with HTTP ${liRes.status}: ${errText.slice(0, 100)}`;
+            apiNotes = "LinkedIn member token valid, but author URN could not be resolved.";
           }
         } catch (e: any) {
           apiNotes = `LinkedIn live dispatch error: ${e.message}`;
         }
       }
 
-      // 2. Real Meta (Facebook Graph API) Integration
-      if ((pUpper === 'FACEBOOK' || pUpper === 'INSTAGRAM') && process.env.META_PAGE_ACCESS_TOKEN) {
+      // 2. Real Meta (Facebook Graph API & Instagram Content Publish) Integration
+      const metaToken = process.env.META_PAGE_ACCESS_TOKEN || connectedAcc?.accessToken;
+      const metaPageId = process.env.META_PAGE_ID || connectedAcc?.pageId || "me";
+      if ((pUpper === 'FACEBOOK' || pUpper === 'INSTAGRAM') && metaToken) {
         try {
-          const pageId = process.env.META_PAGE_ID || "me";
-          const metaRes = await fetch(`https://graph.facebook.com/v19.0/${pageId}/feed`, {
+          const metaRes = await fetch(`https://graph.facebook.com/v19.0/${metaPageId}/feed`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               message: postCaption,
-              access_token: process.env.META_PAGE_ACCESS_TOKEN
+              access_token: metaToken
             })
           });
 
@@ -476,13 +510,43 @@ app.post("/api/social/publish-now", async (req, res) => {
             realApiStatus = 'LIVE_API_PUBLISHED';
             realPostId = metaData.id || realPostId;
             liveUrl = `https://facebook.com/${metaData.id || ''}`;
-            apiNotes = "Directly published to live Facebook Page feed via Meta Graph API v19.0.";
+            apiNotes = `Directly published to live Facebook Page (${metaPageId}) feed via Meta Graph API v19.0.`;
           } else {
             const errText = await metaRes.text();
             apiNotes = `Meta Graph API responded with HTTP ${metaRes.status}: ${errText.slice(0, 100)}`;
           }
         } catch (e: any) {
           apiNotes = `Meta Graph live dispatch error: ${e.message}`;
+        }
+      }
+
+      // 3. Real X / Twitter (API v2) Integration
+      const twitterToken = process.env.TWITTER_BEARER_TOKEN || process.env.TWITTER_ACCESS_TOKEN || connectedAcc?.accessToken;
+      if ((pUpper === 'TWITTER' || pUpper === 'X') && twitterToken) {
+        try {
+          const twRes = await fetch("https://api.twitter.com/2/tweets", {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${twitterToken}`,
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+              text: postCaption.slice(0, 280)
+            })
+          });
+
+          if (twRes.ok) {
+            const twData: any = await twRes.json();
+            realApiStatus = 'LIVE_API_PUBLISHED';
+            realPostId = twData.data?.id || realPostId;
+            liveUrl = `https://x.com/i/status/${twData.data?.id || ''}`;
+            apiNotes = "Directly published to live X / Twitter feed via X API v2.0.";
+          } else {
+            const errText = await twRes.text();
+            apiNotes = `X API v2 responded with HTTP ${twRes.status}: ${errText.slice(0, 100)}`;
+          }
+        } catch (e: any) {
+          apiNotes = `X API live dispatch error: ${e.message}`;
         }
       }
 
@@ -876,6 +940,95 @@ app.get(["/auth/social/callback", "/auth/social/callback/"], async (req: express
       }
     }
 
+    // 2. Live Exchange for LinkedIn
+    if (platform === "LINKEDIN") {
+      if (code && process.env.LINKEDIN_CLIENT_ID && process.env.LINKEDIN_CLIENT_SECRET) {
+        try {
+          const tokenRes = await fetch("https://www.linkedin.com/oauth/v2/accessToken", {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: new URLSearchParams({
+              grant_type: "authorization_code",
+              code,
+              redirect_uri: redirectUri,
+              client_id: process.env.LINKEDIN_CLIENT_ID,
+              client_secret: process.env.LINKEDIN_CLIENT_SECRET
+            })
+          });
+          const tokenData: any = await tokenRes.json();
+          if (tokenData.access_token) {
+            const userRes = await fetch("https://api.linkedin.com/v2/userinfo", {
+              headers: { "Authorization": `Bearer ${tokenData.access_token}` }
+            });
+            const userData: any = await userRes.json();
+            const memberName = userData.name || `${userData.given_name || ''} ${userData.family_name || ''}`.trim() || "LinkedIn Member";
+            fetchedPages.push({
+              id: `li-page-${userData.sub || Date.now()}`,
+              platform: "LINKEDIN",
+              accountName: memberName,
+              accountHandle: `@${memberName.toLowerCase().replace(/[^a-z0-9]/g, '')}`,
+              pageId: userData.sub || "li_member",
+              profileImage: userData.picture || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&fit=crop&q=80',
+              followerCount: 2800,
+              isActive: true,
+              accessToken: tokenData.access_token,
+              connectedAt: new Date().toISOString(),
+              postCountThisMonth: 0,
+              autoResponderActive: true
+            });
+          }
+        } catch (e: any) {
+          console.warn("[LinkedIn OAuth Exchange Error]:", e.message);
+        }
+      }
+    }
+
+    // 3. Live Exchange for X / Twitter
+    if (platform === "TWITTER" || platform === "X") {
+      if (code && process.env.TWITTER_CLIENT_ID && process.env.TWITTER_CLIENT_SECRET) {
+        try {
+          const tokenRes = await fetch("https://api.twitter.com/2/oauth2/token", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/x-www-form-urlencoded",
+              "Authorization": "Basic " + Buffer.from(`${process.env.TWITTER_CLIENT_ID}:${process.env.TWITTER_CLIENT_SECRET}`).toString("base64")
+            },
+            body: new URLSearchParams({
+              grant_type: "authorization_code",
+              code,
+              redirect_uri: redirectUri,
+              code_verifier: "challenge"
+            })
+          });
+          const tokenData: any = await tokenRes.json();
+          if (tokenData.access_token) {
+            const userRes = await fetch("https://api.twitter.com/2/users/me?user.fields=profile_image_url,public_metrics", {
+              headers: { "Authorization": `Bearer ${tokenData.access_token}` }
+            });
+            const userData: any = await userRes.json();
+            if (userData.data) {
+              fetchedPages.push({
+                id: `tw-page-${userData.data.id}`,
+                platform: "TWITTER",
+                accountName: userData.data.name || "X Profile",
+                accountHandle: `@${userData.data.username}`,
+                pageId: userData.data.id,
+                profileImage: userData.data.profile_image_url || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120&fit=crop&q=80',
+                followerCount: userData.data.public_metrics?.followers_count || 1200,
+                isActive: true,
+                accessToken: tokenData.access_token,
+                connectedAt: new Date().toISOString(),
+                postCountThisMonth: 0,
+                autoResponderActive: true
+              });
+            }
+          }
+        } catch (e: any) {
+          console.warn("[X / Twitter OAuth Exchange Error]:", e.message);
+        }
+      }
+    }
+
     // Persist discovered real pages to database
     if (fetchedPages.length > 0) {
       if (!serverMemoryStore.social_accounts) serverMemoryStore.social_accounts = {};
@@ -1027,6 +1180,35 @@ app.post("/api/social/validate-token", async (req: express.Request, res: express
         }
       } catch (e: any) {
         return res.status(400).json({ error: `LinkedIn verification error: ${e.message}` });
+      }
+    } else if (plat === "TWITTER" || plat === "X") {
+      // Query X / Twitter v2 User Profile
+      try {
+        const twRes = await fetch("https://api.twitter.com/2/users/me?user.fields=profile_image_url,public_metrics,description", {
+          headers: { "Authorization": `Bearer ${token}` }
+        });
+        const twData: any = await twRes.json();
+        if (twData.data && twData.data.id) {
+          discoveredPages.push({
+            id: `tw-live-${twData.data.id}`,
+            platform: "TWITTER",
+            accountName: twData.data.name || "X Profile",
+            accountHandle: `@${twData.data.username}`,
+            pageId: twData.data.id,
+            profileImage: twData.data.profile_image_url || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120&fit=crop&q=80',
+            followerCount: twData.data.public_metrics?.followers_count || 1200,
+            category: 'Verified X Account',
+            isActive: true,
+            accessToken: token,
+            connectedAt: new Date().toISOString(),
+            postCountThisMonth: 0,
+            autoResponderActive: true
+          });
+        } else {
+          return res.status(400).json({ error: `X API error: ${twData.detail || twData.title || 'Invalid token'}` });
+        }
+      } catch (e: any) {
+        return res.status(400).json({ error: `X verification error: ${e.message}` });
       }
     }
 
@@ -4625,8 +4807,46 @@ app.post("/api/payments/checkout", async (req: express.Request, res: express.Res
       });
     }
 
-    if (['esewa', 'khalti', 'fonepay', 'connectips'].includes(gateway.toLowerCase())) {
-      const merchantCode = process.env.ESEWA_MERCHANT_CODE || process.env.KHALTI_PUBLIC_KEY || "EPAYTEST";
+    if (gateway.toLowerCase() === 'esewa') {
+      const merchantCode = process.env.ESEWA_MERCHANT_CODE || "EPAYTEST";
+      const secretKey = process.env.ESEWA_SECRET_KEY || "8gBm/:&EnhH.1/q";
+      const totalAmountStr = String(amountNpr || 500);
+      const dataString = `total_amount=${totalAmountStr},transaction_uuid=${transactionId},product_code=${merchantCode}`;
+      const signature = crypto.createHmac('sha256', secretKey).update(dataString).digest('base64');
+      
+      const successUrl = `/api/payments/nepal/verify?txn=${transactionId}&gateway=esewa&tenantId=${tenantId}&amount=${totalAmountStr}&moduleIds=${(moduleIds || []).join(',')}`;
+      const failureUrl = `/?payment_failed=true&txn=${transactionId}`;
+
+      return res.json({
+        success: true,
+        gateway: 'esewa',
+        transactionId,
+        merchantCode,
+        amountNpr: amountNpr || 500,
+        currency: "NPR",
+        signature,
+        signedFieldNames: "total_amount,transaction_uuid,product_code",
+        esewaFormPayload: {
+          amount: totalAmountStr,
+          tax_amount: "0",
+          total_amount: totalAmountStr,
+          transaction_uuid: transactionId,
+          product_code: merchantCode,
+          product_service_charge: "0",
+          product_delivery_charge: "0",
+          success_url: successUrl,
+          failure_url: failureUrl,
+          signed_field_names: "total_amount,transaction_uuid,product_code",
+          signature: signature
+        },
+        esewaEndpoint: "https://rc-epay.esewa.com.np/api/epay/main/v2/form",
+        redirectUrl: successUrl,
+        message: `eSewa Nepal Test Gateway session prepared (Merchant: ${merchantCode}).`
+      });
+    }
+
+    if (['khalti', 'fonepay', 'connectips'].includes(gateway.toLowerCase())) {
+      const merchantCode = process.env.KHALTI_PUBLIC_KEY || "EPAYTEST";
       return res.json({
         success: true,
         gateway: gateway.toLowerCase(),
@@ -4731,7 +4951,7 @@ app.post("/api/webhooks/stripe", async (req: express.Request, res: express.Respo
 app.post("/api/webhooks/esewa", async (req: express.Request, res: express.Response) => {
   try {
     const { total_amount, transaction_uuid, product_code, signature, tenantId, moduleIds } = req.body;
-    const secretKey = process.env.ESEWA_SECRET_KEY || '8gBmUz3q1GE0rm3s';
+    const secretKey = process.env.ESEWA_SECRET_KEY || '8gBm/:&EnhH.1/q';
 
     const sigCheck = PaymentWebhookService.verifyEsewaSignature(
       String(total_amount || 2900),
@@ -6581,7 +6801,7 @@ app.post("/api/agent/goal_os", rateLimiter, requireAuth, async (req: AuthRequest
   }
 
   try {
-    const modelName = "gemini-2.5-flash";
+    const modelName = "gemini-3.7-flash";
     const prompt = `
 You are the Chief AI Growth Executive at MarketForge AI. Your objective is to formulate a high-fidelity business outcome action plan and executable strategic roadmap for the following company.
 
@@ -6642,13 +6862,24 @@ You MUST return a JSON object containing exactly the following keys (ensure all 
 Return ONLY the JSON string. Do NOT wrap in markdown \`\`\`json blocks.
 `;
 
-    const response = await ai.models.generateContent({
-      model: modelName,
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json",
-      }
-    });
+    let response;
+    try {
+      response = await ai.models.generateContent({
+        model: modelName,
+        contents: prompt,
+        config: {
+          responseMimeType: "application/json",
+        }
+      });
+    } catch (primaryErr: any) {
+      response = await ai.models.generateContent({
+        model: "gemini-3.1-flash-lite",
+        contents: prompt,
+        config: {
+          responseMimeType: "application/json",
+        }
+      });
+    }
 
     const textOutput = response.text;
     if (textOutput) {

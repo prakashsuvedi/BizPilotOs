@@ -463,7 +463,7 @@ export class AutonomousIntelligenceEngine {
     return [
       {
         provider: "Google AI",
-        model: "gemini-2.0-flash",
+        model: "gemini-3.7-flash",
         promptQuality: "Excellent",
         tokenConsumption: { input: 124500, output: 89600, total: 214100 },
         responseLatencyMs: 640,
@@ -480,7 +480,7 @@ export class AutonomousIntelligenceEngine {
       },
       {
         provider: "Google AI",
-        model: "gemini-1.5-pro",
+        model: "gemini-3.1-pro-preview",
         promptQuality: "Good",
         tokenConsumption: { input: 82000, output: 41000, total: 123000 },
         responseLatencyMs: 1450,
@@ -491,7 +491,7 @@ export class AutonomousIntelligenceEngine {
         hallucinationRisk: "Low",
         providerHealth: "Healthy",
         optimizations: [
-          "Switch lightweight classification queries to gemini-2.0-flash to save costs by up to 80%."
+          "Switch lightweight classification queries to gemini-3.7-flash to save costs by up to 80%."
         ]
       },
       {

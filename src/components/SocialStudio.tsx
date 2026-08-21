@@ -355,6 +355,19 @@ export default function SocialStudio({ profile, tenantId, userRole, onCreateAudi
         connectedAt: '2026-07-20T09:15:00Z',
         postCountThisMonth: 22,
         autoResponderActive: true
+      },
+      {
+        id: 'acc-tw-1',
+        platform: 'TWITTER',
+        accountName: `${profile.name} Stream`,
+        accountHandle: `@${profile.name.toLowerCase().replace(/[^a-z0-9]/g, '')}_x`,
+        pageId: 'tw_90812344',
+        profileImage: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=80&fit=crop&q=60',
+        followerCount: 18900,
+        isActive: true,
+        connectedAt: '2026-07-22T11:00:00Z',
+        postCountThisMonth: 28,
+        autoResponderActive: true
       }
     ];
   });
@@ -1285,7 +1298,8 @@ export default function SocialStudio({ profile, tenantId, userRole, onCreateAudi
         body: JSON.stringify({
           postId: targetPostId,
           caption: targetCaption,
-          platforms: targetPlats
+          platforms: targetPlats,
+          tenantId
         })
       });
 
