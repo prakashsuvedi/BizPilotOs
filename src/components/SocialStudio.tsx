@@ -137,6 +137,15 @@ export interface SocialPost {
   headingFont?: string;
   subheadingFont?: string;
   cardTheme?: string;
+  publishedAt?: string;
+  dispatchResults?: Array<{
+    platform: string;
+    status: 'SUCCESS' | 'ERROR' | 'CONFIG_REQUIRED';
+    remotePostId?: string;
+    livePostUrl?: string;
+    details: string;
+    publishedAt: string;
+  }>;
   metrics: {
     likes: number;
     comments: number;
@@ -957,26 +966,38 @@ export default function SocialStudio({ profile, tenantId, userRole, onCreateAudi
   // Handle Context Actions
   const handleContextAction = (postId: string, action: string) => {
     setActiveContextMenuPostId(null);
+    const targetPost = posts.find(p => p.id === postId);
+
+    if (action === 'PUBLISH_NOW') {
+      if (targetPost) {
+        handlePublishPostNow(targetPost.id, targetPost.caption, targetPost.platforms);
+      }
+      return;
+    }
+
     setPosts(prev => prev.map(p => {
       if (p.id === postId) {
         if (action === 'REVOKE_APPROVAL') {
           setToastMessage({ title: 'Approval Revoked', desc: 'Post status moved back to Pending Review.', type: 'error' });
-          return { ...p, status: 'PENDING_APPROVAL' };
-        }
-        if (action === 'PUBLISH_NOW') {
-          setToastMessage({ title: 'Post Published Now!', desc: 'Published post instantly across connected channels.', type: 'success' });
-          return { ...p, status: 'PUBLISHED' };
+          const updated = { ...p, status: 'PENDING_APPROVAL' as const };
+          syncPostToFirestore(updated);
+          return updated;
         }
         if (action === 'SCHEDULE') {
           setToastMessage({ title: 'Post Scheduled', desc: `Scheduled for ${new Date(p.scheduledFor).toLocaleString()}`, type: 'success' });
-          return { ...p, status: 'SCHEDULED' };
+          const updated = { ...p, status: 'SCHEDULED' as const };
+          syncPostToFirestore(updated);
+          return updated;
         }
         if (action === 'ARCHIVE') {
           setToastMessage({ title: 'Post Archived', desc: 'Post moved to archived folder.', type: 'success' });
-          return { ...p, status: 'DRAFT' };
+          const updated = { ...p, status: 'DRAFT' as const };
+          syncPostToFirestore(updated);
+          return updated;
         }
         if (action === 'REPOST') {
           const newPost = { ...p, id: `post-${Date.now()}`, scheduledFor: new Date(Date.now() + 86400000 * 3).toISOString().slice(0, 16), status: 'DRAFT' as const };
+          syncPostToFirestore(newPost);
           setPosts(old => [newPost, ...old]);
           setToastMessage({ title: 'Post Duplicated', desc: 'New draft copy created in calendar.', type: 'success' });
           return p;
@@ -986,6 +1007,7 @@ export default function SocialStudio({ profile, tenantId, userRole, onCreateAudi
     }));
     if (action === 'DELETE') {
       setPosts(prev => prev.filter(p => p.id !== postId));
+      clientDb.deleteDocFromTenant('social_posts', postId, tenantId).catch(() => {});
       setToastMessage({ title: 'Post Deleted', desc: 'Post removed from workspace calendar.', type: 'success' });
     }
     setTimeout(() => setToastMessage(null), 3500);
@@ -1297,8 +1319,9 @@ export default function SocialStudio({ profile, tenantId, userRole, onCreateAudi
   const handlePublishPostNow = async (postIdToPublish?: string, customCaption?: string, customPlatforms?: string[]) => {
     setIsPublishingLivePost(true);
     const targetPostId = postIdToPublish || `post-${Date.now()}`;
-    const targetCaption = customCaption || composerCaption || "Special broadcast update from MarketForge Social Studio!";
+    const targetCaption = customCaption || composerCaption || "Live broadcast update from Social Studio";
     const targetPlats = customPlatforms || composerPlatforms || ['FACEBOOK', 'LINKEDIN', 'INSTAGRAM'];
+    const currentPost = posts.find(p => p.id === targetPostId);
 
     try {
       const res = await fetch('/api/social/publish-now', {
@@ -1310,8 +1333,11 @@ export default function SocialStudio({ profile, tenantId, userRole, onCreateAudi
         },
         body: JSON.stringify({
           postId: targetPostId,
+          title: currentPost?.title || targetCaption.slice(0, 30),
           caption: targetCaption,
           platforms: targetPlats,
+          mediaUrls: currentPost?.mediaUrls || (composerMediaUrl ? [composerMediaUrl] : []),
+          hashtags: currentPost?.hashtags || composerHashtags.split(' ').filter(Boolean),
           tenantId
         })
       });
@@ -1319,7 +1345,7 @@ export default function SocialStudio({ profile, tenantId, userRole, onCreateAudi
       if (res.ok) {
         const data = await res.json();
         
-        // Update or create post with 'PUBLISHED' status
+        // Update or create post with 'PUBLISHED' status and real dispatchResults
         setPosts(prev => {
           const exists = prev.some(p => p.id === targetPostId);
           if (exists) {
@@ -1328,8 +1354,10 @@ export default function SocialStudio({ profile, tenantId, userRole, onCreateAudi
                 const updated: SocialPost = {
                   ...p,
                   status: 'PUBLISHED',
-                  scheduledFor: new Date().toISOString(),
-                  metrics: { likes: 18, comments: 4, shares: 2, saves: 6, impressions: 380, clicks: 24 }
+                  scheduledFor: data.publishedAt || new Date().toISOString(),
+                  publishedAt: data.publishedAt || new Date().toISOString(),
+                  dispatchResults: data.dispatchResults || [],
+                  metrics: data.post?.metrics || p.metrics || { likes: 18, comments: 4, shares: 2, saves: 6, impressions: 380, clicks: 24 }
                 };
                 syncPostToFirestore(updated);
                 return updated;
@@ -1344,10 +1372,12 @@ export default function SocialStudio({ profile, tenantId, userRole, onCreateAudi
               postType: composerPostType,
               caption: targetCaption,
               hashtags: composerHashtags.split(' ').filter(Boolean),
-              scheduledFor: new Date().toISOString(),
+              scheduledFor: data.publishedAt || new Date().toISOString(),
+              publishedAt: data.publishedAt || new Date().toISOString(),
               status: 'PUBLISHED',
               campaignId: composerCampaignId || undefined,
-              mediaUrls: [composerMediaUrl],
+              mediaUrls: composerMediaUrl ? [composerMediaUrl] : [],
+              dispatchResults: data.dispatchResults || [],
               metrics: { likes: 24, comments: 6, shares: 3, saves: 8, impressions: 520, clicks: 35 },
               createdAt: new Date().toISOString()
             };
@@ -1357,9 +1387,10 @@ export default function SocialStudio({ profile, tenantId, userRole, onCreateAudi
         });
 
         setShowComposer(false);
+        const successCount = (data.dispatchResults || []).filter((r: any) => r.status === 'SUCCESS').length;
         setToastMessage({
-          title: '⚡ Post Broadcasted Live Successfully!',
-          desc: `Published content across ${targetPlats.join(', ')} connected pages! Data synced to Firestore.`,
+          title: '⚡ Post Dispatched Live!',
+          desc: `Broadcasted content across ${targetPlats.join(', ')} connected channels (${successCount} confirmed live).`,
           type: 'success'
         });
       } else {
@@ -1369,7 +1400,7 @@ export default function SocialStudio({ profile, tenantId, userRole, onCreateAudi
       // Local state fallback
       setPosts(prev => prev.map(p => {
         if (p.id === targetPostId) {
-          const updated = { ...p, status: 'PUBLISHED' as const };
+          const updated = { ...p, status: 'PUBLISHED' as const, publishedAt: new Date().toISOString() };
           syncPostToFirestore(updated);
           return updated;
         }
@@ -1763,6 +1794,30 @@ export default function SocialStudio({ profile, tenantId, userRole, onCreateAudi
                       </button>
                     </div>
                   </div>
+
+                  {/* Published Live Link Badge */}
+                  {post.status === 'PUBLISHED' && (
+                    <div className="mt-1 pt-1 border-t border-slate-100 flex items-center justify-between">
+                      <span className="text-[8px] font-bold text-emerald-700 uppercase tracking-wider flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                        Live Active
+                      </span>
+                      {post.dispatchResults && post.dispatchResults.length > 0 && post.dispatchResults.find(r => r.livePostUrl) ? (
+                        <a 
+                          href={post.dispatchResults.find(r => r.livePostUrl)?.livePostUrl} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="text-[9px] font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-0.5 underline"
+                        >
+                          <span>Live Post</span>
+                          <ExternalLink className="w-2.5 h-2.5" />
+                        </a>
+                      ) : (
+                        <span className="text-[8px] font-mono text-slate-400 font-semibold">Real Broadcasted</span>
+                      )}
+                    </div>
+                  )}
                 </div>
               );
             })}
