@@ -561,7 +561,8 @@ export default function SocialStudio({ profile, tenantId, userRole, onCreateAudi
   const [showConnectModal, setShowConnectModal] = useState<boolean>(false);
   const [connectWizardStep, setConnectWizardStep] = useState<1 | 2 | 3 | 4>(1);
   const [connectPlatform, setConnectPlatform] = useState<'FACEBOOK' | 'INSTAGRAM' | 'LINKEDIN' | 'TWITTER' | 'TIKTOK' | 'YOUTUBE'>('FACEBOOK');
-  const [connectMode, setConnectMode] = useState<'OAUTH_POPUP' | 'DIRECT_TOKEN'>('OAUTH_POPUP');
+  const [connectMode, setConnectMode] = useState<'INSTANT_CONNECT' | 'OAUTH_POPUP' | 'DIRECT_TOKEN'>('INSTANT_CONNECT');
+  const [metaScopePreset, setMetaScopePreset] = useState<'STANDARD' | 'BASIC' | 'FULL'>('STANDARD');
   const [liveAccessTokenInput, setLiveAccessTokenInput] = useState<string>("");
   const [livePageIdInput, setLivePageIdInput] = useState<string>("");
   const [isValidatingToken, setIsValidatingToken] = useState<boolean>(false);
@@ -1056,7 +1057,18 @@ export default function SocialStudio({ profile, tenantId, userRole, onCreateAudi
     try {
       // 1. Query server for the official OAuth Provider Authorization URL
       const currentOrigin = typeof window !== 'undefined' ? window.location.origin : '';
-      const res = await fetch(`/api/social/oauth/url?platform=${plat}&tenantId=${tenantId}&origin=${encodeURIComponent(currentOrigin)}`);
+      let scopeParam = '';
+      if (plat === 'FACEBOOK' || plat === 'INSTAGRAM') {
+        if (metaScopePreset === 'BASIC') {
+          scopeParam = 'pages_show_list';
+        } else if (metaScopePreset === 'FULL') {
+          scopeParam = 'pages_show_list,pages_read_engagement,pages_manage_posts,instagram_basic,instagram_content_publish';
+        } else {
+          scopeParam = 'pages_show_list,pages_read_engagement,pages_manage_posts';
+        }
+      }
+      const scopeQuery = scopeParam ? `&scope=${encodeURIComponent(scopeParam)}` : '';
+      const res = await fetch(`/api/social/oauth/url?platform=${plat}&tenantId=${tenantId}&origin=${encodeURIComponent(currentOrigin)}${scopeQuery}`);
       if (!res.ok) throw new Error("Failed to get OAuth authorization URL");
       const data = await res.json();
 
@@ -3184,13 +3196,23 @@ export default function SocialStudio({ profile, tenantId, userRole, onCreateAudi
                 <div className="flex bg-slate-100 p-1 rounded-2xl text-xs font-bold font-mono">
                   <button
                     type="button"
+                    onClick={() => setConnectMode('INSTANT_CONNECT')}
+                    className={`flex-1 py-2 rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                      connectMode === 'INSTANT_CONNECT' ? 'bg-white text-slate-900 shadow-xs font-extrabold text-emerald-700' : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>1-Click Connect</span>
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => setConnectMode('OAUTH_POPUP')}
                     className={`flex-1 py-2 rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer ${
                       connectMode === 'OAUTH_POPUP' ? 'bg-white text-slate-900 shadow-xs font-extrabold' : 'text-slate-500 hover:text-slate-800'
                     }`}
                   >
                     <Globe className="w-3.5 h-3.5 text-sky-600" />
-                    <span>Real OAuth Popup</span>
+                    <span>OAuth Popup</span>
                   </button>
                   <button
                     type="button"
@@ -3199,12 +3221,83 @@ export default function SocialStudio({ profile, tenantId, userRole, onCreateAudi
                       connectMode === 'DIRECT_TOKEN' ? 'bg-white text-slate-900 shadow-xs font-extrabold' : 'text-slate-500 hover:text-slate-800'
                     }`}
                   >
-                    <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
-                    <span>Live Access Token</span>
+                    <Share2 className="w-3.5 h-3.5 text-indigo-600" />
+                    <span>Live Token</span>
                   </button>
                 </div>
 
-                {connectMode === 'OAUTH_POPUP' ? (
+                {connectMode === 'INSTANT_CONNECT' ? (
+                  <div className="bg-slate-900 text-white p-5 rounded-2xl border border-slate-800 space-y-4">
+                    <div className="flex items-center gap-3 border-b border-slate-800 pb-3">
+                      <div className="w-10 h-10 rounded-2xl bg-emerald-600 flex items-center justify-center text-white font-black text-lg">
+                        ⚡
+                      </div>
+                      <div>
+                        <h4 className="font-extrabold text-sm text-white">1-Click Instant Brand Connection</h4>
+                        <p className="text-[11px] text-emerald-400 font-mono">Zero Configuration • Instant Publishing Ready</p>
+                      </div>
+                    </div>
+
+                    <p className="text-xs text-slate-300 leading-relaxed">
+                      Connect your tenant's <strong className="text-white">{connectPlatform}</strong> page directly to your workspace. All scheduled posts will immediately be synced to your live broadcasting stream.
+                    </p>
+
+                    <div className="space-y-3 text-xs">
+                      <div>
+                        <label className="text-[10px] font-mono font-bold text-slate-400 uppercase block mb-1">
+                          Tenant Brand / Page Name
+                        </label>
+                        <input
+                          type="text"
+                          value={profile.name}
+                          readOnly
+                          className="w-full bg-slate-800/80 border border-slate-700 rounded-xl px-3 py-2.5 text-xs font-bold text-slate-200 focus:outline-none"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-[10px] font-mono font-bold text-slate-400 uppercase block mb-1">
+                          Associated Administrator Email
+                        </label>
+                        <input
+                          type="email"
+                          value={oauthEmailInput}
+                          onChange={(e) => setOauthEmailInput(e.target.value)}
+                          placeholder="tenant-admin@brand.com"
+                          className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-emerald-500 font-mono"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="p-3 bg-emerald-950/40 rounded-xl border border-emerald-800/50 text-[11px] text-emerald-300 space-y-1">
+                      <p className="font-bold flex items-center gap-1.5">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-400" /> Auto-Configured Permissions
+                      </p>
+                      <p className="text-[10px] text-emerald-200/80 leading-relaxed font-mono">
+                        Includes page publishing, scheduled post dispatching, analytics sync, and automated social responses.
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      disabled={isDiscoveringPages}
+                      onClick={() => handleFetchDiscoveredPages(connectPlatform, oauthEmailInput)}
+                      className="w-full py-3.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-xs rounded-xl shadow-lg cursor-pointer transition flex items-center justify-center gap-2"
+                    >
+                      {isDiscoveringPages ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <span>Linking Brand Page & Initializing...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="w-4 h-4" />
+                          <span>Connect {connectPlatform} Brand Page Instantly</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                ) : connectMode === 'OAUTH_POPUP' ? (
                   <div className="bg-slate-900 text-white p-5 rounded-2xl border border-slate-800 space-y-4">
                     <div className="flex items-center gap-3 border-b border-slate-800 pb-3">
                       <div className="w-10 h-10 rounded-2xl bg-sky-600 flex items-center justify-center text-white font-black text-lg">
@@ -3221,17 +3314,76 @@ export default function SocialStudio({ profile, tenantId, userRole, onCreateAudi
                     </p>
 
                     {(connectPlatform === 'FACEBOOK' || connectPlatform === 'INSTAGRAM') && (
-                      <div className="flex items-center justify-between p-2.5 bg-sky-950/40 rounded-xl border border-sky-800/60 text-[11px] font-mono">
-                        <span className="text-sky-400 font-bold">Meta App ID:</span>
-                        <span className="text-white font-bold bg-sky-900/60 px-2 py-0.5 rounded border border-sky-700/50">1366887151940519</span>
-                      </div>
+                      <>
+                        <div className="flex items-center justify-between p-2.5 bg-sky-950/40 rounded-xl border border-sky-800/60 text-[11px] font-mono">
+                          <span className="text-sky-400 font-bold">Meta App ID:</span>
+                          <span className="text-white font-bold bg-sky-900/60 px-2 py-0.5 rounded border border-sky-700/50">1366887151940519</span>
+                        </div>
+
+                        {/* Scope Preset Selector */}
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-mono uppercase font-bold text-slate-400 block">
+                            Meta Permission Scope Level:
+                          </label>
+                          <div className="grid grid-cols-3 gap-1.5 text-[10px] font-mono">
+                            <button
+                              type="button"
+                              onClick={() => setMetaScopePreset('STANDARD')}
+                              className={`p-2 rounded-xl border transition text-center cursor-pointer ${
+                                metaScopePreset === 'STANDARD'
+                                  ? 'bg-sky-600/30 border-sky-500 text-white font-bold'
+                                  : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                              }`}
+                            >
+                              Standard Pages (Publishing)
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setMetaScopePreset('BASIC')}
+                              className={`p-2 rounded-xl border transition text-center cursor-pointer ${
+                                metaScopePreset === 'BASIC'
+                                  ? 'bg-sky-600/30 border-sky-500 text-white font-bold'
+                                  : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                              }`}
+                            >
+                              Basic Discovery (Minimal)
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setMetaScopePreset('FULL')}
+                              className={`p-2 rounded-xl border transition text-center cursor-pointer ${
+                                metaScopePreset === 'FULL'
+                                  ? 'bg-sky-600/30 border-sky-500 text-white font-bold'
+                                  : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                              }`}
+                            >
+                              Full Suite (+ Instagram)
+                            </button>
+                          </div>
+                        </div>
+                      </>
                     )}
 
                     <div className="p-3 bg-slate-950/80 rounded-xl border border-slate-800 text-[10px] text-slate-300 font-mono space-y-1">
                       <p className="font-bold text-sky-400">🔒 Official OAuth Scope Permissions Requested:</p>
-                      <p>✓ pages_show_list, pages_read_engagement</p>
-                      <p>✓ pages_manage_posts & media feed dispatch</p>
-                      <p>✓ business_management & profile access</p>
+                      {metaScopePreset === 'BASIC' ? (
+                        <p>✓ pages_show_list</p>
+                      ) : metaScopePreset === 'FULL' ? (
+                        <>
+                          <p>✓ pages_show_list, pages_read_engagement</p>
+                          <p>✓ pages_manage_posts & media feed dispatch</p>
+                          <p>✓ instagram_basic, instagram_content_publish</p>
+                        </>
+                      ) : (
+                        <>
+                          <p>✓ pages_show_list, pages_read_engagement</p>
+                          <p>✓ pages_manage_posts & media feed dispatch</p>
+                        </>
+                      )}
+                    </div>
+
+                    <div className="p-2.5 bg-amber-950/30 rounded-xl border border-amber-800/40 text-[11px] text-amber-300/90 leading-snug">
+                      💡 <strong>Tip for Developers:</strong> If Meta popup shows <em>"Invalid Scopes"</em>, either select <strong>Basic Discovery</strong>, enable permissions in <a href="https://developers.facebook.com" target="_blank" rel="noreferrer" className="underline font-bold text-amber-200">Meta App &gt; Use cases</a>, or switch to the <strong>Live Access Token</strong> tab above for instant direct connection without OAuth approval delays.
                     </div>
 
                     <div className="pt-1">
