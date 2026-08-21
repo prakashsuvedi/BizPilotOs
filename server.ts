@@ -3782,6 +3782,62 @@ app.get("/api/tenant/details", async (req: express.Request, res: express.Respons
   }
 });
 
+// POST /api/tenant/update-currency (Persist tenant currency preference across all platforms and databases)
+app.post("/api/tenant/update-currency", async (req: express.Request, res: express.Response) => {
+  try {
+    const { tenantId, currency } = req.body;
+    if (!tenantId || !currency) {
+      return res.status(400).json({ error: "Missing tenantId or currency." });
+    }
+
+    const cleanCurrency = String(currency).toUpperCase().trim();
+
+    // 1. Update in-memory store
+    if (!serverMemoryStore.tenants) {
+      serverMemoryStore.tenants = {};
+    }
+    if (serverMemoryStore.tenants[tenantId]) {
+      serverMemoryStore.tenants[tenantId].currency = cleanCurrency;
+      serverMemoryStore.tenants[tenantId].settings = {
+        ...(serverMemoryStore.tenants[tenantId].settings || {}),
+        currencyCode: cleanCurrency
+      };
+    } else {
+      serverMemoryStore.tenants[tenantId] = {
+        id: tenantId,
+        currency: cleanCurrency,
+        settings: { currencyCode: cleanCurrency }
+      };
+    }
+
+    // 2. Persist to Firestore if available
+    const isReal = getIsRealAdminReady();
+    if (isReal) {
+      try {
+        const db = getAdminDb();
+        await db.collection("tenants").doc(tenantId).set({
+          currency: cleanCurrency,
+          settings: {
+            currencyCode: cleanCurrency
+          },
+          updatedAt: new Date().toISOString()
+        }, { merge: true });
+      } catch (dbErr: any) {
+        console.warn("[update-currency] Firestore write warning:", dbErr.message);
+      }
+    }
+
+    return res.json({
+      success: true,
+      tenantId,
+      currency: cleanCurrency,
+      message: `Tenant currency successfully set to ${cleanCurrency}`
+    });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 // --- TENANT & ADMIN AUTHENTICATION API ENDPOINTS ---
 
 const syncFirebaseAccountsToMemoryAndFirestore = async () => {
@@ -16914,6 +16970,117 @@ app.delete("/api/agent/ads/negative_keywords", requireAuth, async (req: AuthRequ
   }
 });
 
+// =========================================================================
+// TENANT CONFIGURATION: CURRENCY & BUSINESS ARCHETYPE PERSISTENCE
+// =========================================================================
+
+// GET /api/tenant/details
+app.get("/api/tenant/details", async (req: express.Request, res: express.Response) => {
+  try {
+    const tenantId = (req.query.tenantId as string) || (req.headers["x-simulated-tenant"] as string) || "demo-tenant";
+    let tenantData: any = null;
+
+    if (getIsRealAdminReady()) {
+      try {
+        const snap = await getAdminDb().collection("tenants").doc(tenantId).get();
+        if (snap.exists) {
+          tenantData = { id: snap.id, ...snap.data() };
+        }
+      } catch (e) {}
+    }
+
+    if (!tenantData && serverMemoryStore.tenants && serverMemoryStore.tenants[tenantId]) {
+      tenantData = serverMemoryStore.tenants[tenantId];
+    }
+
+    if (!tenantData) {
+      tenantData = {
+        id: tenantId,
+        name: tenantId === 'demo-tenant' ? 'MarketForge Enterprise' : tenantId,
+        businessType: 'tech_saas',
+        currency: 'NPR',
+        status: 'active'
+      };
+    }
+
+    return res.json({ success: true, tenant: tenantData });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/tenant/update-currency
+app.post("/api/tenant/update-currency", async (req: express.Request, res: express.Response) => {
+  try {
+    const { tenantId, currency } = req.body;
+    if (!currency) {
+      return res.status(400).json({ error: "Currency code is required." });
+    }
+
+    const tId = tenantId || "demo-tenant";
+    const curr = String(currency).toUpperCase();
+
+    if (!serverMemoryStore.tenants) serverMemoryStore.tenants = {};
+    if (!serverMemoryStore.tenants[tId]) {
+      serverMemoryStore.tenants[tId] = { id: tId, name: tId, currency: curr, updatedAt: new Date().toISOString() };
+    } else {
+      serverMemoryStore.tenants[tId].currency = curr;
+      if (!serverMemoryStore.tenants[tId].settings) serverMemoryStore.tenants[tId].settings = {};
+      serverMemoryStore.tenants[tId].settings.currencyCode = curr;
+      serverMemoryStore.tenants[tId].updatedAt = new Date().toISOString();
+    }
+
+    if (getIsRealAdminReady()) {
+      try {
+        await getAdminDb().collection("tenants").doc(tId).set({
+          currency: curr,
+          settings: { currencyCode: curr },
+          updatedAt: new Date().toISOString()
+        }, { merge: true });
+      } catch (e) {}
+    }
+
+    return res.json({ success: true, tenantId: tId, currency: curr, message: `Currency successfully saved as ${curr}` });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/tenant/update-business-type
+app.post("/api/tenant/update-business-type", async (req: express.Request, res: express.Response) => {
+  try {
+    const { tenantId, businessType } = req.body;
+    if (!businessType) {
+      return res.status(400).json({ error: "businessType is required." });
+    }
+
+    const tId = tenantId || "demo-tenant";
+
+    if (!serverMemoryStore.tenants) serverMemoryStore.tenants = {};
+    if (!serverMemoryStore.tenants[tId]) {
+      serverMemoryStore.tenants[tId] = { id: tId, name: tId, businessType, updatedAt: new Date().toISOString() };
+    } else {
+      serverMemoryStore.tenants[tId].businessType = businessType;
+      if (!serverMemoryStore.tenants[tId].settings) serverMemoryStore.tenants[tId].settings = {};
+      serverMemoryStore.tenants[tId].settings.businessType = businessType;
+      serverMemoryStore.tenants[tId].updatedAt = new Date().toISOString();
+    }
+
+    if (getIsRealAdminReady()) {
+      try {
+        await getAdminDb().collection("tenants").doc(tId).set({
+          businessType,
+          settings: { businessType },
+          updatedAt: new Date().toISOString()
+        }, { merge: true });
+      } catch (e) {}
+    }
+
+    return res.json({ success: true, tenantId: tId, businessType, message: `Business type successfully updated to ${businessType}` });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
 
 async function bootstrap() {
   // Load persisted platform email config from Firestore

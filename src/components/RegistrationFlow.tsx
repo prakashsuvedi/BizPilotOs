@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { clientAuth, clientDb } from '../lib/firebase';
-import { Building2, Mail, Lock, CheckCircle2, AlertTriangle, ArrowRight, RefreshCw, Terminal, UtensilsCrossed, Compass, Share2, Users, User, MessageSquare, Globe, Bot, Send, Megaphone, Check, CreditCard, ShieldCheck, Eye, EyeOff } from 'lucide-react';
+import { Building2, Mail, Lock, CheckCircle2, AlertTriangle, ArrowRight, RefreshCw, Terminal, UtensilsCrossed, Compass, Share2, Users, User, MessageSquare, Globe, Bot, Send, Megaphone, Check, CreditCard, ShieldCheck, Eye, EyeOff, Zap, Hotel, ShoppingBag, Briefcase } from 'lucide-react';
 import { OrchestrationEngine } from '../lib/orchestration';
 import PasswordStrengthView from './PasswordStrengthView';
 import { validatePasswordStrength } from '../lib/passwordValidation';
+import { useCurrency } from '../lib/CurrencyContext';
+import { saveTenantBranding } from '../lib/tenantBranding';
+import { generateBusinessDefaultBranding, BusinessType } from '../lib/businessTemplates';
 
 const MODULE_CATALOG = [
   { id: 'restaurant', name: 'Restaurant Management System', priceNpr: 500, category: 'base', icon: UtensilsCrossed, description: 'POS, Order Management, Kitchen Display & Menu Builder' },
@@ -19,6 +22,7 @@ const MODULE_CATALOG = [
 ];
 
 export default function RegistrationFlow({ onActivateTenant, onLogin }: { onActivateTenant: (tenant: any) => void, onLogin: (role: string, tenantId: string, email: string) => void }) {
+  const { currency, setCurrency, formatCurrency } = useCurrency();
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -28,9 +32,10 @@ export default function RegistrationFlow({ onActivateTenant, onLogin }: { onActi
   const [companyDomain, setCompanyDomain] = useState('');
   const [otp, setOtp] = useState('');
   const [otpSent, setOtpSent] = useState(false);
+  const [selectedCurrency, setSelectedCurrency] = useState<string>(currency || 'NPR');
 
   // Module & Pricing Selection State
-  const [baseIndustry, setBaseIndustry] = useState<'restaurant' | 'tours'>('restaurant');
+  const [baseIndustry, setBaseIndustry] = useState<string>('tech_saas');
   const [selectedAddons, setSelectedAddons] = useState<string[]>(['marketing', 'hr', 'website']);
   const [paymentGateway, setPaymentGateway] = useState<'stripe' | 'esewa' | 'khalti' | 'fonepay'>('stripe');
 
@@ -40,7 +45,7 @@ export default function RegistrationFlow({ onActivateTenant, onLogin }: { onActi
   const [success, setSuccess] = useState(false);
 
   // Compute total monthly subscription in NPR and converted USD (~133.5 NPR = 1 USD)
-  const totalNpr = (baseIndustry === 'restaurant' ? 500 : 500) + 
+  const totalNpr = 500 + 
     selectedAddons.reduce((sum, id) => {
       const item = MODULE_CATALOG.find(m => m.id === id);
       return sum + (item ? item.priceNpr : 0);
@@ -116,9 +121,10 @@ export default function RegistrationFlow({ onActivateTenant, onLogin }: { onActi
           ownerEmail: email,
           password: password,
           baseIndustry: baseIndustry,
+          businessType: baseIndustry === 'tours' ? 'tours_travel' : baseIndustry,
           selectedModules: allSelectedModules,
           paymentGateway: paymentGateway,
-          currency: paymentGateway === 'stripe' ? 'USD' : 'NPR'
+          currency: selectedCurrency
         })
       });
 
@@ -129,6 +135,27 @@ export default function RegistrationFlow({ onActivateTenant, onLogin }: { onActi
 
       const resData = await resp.json();
       const finalTenantSlug = resData.tenantSlug || resData.tenant?.id || generatedTenantId;
+
+      // 1. Immediately persist tenant currency globally & specifically
+      setCurrency(selectedCurrency, finalTenantSlug);
+
+      // 2. Initialize and save industry-specific branding template (Software SaaS, Hotel & Resort, etc.)
+      const bizTypeForBranding: BusinessType = 
+        baseIndustry === 'tech_saas' ? 'tech_saas' :
+        baseIndustry === 'hotel_resort' ? 'hotel_resort' :
+        baseIndustry === 'tours' ? 'tours_travel' :
+        baseIndustry === 'retail_commerce' ? 'retail_commerce' :
+        baseIndustry === 'agency_enterprise' ? 'agency_enterprise' : 'restaurant';
+
+      const initialBranding = generateBusinessDefaultBranding(
+        finalTenantSlug,
+        companyName,
+        bizTypeForBranding,
+        companyDomain,
+        email
+      );
+      saveTenantBranding(initialBranding);
+
       setLogs(prev => [...prev, `[PAYMENT] Initiating gateway session for ${paymentGateway.toUpperCase()}...`]);
 
       // Call payment API
@@ -292,6 +319,25 @@ export default function RegistrationFlow({ onActivateTenant, onLogin }: { onActi
           )}
 
           <div className="space-y-1.5">
+            <label className="text-[10px] uppercase font-mono font-bold text-slate-400 block">Workspace Operating Currency</label>
+            <select
+              value={selectedCurrency}
+              onChange={(e) => setSelectedCurrency(e.target.value)}
+              className="w-full bg-slate-900 border border-slate-700 text-white text-xs rounded-xl px-3 py-2.5 focus:outline-none font-bold"
+            >
+              <option value="NPR">NPR (Nepalese Rupee - रु)</option>
+              <option value="USD">USD (US Dollar - $)</option>
+              <option value="EUR">EUR (Euro - €)</option>
+              <option value="GBP">GBP (British Pound - £)</option>
+              <option value="INR">INR (Indian Rupee - ₹)</option>
+              <option value="AED">AED (UAE Dirham - د.إ)</option>
+              <option value="CAD">CAD (Canadian Dollar - CA$)</option>
+              <option value="AUD">AUD (Australian Dollar - AU$)</option>
+              <option value="JPY">JPY (Japanese Yen - ¥)</option>
+            </select>
+          </div>
+
+          <div className="space-y-1.5">
             <label className="text-[10px] uppercase font-mono font-bold text-slate-400 block">Verification Code (OTP)</label>
             <div className="flex gap-2">
               <input
@@ -333,39 +379,95 @@ export default function RegistrationFlow({ onActivateTenant, onLogin }: { onActi
         <div className="space-y-4 text-left">
           <div>
             <h3 className="text-sm font-bold text-white mb-1">Select Industry Base & Activated Modules</h3>
-            <p className="text-xs text-slate-400">Choose your base management system and add-on platforms. Activated modules will be immediately accessible in your workspace.</p>
+            <p className="text-xs text-slate-400">Choose your base business archetype. The landing page, showcase items, and core modules will automatically calibrate to your industry.</p>
           </div>
 
           {/* Base Industry System Selection */}
           <div className="space-y-2">
-            <label className="text-[10px] uppercase font-mono font-bold text-slate-400 block">1. Base Business System (NPR 500 / month)</label>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <label className="text-[10px] uppercase font-mono font-bold text-slate-400 block">1. Base Industry Archetype (NPR 500 / month)</label>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+              <div 
+                onClick={() => setBaseIndustry('tech_saas')}
+                className={`p-3 rounded-xl border cursor-pointer transition ${baseIndustry === 'tech_saas' ? 'bg-indigo-950/50 border-indigo-500 text-white shadow-md' : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:border-slate-700'}`}
+              >
+                <div className="flex items-center justify-between mb-1">
+                  <div className="flex items-center gap-2">
+                    <Zap className="w-4 h-4 text-indigo-400" />
+                    <span className="text-xs font-bold text-white">Software, Tech & SaaS</span>
+                  </div>
+                  <span className="text-[11px] font-mono font-bold text-emerald-400">NPR 500/mo</span>
+                </div>
+                <p className="text-[10.5px] text-slate-400 leading-snug">Cloud SaaS landing page, subscription tiers, API docs & automated workflows.</p>
+              </div>
+
+              <div 
+                onClick={() => setBaseIndustry('hotel_resort')}
+                className={`p-3 rounded-xl border cursor-pointer transition ${baseIndustry === 'hotel_resort' ? 'bg-indigo-950/50 border-indigo-500 text-white shadow-md' : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:border-slate-700'}`}
+              >
+                <div className="flex items-center justify-between mb-1">
+                  <div className="flex items-center gap-2">
+                    <Hotel className="w-4 h-4 text-indigo-400" />
+                    <span className="text-xs font-bold text-white">Hotel, Resort & Stays</span>
+                  </div>
+                  <span className="text-[11px] font-mono font-bold text-emerald-400">NPR 500/mo</span>
+                </div>
+                <p className="text-[10.5px] text-slate-400 leading-snug">Suites & villas showcase, room reservations, amenities & guest hospitality.</p>
+              </div>
+
               <div 
                 onClick={() => setBaseIndustry('restaurant')}
-                className={`p-3 rounded-xl border cursor-pointer transition ${baseIndustry === 'restaurant' ? 'bg-indigo-950/40 border-indigo-500 text-white' : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:border-slate-700'}`}
+                className={`p-3 rounded-xl border cursor-pointer transition ${baseIndustry === 'restaurant' ? 'bg-indigo-950/50 border-indigo-500 text-white shadow-md' : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:border-slate-700'}`}
               >
                 <div className="flex items-center justify-between mb-1">
                   <div className="flex items-center gap-2">
                     <UtensilsCrossed className="w-4 h-4 text-indigo-400" />
-                    <span className="text-xs font-bold text-white">Restaurant Management</span>
+                    <span className="text-xs font-bold text-white">Restaurant & Dining POS</span>
                   </div>
-                  <span className="text-xs font-mono font-bold text-emerald-400">NPR 500/mo</span>
+                  <span className="text-[11px] font-mono font-bold text-emerald-400">NPR 500/mo</span>
                 </div>
-                <p className="text-[11px] text-slate-400">POS, menu builder, order tracking & kitchen display system.</p>
+                <p className="text-[10.5px] text-slate-400 leading-snug">POS terminals, menu showcase, kitchen display & floor table manager.</p>
               </div>
 
               <div 
                 onClick={() => setBaseIndustry('tours')}
-                className={`p-3 rounded-xl border cursor-pointer transition ${baseIndustry === 'tours' ? 'bg-indigo-950/40 border-indigo-500 text-white' : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:border-slate-700'}`}
+                className={`p-3 rounded-xl border cursor-pointer transition ${baseIndustry === 'tours' ? 'bg-indigo-950/50 border-indigo-500 text-white shadow-md' : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:border-slate-700'}`}
               >
                 <div className="flex items-center justify-between mb-1">
                   <div className="flex items-center gap-2">
                     <Compass className="w-4 h-4 text-indigo-400" />
-                    <span className="text-xs font-bold text-white">Tours & Travels</span>
+                    <span className="text-xs font-bold text-white">Tours, Travels & Trips</span>
                   </div>
-                  <span className="text-xs font-mono font-bold text-emerald-400">NPR 500/mo</span>
+                  <span className="text-[11px] font-mono font-bold text-emerald-400">NPR 500/mo</span>
                 </div>
-                <p className="text-[11px] text-slate-400">Itinerary builder, booking manager & tour package operations.</p>
+                <p className="text-[10.5px] text-slate-400 leading-snug">Expedition packages, itinerary scheduling, booking operations & guide dispatch.</p>
+              </div>
+
+              <div 
+                onClick={() => setBaseIndustry('retail_commerce')}
+                className={`p-3 rounded-xl border cursor-pointer transition ${baseIndustry === 'retail_commerce' ? 'bg-indigo-950/50 border-indigo-500 text-white shadow-md' : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:border-slate-700'}`}
+              >
+                <div className="flex items-center justify-between mb-1">
+                  <div className="flex items-center gap-2">
+                    <ShoppingBag className="w-4 h-4 text-indigo-400" />
+                    <span className="text-xs font-bold text-white">Retail & E-Commerce</span>
+                  </div>
+                  <span className="text-[11px] font-mono font-bold text-emerald-400">NPR 500/mo</span>
+                </div>
+                <p className="text-[10.5px] text-slate-400 leading-snug">Digital storefront, catalog showcases, inventory tracking & payment cart.</p>
+              </div>
+
+              <div 
+                onClick={() => setBaseIndustry('agency_enterprise')}
+                className={`p-3 rounded-xl border cursor-pointer transition ${baseIndustry === 'agency_enterprise' ? 'bg-indigo-950/50 border-indigo-500 text-white shadow-md' : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:border-slate-700'}`}
+              >
+                <div className="flex items-center justify-between mb-1">
+                  <div className="flex items-center gap-2">
+                    <Briefcase className="w-4 h-4 text-indigo-400" />
+                    <span className="text-xs font-bold text-white">Agency & Professional</span>
+                  </div>
+                  <span className="text-[11px] font-mono font-bold text-emerald-400">NPR 500/mo</span>
+                </div>
+                <p className="text-[10.5px] text-slate-400 leading-snug">Corporate portfolio, strategic advisory proposals, client intake & contracts.</p>
               </div>
             </div>
           </div>

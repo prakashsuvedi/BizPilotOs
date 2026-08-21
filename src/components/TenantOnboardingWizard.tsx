@@ -28,6 +28,9 @@ import {
 import { TenantConfig, TenantInfrastructureSettings, TenantTeamMember } from '../types';
 import { createTenantBackupSnapshot } from '../lib/tenantBackupEngine';
 import { CURRENT_SYSTEM_SCHEMA_VERSION, validateTenantSchemaCompatibility } from '../lib/schemaMigrationManager';
+import { saveTenantBranding } from '../lib/tenantBranding';
+import { generateBusinessDefaultBranding, BusinessType } from '../lib/businessTemplates';
+import { useCurrency } from '../lib/CurrencyContext';
 
 interface Props {
   isOpen: boolean;
@@ -46,6 +49,7 @@ export default function TenantOnboardingWizard({
   initialDomain = '',
   initialOwnerEmail = ''
 }: Props) {
+  const { setCurrency } = useCurrency();
   if (!isOpen) return null;
 
   const [step, setStep] = useState<1 | 2 | 3 | 4 | 5>(1);
@@ -54,7 +58,8 @@ export default function TenantOnboardingWizard({
   const [tenantName, setTenantName] = useState(initialName || 'Everest Summit Bistro & Lounge');
   const [tenantDomain, setTenantDomain] = useState(initialDomain || 'everestbistro.marketforge.app');
   const [ownerEmail, setOwnerEmail] = useState(initialOwnerEmail || 'owner@everestbistro.com');
-  const [currencyCode, setCurrencyCode] = useState<'USD' | 'EUR' | 'GBP' | 'NPR' | 'INR' | 'AED'>('NPR');
+  const [currencyCode, setCurrencyCode] = useState<string>('NPR');
+  const [businessType, setBusinessType] = useState<BusinessType>('tech_saas');
   const [taxVatRate, setTaxVatRate] = useState<number>(13);
   const [serviceChargeRate, setServiceChargeRate] = useState<number>(10);
   const [vatRegNumber, setVatRegNumber] = useState('PAN-309485123');
@@ -62,7 +67,6 @@ export default function TenantOnboardingWizard({
   const [phone, setPhone] = useState('+977 61-532100');
 
   // Step 2: Infrastructure Configuration
-  const [businessType, setBusinessType] = useState<'restaurant' | 'hotel_resort' | 'tours_travel' | 'retail_commerce'>('restaurant');
   const [numberOfCashiers, setNumberOfCashiers] = useState<number>(3);
   const [cashierTerminals, setCashierTerminals] = useState<string[]>(['POS-01 Main Counter', 'POS-02 Terrace Bar', 'POS-03 VIP Room']);
   const [numberOfRooms, setNumberOfRooms] = useState<number>(18);
@@ -228,6 +232,19 @@ export default function TenantOnboardingWizard({
   const handleFinishOnboarding = async () => {
     const generatedTenantId = tenantDomain.split('.')[0].toLowerCase().replace(/[^a-z0-9]/g, '') + '-tenant';
 
+    // 1. Immediately persist tenant currency globally & specifically
+    setCurrency(currencyCode, generatedTenantId);
+
+    // 2. Initialize and save industry-specific branding template (Software SaaS, Hotel & Resort, etc.)
+    const initialBranding = generateBusinessDefaultBranding(
+      generatedTenantId,
+      tenantName,
+      businessType,
+      tenantDomain,
+      ownerEmail
+    );
+    saveTenantBranding(initialBranding);
+
     const settings: TenantInfrastructureSettings = {
       businessType,
       numberOfRooms,
@@ -250,6 +267,7 @@ export default function TenantOnboardingWizard({
       name: tenantName,
       domain: tenantDomain,
       ownerEmail,
+      currency: currencyCode,
       status: 'active',
       plan: 'Growth (1 Month Free Trial)',
       mrr: 0,
@@ -379,6 +397,26 @@ export default function TenantOnboardingWizard({
               </div>
 
               <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">Business Type & Industry Category</label>
+                <select
+                  value={businessType}
+                  onChange={(e: any) => setBusinessType(e.target.value as BusinessType)}
+                  className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:border-indigo-500"
+                >
+                  <option value="tech_saas">Software, Technology & SaaS Platform</option>
+                  <option value="hotel_resort">Hotel, Luxury Resort & Stays</option>
+                  <option value="restaurant">Restaurant, Cafe & Dining</option>
+                  <option value="tours_travel">Tours, Travels & Adventure Experiences</option>
+                  <option value="retail_commerce">Retail & E-Commerce Store</option>
+                  <option value="agency_enterprise">Corporate, Agency & Professional Services</option>
+                  <option value="healthcare_clinic">Healthcare & Medical Clinic</option>
+                  <option value="fitness_gym">Fitness, Gym & Sports Club</option>
+                  <option value="education_academy">Education, School & Online Academy</option>
+                  <option value="real_estate">Real Estate & Property Management</option>
+                </select>
+              </div>
+
+              <div>
                 <label className="text-xs font-bold text-slate-700 block mb-1">Primary Operating Currency</label>
                 <select
                   value={currencyCode}
@@ -391,6 +429,9 @@ export default function TenantOnboardingWizard({
                   <option value="GBP">GBP (British Pound - £)</option>
                   <option value="INR">INR (Indian Rupee - ₹)</option>
                   <option value="AED">AED (UAE Dirham - د.إ)</option>
+                  <option value="CAD">CAD (Canadian Dollar - CA$)</option>
+                  <option value="AUD">AUD (Australian Dollar - AU$)</option>
+                  <option value="JPY">JPY (Japanese Yen - ¥)</option>
                 </select>
               </div>
 

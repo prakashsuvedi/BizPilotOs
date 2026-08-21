@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Helmet } from 'react-helmet-async';
 import { MarketForgeLogo, MarketForgeEmblem } from './MarketForgeLogo';
 import { getTenantBranding, saveTenantBranding, TenantBranding } from '../lib/tenantBranding';
-import { BusinessType, BUSINESS_TEMPLATES } from '../lib/businessTemplates';
+import { BusinessType, BUSINESS_TEMPLATES, generateBusinessDefaultBranding } from '../lib/businessTemplates';
 import type { CompanyPageType } from './CompanyPagesModal';
 
 const CompanyPagesModal = React.lazy(() => import('./CompanyPagesModal'));
@@ -121,6 +121,46 @@ export function MarketForgeLanding({
       setAuthModalTab('login');
     }
   }, [initialAuthModalOpen]);
+
+  // Synchronize dynamic branding and businessType archetype based on tenant
+  useEffect(() => {
+    const localBrand = getTenantBranding(tenantId);
+    setBranding(localBrand);
+
+    if (tenantId && tenantId !== 'demo-tenant') {
+      fetch(`/api/tenant/details?tenantId=${encodeURIComponent(tenantId)}`)
+        .then(res => res.ok ? res.json() : null)
+        .then(data => {
+          if (data && data.tenant) {
+            const t = data.tenant;
+            const bizType: BusinessType = (t.businessType || t.settings?.businessType || localBrand.businessType || 'tech_saas') as BusinessType;
+            const companyName = t.name || localBrand.companyName || tenantId;
+            const domain = t.domain || localBrand.domain;
+            const email = t.ownerEmail || localBrand.contactEmail;
+            
+            const templateBranding = generateBusinessDefaultBranding(
+              tenantId,
+              companyName,
+              bizType,
+              domain,
+              email
+            );
+
+            const mergedBranding = {
+              ...templateBranding,
+              ...localBrand,
+              businessType: bizType,
+              companyName: companyName,
+              currency: t.currency || t.settings?.currencyCode || localBrand.currency
+            };
+
+            setBranding(mergedBranding);
+            saveTenantBranding(mergedBranding);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [tenantId]);
 
   const handleTenantLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
